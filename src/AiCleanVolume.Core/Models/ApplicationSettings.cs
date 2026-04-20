@@ -114,8 +114,8 @@ namespace AiCleanVolume.Core.Models
     {
         public ScanSettings()
         {
-            MinSizeMb = 128;
-            PerLevelLimit = 80;
+            MinSizeMb = -1;
+            PerLevelLimit = -1;
             SortMode = ScanSortMode.Allocated;
         }
 

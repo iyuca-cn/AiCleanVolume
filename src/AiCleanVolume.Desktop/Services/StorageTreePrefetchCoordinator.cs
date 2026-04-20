@@ -8,8 +8,8 @@ namespace AiCleanVolume.Desktop.Services
 {
     public sealed class StorageTreePrefetchCoordinator
     {
-        private const int MaxPrefetchDepth = 5;
-        private const int MaxDirectoriesPerLevel = 6;
+        private const int MaxPrefetchDepth = 2;
+        private const int MaxDirectoriesPerLevel = 3;
         private const int MaxCacheEntries = 256;
 
         private readonly IScanProvider scanProvider;
@@ -47,8 +47,6 @@ namespace AiCleanVolume.Desktop.Services
                 scheduled.Clear();
                 sessionTemplate = CloneTemplate(template);
                 logger = log;
-                EnqueueHotDirectories(root, 1);
-                EnsureWorker();
                 return generation;
             }
         }

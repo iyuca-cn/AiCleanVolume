@@ -86,23 +86,41 @@ namespace AiCleanVolume.Desktop.Services
 
         private StorageItem ScanPartial(ScanRequest request)
         {
-            try
+            ProcessStartInfo startInfo = CreateStartInfo(request);
+            using (Process process = Process.Start(startInfo))
             {
-                ScanSession session = EnsureTreeSession(request);
-                DirectoryNodeIndex entry;
-                string key = NormalizePathKey(request.Location);
-                if (!session.DirectoryIndex.TryGetValue(key, out entry))
+                StorageItem root = null;
+                Exception parseError = null;
+
+                try
                 {
-                    throw new InvalidOperationException("扫描缓存中未找到目标目录：" + request.Location);
+                    using (JsonTextReader reader = new JsonTextReader(process.StandardOutput))
+                    {
+                        if (!reader.Read() || reader.TokenType != JsonToken.StartObject)
+                        {
+                            throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
+                        }
+
+                        root = ParseFolder(reader, true, request.LoadDepth);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    parseError = ex;
                 }
 
-                return MaterializeDirectory(session, entry, request.LoadDepth, IsSamePath(session.RootPath, request.Location));
-            }
-            catch (CliExecutionException ex)
-            {
-                StorageItem fallback = TryScanWithPlatformApi(request, ex.CliError);
-                if (fallback != null) return fallback;
-                throw new InvalidOperationException("folder-size-ranker-cli 执行失败：" + ex.CliError, ex);
+                string error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                if (process.ExitCode != 0)
+                {
+                    StorageItem fallback = TryScanWithPlatformApi(request, error);
+                    if (fallback != null) return fallback;
+                    throw new InvalidOperationException("folder-size-ranker-cli 执行失败：" + error);
+                }
+
+                if (parseError != null) throw new InvalidOperationException("扫描结果解析失败：" + parseError.Message, parseError);
+                if (root == null) throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
+                return root;
             }
         }
 
@@ -906,6 +924,164 @@ namespace AiCleanVolume.Desktop.Services
             return item;
         }
 
+        private static StorageItem ParseFolder(JsonTextReader reader, bool isRoot, int remainingDepth)
+        {
+            StorageItem item = new StorageItem();
+            item.IsDirectory = true;
+
+            List<StorageItem> directFiles = remainingDepth > 0 ? new List<StorageItem>() : null;
+            List<StorageItem> childDirectories = remainingDepth > 0 ? new List<StorageItem>() : null;
+            int directFileCount = 0;
+            int totalFiles = 0;
+            int totalDirs = 0;
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonToken.PropertyName)
+                {
+                    string propertyName = reader.Value == null ? string.Empty : reader.Value.ToString();
+                    if (!reader.Read()) throw new InvalidOperationException("扫描结果不完整。");
+
+                    switch (propertyName)
+                    {
+                        case "path":
+                            item.Path = reader.Value == null ? string.Empty : reader.Value.ToString();
+                            item.Name = isRoot ? item.Path : StorageFormatting.GetDisplayName(item.Path, true);
+                            break;
+                        case "bytes":
+                            item.Bytes = ReadInt64(reader.Value);
+                            break;
+                        case "files":
+                            ParseFiles(reader, directFiles, ref directFileCount);
+                            break;
+                        case "children":
+                            if (remainingDepth > 0) ParseChildren(reader, remainingDepth, childDirectories, ref totalFiles, ref totalDirs);
+                            else ParseChildrenSummary(reader, ref totalDirs);
+                            break;
+                        default:
+                            reader.Skip();
+                            break;
+                    }
+                }
+                else if (reader.TokenType == JsonToken.EndObject)
+                {
+                    break;
+                }
+            }
+
+            item.DirectFileCount = directFileCount;
+            item.TotalFileCount = directFileCount + totalFiles;
+            item.TotalDirectoryCount = totalDirs;
+            item.HasChildren = item.DirectFileCount > 0 || item.TotalDirectoryCount > 0;
+            item.ChildrenLoaded = remainingDepth > 0;
+            if (string.IsNullOrEmpty(item.Name)) item.Name = isRoot ? item.Path : StorageFormatting.GetDisplayName(item.Path, true);
+
+            if (directFiles != null) AddAll(item.Children, directFiles);
+            if (childDirectories != null) AddAll(item.Children, childDirectories);
+            return item;
+        }
+
+        private static void ParseFiles(JsonTextReader reader, IList<StorageItem> target, ref int directFileCount)
+        {
+            if (reader.TokenType == JsonToken.Null) return;
+            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果文件数组格式错误。");
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonToken.EndArray) break;
+                if (reader.TokenType != JsonToken.StartObject)
+                {
+                    reader.Skip();
+                    continue;
+                }
+
+                StorageItem file = ParseFile(reader);
+                directFileCount++;
+                if (target != null) target.Add(file);
+            }
+        }
+
+        private static StorageItem ParseFile(JsonTextReader reader)
+        {
+            StorageItem item = new StorageItem();
+            item.IsDirectory = false;
+            item.HasChildren = false;
+            item.ChildrenLoaded = true;
+            item.DirectFileCount = 0;
+            item.TotalFileCount = 1;
+            item.TotalDirectoryCount = 0;
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonToken.PropertyName)
+                {
+                    string propertyName = reader.Value == null ? string.Empty : reader.Value.ToString();
+                    if (!reader.Read()) throw new InvalidOperationException("扫描结果不完整。");
+
+                    switch (propertyName)
+                    {
+                        case "path":
+                            item.Path = reader.Value == null ? string.Empty : reader.Value.ToString();
+                            item.Name = StorageFormatting.GetDisplayName(item.Path, false);
+                            break;
+                        case "bytes":
+                            item.Bytes = ReadInt64(reader.Value);
+                            break;
+                        default:
+                            reader.Skip();
+                            break;
+                    }
+                }
+                else if (reader.TokenType == JsonToken.EndObject)
+                {
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(item.Name)) item.Name = StorageFormatting.GetDisplayName(item.Path, false);
+            return item;
+        }
+
+        private static void ParseChildren(JsonTextReader reader, int remainingDepth, IList<StorageItem> target, ref int totalFiles, ref int totalDirs)
+        {
+            if (reader.TokenType == JsonToken.Null) return;
+            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果目录数组格式错误。");
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonToken.EndArray) break;
+                if (reader.TokenType != JsonToken.StartObject)
+                {
+                    reader.Skip();
+                    continue;
+                }
+
+                StorageItem child = ParseFolder(reader, false, remainingDepth > 0 ? remainingDepth - 1 : 0);
+                totalFiles += child.TotalFileCount;
+                totalDirs += 1 + child.TotalDirectoryCount;
+                if (target != null) target.Add(child);
+            }
+        }
+
+        private static void ParseChildrenSummary(JsonTextReader reader, ref int totalDirs)
+        {
+            if (reader.TokenType == JsonToken.Null) return;
+            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果目录数组格式错误。");
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonToken.EndArray) break;
+                if (reader.TokenType != JsonToken.StartObject)
+                {
+                    reader.Skip();
+                    continue;
+                }
+
+                totalDirs++;
+                reader.Skip();
+            }
+        }
+
         private static FileInfo[] SafeGetFiles(DirectoryInfo directory)
         {
             try { return directory.GetFiles(); }
@@ -930,9 +1106,20 @@ namespace AiCleanVolume.Desktop.Services
             catch { return true; }
         }
 
+        private static long ReadInt64(object value)
+        {
+            if (value == null) return 0;
+            return Convert.ToInt64(value);
+        }
+
         private static int CompareByBytesDescending(StorageItem left, StorageItem right)
         {
             return right.Bytes.CompareTo(left.Bytes);
+        }
+
+        private static void AddAll(IList<StorageItem> target, IList<StorageItem> source)
+        {
+            for (int i = 0; i < source.Count; i++) target.Add(source[i]);
         }
 
         private static void AddLimited(IList<StorageItem> target, IList<StorageItem> source, int limit)

@@ -89,9 +89,15 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Input allowRootsInput;
         private AntdUI.Input logInput;
 
-        private Label rootValueLabel;
-        private Label scanValueLabel;
-        private Label suggestionValueLabel;
+        private Label selectedDriveValueLabel;
+        private Label totalSpaceValueLabel;
+        private Label usedSpaceValueLabel;
+        private Label availableSpaceValueLabel;
+        private Label reservedSpaceValueLabel;
+        private Label scanStatusLabel;
+        private Panel scanProgressTrack;
+        private Panel scanProgressFill;
+        private float scanProgressValue;
 
         private readonly string defaultDescription = "选择磁盘或目录，扫描空间占用，生成可确认的安全清理建议";
         private FormWindowState lastWindowState;
@@ -165,13 +171,12 @@ namespace AiCleanVolume.Desktop
             analyzeButton = CreateHeaderButton("AI 识别", AntdUI.TTypeMini.Success);
             analyzeButton.Click += delegate { AnalyzeSuggestions(); };
 
-            scanButton = CreateHeaderButton("重新扫描", AntdUI.TTypeMini.Primary);
+            scanButton = CreateToolbarActionButton("扫描", AntdUI.TTypeMini.Primary);
             scanButton.Click += delegate { ScanCurrentLocation(); };
 
             titleBar.Controls.Add(saveSettingsButton);
             titleBar.Controls.Add(deleteButton);
             titleBar.Controls.Add(analyzeButton);
-            titleBar.Controls.Add(scanButton);
 
             Panel shell = new Panel();
             shell.Dock = DockStyle.Fill;
@@ -351,7 +356,7 @@ namespace AiCleanVolume.Desktop
             Panel toolbarHost = new Panel();
             toolbarHost.Dock = DockStyle.Top;
             toolbarHost.BackColor = PageBackground;
-            toolbarHost.Height = 156;
+            toolbarHost.Height = 188;
             toolbarHost.Padding = new Padding(0, 0, 0, 12);
 
             AntdUI.Panel toolbarCard = CreateCardPanel(16);
@@ -362,20 +367,56 @@ namespace AiCleanVolume.Desktop
             TableLayoutPanel toolbarLayout = new TableLayoutPanel();
             toolbarLayout.Dock = DockStyle.Fill;
             toolbarLayout.BackColor = Color.Transparent;
-            toolbarLayout.ColumnCount = 10;
-            toolbarLayout.RowCount = 2;
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 64F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 132F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 64F));
+            toolbarLayout.ColumnCount = 3;
+            toolbarLayout.RowCount = 3;
             toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 72F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 132F));
+            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 1F));
+            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 336F));
+            toolbarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             toolbarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             toolbarLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            Control filtersPanel = CreateScanFiltersPanel();
+            Panel divider = new Panel();
+            divider.Dock = DockStyle.Fill;
+            divider.BackColor = BorderLightColor;
+            divider.Margin = new Padding(18, 4, 18, 8);
+
+            Control summaryPanel = CreateDriveSummaryPanel();
+            Control statusPanel = CreateScanStatusPanel();
+
+            toolbarLayout.Controls.Add(filtersPanel, 0, 0);
+            toolbarLayout.SetRowSpan(filtersPanel, 2);
+            toolbarLayout.Controls.Add(divider, 1, 0);
+            toolbarLayout.SetRowSpan(divider, 3);
+            toolbarLayout.Controls.Add(summaryPanel, 2, 0);
+            toolbarLayout.SetRowSpan(summaryPanel, 3);
+            toolbarLayout.Controls.Add(statusPanel, 0, 2);
+
+            toolbarCard.Controls.Add(toolbarLayout);
+            toolbarHost.Controls.Add(toolbarCard);
+            return toolbarHost;
+        }
+
+        private Control CreateScanFiltersPanel()
+        {
+            TableLayoutPanel host = new TableLayoutPanel();
+            host.Dock = DockStyle.Fill;
+            host.BackColor = Color.Transparent;
+            host.RowCount = 2;
+            host.ColumnCount = 1;
+            host.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            host.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+
+            TableLayoutPanel topRow = new TableLayoutPanel();
+            topRow.Dock = DockStyle.Fill;
+            topRow.BackColor = Color.Transparent;
+            topRow.ColumnCount = 5;
+            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 216F));
+            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
+            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
             driveSelect = new AntdUI.Select();
             driveSelect.Dock = DockStyle.Fill;
@@ -384,43 +425,133 @@ namespace AiCleanVolume.Desktop
             driveSelect.Font = Font;
             driveSelect.SelectedValueChanged += DriveSelect_SelectedValueChanged;
 
-            pathInput = CreateInput("输入盘符或目录，例如 C:\\");
-            minSizeInput = CreateInput("128，负数=不限");
-            limitInput = CreateInput("80，负数=不限");
+            scanButton.Dock = DockStyle.Fill;
+            scanButton.Margin = new Padding(10, 0, 0, 0);
+
+            pathInput = CreateInput("C:\\ 或目录路径");
+            pathInput.TextChanged += PathInput_TextChanged;
+
+            topRow.Controls.Add(CreateToolbarCaption("选择:"), 0, 0);
+            topRow.Controls.Add(driveSelect, 1, 0);
+            topRow.Controls.Add(scanButton, 2, 0);
+            topRow.Controls.Add(CreateToolbarCaption("位置:"), 3, 0);
+            topRow.Controls.Add(pathInput, 4, 0);
+
+            TableLayoutPanel bottomRow = new TableLayoutPanel();
+            bottomRow.Dock = DockStyle.Fill;
+            bottomRow.BackColor = Color.Transparent;
+            bottomRow.ColumnCount = 7;
+            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));
+            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));
+            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
+            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
+            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            minSizeInput = CreateInput("-1 表示不限");
+            limitInput = CreateInput("-1 表示不限");
 
             sortSelect = new AntdUI.Select();
             sortSelect.Dock = DockStyle.Fill;
             sortSelect.DropDownArrow = true;
             sortSelect.ListAutoWidth = true;
             sortSelect.Font = Font;
-            sortSelect.Items.Add(new AntdUI.SelectItem("分配大小", ScanSortMode.Allocated));
-            sortSelect.Items.Add(new AntdUI.SelectItem("逻辑大小", ScanSortMode.Logical));
+            string[] sortOptionTexts = { "分配大小", "逻辑大小" };
+            sortSelect.Items.Add(new AntdUI.SelectItem(sortOptionTexts[0], ScanSortMode.Allocated));
+            sortSelect.Items.Add(new AntdUI.SelectItem(sortOptionTexts[1], ScanSortMode.Logical));
+            int sortSelectWidth = MeasureSelectWidth(sortSelect.Font, sortOptionTexts);
+            bottomRow.ColumnStyles[5].Width = sortSelectWidth;
+            sortSelect.Width = sortSelectWidth;
 
-            toolbarLayout.Controls.Add(CreateCaption("盘符"), 0, 0);
-            toolbarLayout.Controls.Add(driveSelect, 1, 0);
-            toolbarLayout.Controls.Add(CreateCaption("位置"), 2, 0);
-            toolbarLayout.Controls.Add(pathInput, 3, 0);
-            toolbarLayout.Controls.Add(CreateCaption("最小 MB"), 4, 0);
-            toolbarLayout.Controls.Add(minSizeInput, 5, 0);
-            toolbarLayout.Controls.Add(CreateCaption("每层限制"), 6, 0);
-            toolbarLayout.Controls.Add(limitInput, 7, 0);
-            toolbarLayout.Controls.Add(CreateCaption("排序"), 8, 0);
-            toolbarLayout.Controls.Add(sortSelect, 9, 0);
+            bottomRow.Controls.Add(CreateToolbarCaption("最小:"), 0, 0);
+            bottomRow.Controls.Add(minSizeInput, 1, 0);
+            bottomRow.Controls.Add(CreateToolbarCaption("限制:"), 2, 0);
+            bottomRow.Controls.Add(limitInput, 3, 0);
+            bottomRow.Controls.Add(CreateToolbarCaption("排序:"), 4, 0);
+            bottomRow.Controls.Add(sortSelect, 5, 0);
 
-            Control rootCard = CreateInfoCard("当前根路径", out rootValueLabel);
-            Control scanCard = CreateInfoCard("最近扫描", out scanValueLabel);
-            Control suggestionCard = CreateInfoCard("建议数量", out suggestionValueLabel);
+            host.Controls.Add(topRow, 0, 0);
+            host.Controls.Add(bottomRow, 0, 1);
+            return host;
+        }
 
-            toolbarLayout.Controls.Add(rootCard, 0, 1);
-            toolbarLayout.SetColumnSpan(rootCard, 4);
-            toolbarLayout.Controls.Add(scanCard, 4, 1);
-            toolbarLayout.SetColumnSpan(scanCard, 3);
-            toolbarLayout.Controls.Add(suggestionCard, 7, 1);
-            toolbarLayout.SetColumnSpan(suggestionCard, 3);
+        private Control CreateDriveSummaryPanel()
+        {
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+            layout.ColumnCount = 4;
+            layout.RowCount = 4;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+            layout.Padding = new Padding(0, 2, 0, 0);
 
-            toolbarCard.Controls.Add(toolbarLayout);
-            toolbarHost.Controls.Add(toolbarCard);
-            return toolbarHost;
+            selectedDriveValueLabel = CreateSummaryValueLabel(true);
+            selectedDriveValueLabel.AutoEllipsis = true;
+            totalSpaceValueLabel = CreateSummaryValueLabel(true);
+            usedSpaceValueLabel = CreateSummaryValueLabel(true);
+            availableSpaceValueLabel = CreateSummaryValueLabel(true);
+            reservedSpaceValueLabel = CreateSummaryValueLabel(true);
+
+            layout.Controls.Add(CreateSummaryCaption("选择:"), 0, 0);
+            layout.Controls.Add(selectedDriveValueLabel, 1, 0);
+            layout.SetColumnSpan(selectedDriveValueLabel, 3);
+
+            layout.Controls.Add(CreateSummaryCaption("总空间:"), 0, 1);
+            layout.Controls.Add(totalSpaceValueLabel, 1, 1);
+            layout.Controls.Add(CreateSummaryCaption("预留:"), 2, 1);
+            layout.Controls.Add(reservedSpaceValueLabel, 3, 1);
+
+            layout.Controls.Add(CreateSummaryCaption("已用:"), 0, 2);
+            layout.Controls.Add(usedSpaceValueLabel, 1, 2);
+            layout.SetColumnSpan(usedSpaceValueLabel, 3);
+
+            layout.Controls.Add(CreateSummaryCaption("可用:"), 0, 3);
+            layout.Controls.Add(availableSpaceValueLabel, 1, 3);
+            layout.SetColumnSpan(availableSpaceValueLabel, 3);
+            return layout;
+        }
+
+        private Control CreateScanStatusPanel()
+        {
+            Panel panel = new Panel();
+            panel.Dock = DockStyle.Fill;
+            panel.BackColor = Color.Transparent;
+            panel.Padding = new Padding(0, 6, 0, 0);
+
+            scanStatusLabel = new Label();
+            scanStatusLabel.Dock = DockStyle.Top;
+            scanStatusLabel.Height = 20;
+            scanStatusLabel.Font = new Font("Microsoft YaHei UI", 9F);
+            scanStatusLabel.ForeColor = TextSecondaryColor;
+            scanStatusLabel.BackColor = Color.Transparent;
+            scanStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
+            scanStatusLabel.Text = "等待开始扫描";
+
+            scanProgressTrack = new Panel();
+            scanProgressTrack.Dock = DockStyle.Top;
+            scanProgressTrack.Height = 14;
+            scanProgressTrack.Padding = new Padding(1);
+            scanProgressTrack.BackColor = Color.FromArgb(232, 242, 225);
+            scanProgressTrack.Resize += ScanProgressTrack_Resize;
+
+            scanProgressFill = new Panel();
+            scanProgressFill.Dock = DockStyle.Left;
+            scanProgressFill.Width = 0;
+            scanProgressFill.BackColor = Color.FromArgb(82, 196, 26);
+
+            scanProgressTrack.Controls.Add(scanProgressFill);
+
+            panel.Controls.Add(scanProgressTrack);
+            panel.Controls.Add(scanStatusLabel);
+            return panel;
         }
 
         private Control CreateStoragePanel()
@@ -793,8 +924,8 @@ namespace AiCleanVolume.Desktop
             settings.Sandbox.UseRecycleBin = recycleSwitch.Checked;
             settings.Sandbox.FullyPrivilegedMode = privilegedSwitch.Checked;
             settings.Sandbox.AllowedRoots = ParseLines(allowRootsInput.Text);
-            settings.Scan.MinSizeMb = ParseInt(minSizeInput.Text, 128);
-            settings.Scan.PerLevelLimit = ParseInt(limitInput.Text, 80);
+            settings.Scan.MinSizeMb = ParseInt(minSizeInput.Text, -1);
+            settings.Scan.PerLevelLimit = ParseInt(limitInput.Text, -1);
             if (sortSelect.SelectedValue is ScanSortMode) settings.Scan.SortMode = (ScanSortMode)sortSelect.SelectedValue;
             settings.EnsureDefaults();
         }
@@ -813,13 +944,24 @@ namespace AiCleanVolume.Desktop
             defaultDrive = defaultDrive.TrimEnd('\\') + "\\";
             driveSelect.SelectedValue = defaultDrive;
             pathInput.Text = defaultDrive;
-            rootValueLabel.Text = defaultDrive;
+            UpdateDriveSummaryForLocation(defaultDrive);
         }
 
         private void DriveSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
             if (e.Value == null) return;
             pathInput.Text = e.Value.ToString();
+            UpdateDriveSummaryForLocation(pathInput.Text);
+        }
+
+        private void PathInput_TextChanged(object sender, EventArgs e)
+        {
+            string location = pathInput.Text;
+            if (string.IsNullOrWhiteSpace(location) && driveSelect != null && driveSelect.SelectedValue != null)
+            {
+                location = driveSelect.SelectedValue.ToString();
+            }
+            UpdateDriveSummaryForLocation(location);
         }
 
         private void ScanCurrentLocation()
@@ -827,23 +969,29 @@ namespace AiCleanVolume.Desktop
             SaveSettingsFromUi();
             ScanRequest request = BuildScanRequest(1);
             StorageItem result = null;
+            DateTime scanStartedAt = DateTime.UtcNow;
             ClearScanProviderCache();
             storageTreePrefetch.Invalidate();
             currentTreeVersion++;
+            UpdateScanProgressState("正在扫描空间占用...", 0.56F, true, AntdUI.TType.None);
 
             RunBackground("正在扫描空间占用…", delegate
             {
                 result = scanProvider.Scan(request);
             }, delegate
             {
+                TimeSpan elapsed = DateTime.UtcNow - scanStartedAt;
                 currentRoot = result;
                 currentTreeRequest = CreateScanRequest(result.Path, 1, request);
                 List<StorageEntryRow> rows = new List<StorageEntryRow> { new StorageEntryRow(result) };
                 storageTable.DataSource = rows;
                 storageTreePrefetch.BeginSession(result, currentTreeRequest, LogBackground);
-                rootValueLabel.Text = result.Path;
-                scanValueLabel.Text = DateTime.Now.ToString("HH:mm:ss");
+                UpdateDriveSummaryForLocation(result.Path);
+                UpdateScanProgressState("扫描完成 " + elapsed.TotalSeconds.ToString("0.00") + " 秒", 1F, false, AntdUI.TType.Success);
                 Log("扫描完成：" + result.Path + "，大小 " + StorageFormatting.FormatBytes(result.Bytes));
+            }, delegate
+            {
+                UpdateScanProgressState("扫描失败", 1F, false, AntdUI.TType.Error);
             });
         }
 
@@ -944,7 +1092,6 @@ namespace AiCleanVolume.Desktop
                 for (int i = 0; i < suggestions.Count; i++) suggestionRows.Add(new CleanupSuggestionRow(suggestions[i]));
             }
             suggestionTable.DataSource = suggestionRows;
-            suggestionValueLabel.Text = suggestionRows.Count + " 项";
         }
 
         private void StorageTable_ExpandChanged(object sender, AntdUI.TableExpandEventArgs e)
@@ -1036,8 +1183,8 @@ namespace AiCleanVolume.Desktop
             return new ScanRequest
             {
                 Location = location,
-                MinSizeBytes = ParseInt(minSizeInput.Text, 128) * 1024L * 1024L,
-                PerLevelLimit = ParseInt(limitInput.Text, 80),
+                MinSizeBytes = ParseMinSizeBytes(minSizeInput.Text, -1),
+                PerLevelLimit = ParseInt(limitInput.Text, -1),
                 SortMode = sortSelect.SelectedValue is ScanSortMode ? (ScanSortMode)sortSelect.SelectedValue : ScanSortMode.Allocated,
                 LoadDepth = loadDepth
             };
@@ -1184,6 +1331,11 @@ namespace AiCleanVolume.Desktop
 
         private void RunBackground(string caption, Action action, Action onSuccess)
         {
+            RunBackground(caption, action, onSuccess, null);
+        }
+
+        private void RunBackground(string caption, Action action, Action onSuccess, Action onError)
+        {
             SetBusy(true, caption);
             Exception error = null;
             ThreadPool.QueueUserWorkItem(delegate
@@ -1202,6 +1354,7 @@ namespace AiCleanVolume.Desktop
                     SetBusy(false, GetActivePageDescription());
                     if (error != null)
                     {
+                        if (onError != null) onError();
                         Log(caption + "失败：" + error.Message);
                         MessageBox.Show(this, error.Message, "操作失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
@@ -1219,6 +1372,11 @@ namespace AiCleanVolume.Desktop
             if (settingsNavButton != null) settingsNavButton.Enabled = !busy;
             if (sidebarResizeRail != null) sidebarResizeRail.Enabled = !busy;
             scanButton.Enabled = !busy;
+            if (driveSelect != null) driveSelect.Enabled = !busy;
+            if (pathInput != null) pathInput.Enabled = !busy;
+            if (minSizeInput != null) minSizeInput.Enabled = !busy;
+            if (limitInput != null) limitInput.Enabled = !busy;
+            if (sortSelect != null) sortSelect.Enabled = !busy;
             analyzeButton.Enabled = !busy;
             deleteButton.Enabled = !busy;
             saveSettingsButton.Enabled = !busy;
@@ -1247,6 +1405,179 @@ namespace AiCleanVolume.Desktop
             }
 
             Log(message);
+        }
+
+        private void UpdateDriveSummaryForLocation(string location)
+        {
+            if (selectedDriveValueLabel == null) return;
+
+            DriveInfo drive = TryResolveDriveInfo(location);
+            selectedDriveValueLabel.Text = BuildDriveDisplayText(drive, location);
+
+            if (drive == null)
+            {
+                SetDriveSummaryValue(totalSpaceValueLabel, "-");
+                SetDriveSummaryValue(usedSpaceValueLabel, "-");
+                SetDriveSummaryValue(availableSpaceValueLabel, "-");
+                SetDriveSummaryValue(reservedSpaceValueLabel, "-");
+                return;
+            }
+
+            try
+            {
+                if (!drive.IsReady)
+                {
+                    SetDriveSummaryValue(totalSpaceValueLabel, "-");
+                    SetDriveSummaryValue(usedSpaceValueLabel, "-");
+                    SetDriveSummaryValue(availableSpaceValueLabel, "-");
+                    SetDriveSummaryValue(reservedSpaceValueLabel, "-");
+                    return;
+                }
+
+                long totalBytes = drive.TotalSize;
+                long availableBytes = drive.AvailableFreeSpace;
+                long reservedBytes = Math.Max(0L, drive.TotalFreeSpace - availableBytes);
+                long usedBytes = Math.Max(0L, totalBytes - drive.TotalFreeSpace);
+
+                SetDriveSummaryValue(totalSpaceValueLabel, StorageFormatting.FormatBytes(totalBytes));
+                SetDriveSummaryValue(usedSpaceValueLabel, FormatBytesWithPercent(usedBytes, totalBytes));
+                SetDriveSummaryValue(availableSpaceValueLabel, FormatBytesWithPercent(availableBytes, totalBytes));
+                SetDriveSummaryValue(reservedSpaceValueLabel, StorageFormatting.FormatBytes(reservedBytes));
+            }
+            catch
+            {
+                SetDriveSummaryValue(totalSpaceValueLabel, "-");
+                SetDriveSummaryValue(usedSpaceValueLabel, "-");
+                SetDriveSummaryValue(availableSpaceValueLabel, "-");
+                SetDriveSummaryValue(reservedSpaceValueLabel, "-");
+            }
+        }
+
+        private void UpdateScanProgressState(string text, float value, bool loading, AntdUI.TType state)
+        {
+            if (scanStatusLabel != null) scanStatusLabel.Text = text;
+            if (value < 0F) value = 0F;
+            if (value > 1F) value = 1F;
+            scanProgressValue = value;
+
+            if (scanProgressTrack == null || scanProgressFill == null) return;
+
+            if (state == AntdUI.TType.Error)
+            {
+                scanProgressTrack.BackColor = Color.FromArgb(255, 232, 232);
+                scanProgressFill.BackColor = Color.FromArgb(255, 77, 79);
+            }
+            else if (loading)
+            {
+                scanProgressTrack.BackColor = Color.FromArgb(232, 243, 255);
+                scanProgressFill.BackColor = Color.FromArgb(22, 119, 255);
+            }
+            else
+            {
+                scanProgressTrack.BackColor = Color.FromArgb(232, 242, 225);
+                scanProgressFill.BackColor = Color.FromArgb(82, 196, 26);
+            }
+
+            RefreshScanProgressFill();
+        }
+
+        private void ScanProgressTrack_Resize(object sender, EventArgs e)
+        {
+            RefreshScanProgressFill();
+        }
+
+        private void RefreshScanProgressFill()
+        {
+            if (scanProgressTrack == null || scanProgressFill == null) return;
+            int innerWidth = Math.Max(0, scanProgressTrack.ClientSize.Width - scanProgressTrack.Padding.Horizontal);
+            int innerHeight = Math.Max(0, scanProgressTrack.ClientSize.Height - scanProgressTrack.Padding.Vertical);
+            int fillWidth = (int)Math.Round(innerWidth * scanProgressValue);
+            if (fillWidth < 0) fillWidth = 0;
+            if (fillWidth > innerWidth) fillWidth = innerWidth;
+            scanProgressFill.Width = fillWidth;
+            scanProgressFill.Height = innerHeight;
+        }
+
+        private static string FormatBytesWithPercent(long bytes, long totalBytes)
+        {
+            if (totalBytes <= 0) return StorageFormatting.FormatBytes(bytes);
+            double percent = (double)bytes / totalBytes * 100D;
+            return StorageFormatting.FormatBytes(bytes) + " (" + percent.ToString("0.0") + "%)";
+        }
+
+        private static void SetDriveSummaryValue(Label label, string text)
+        {
+            if (label != null) label.Text = text;
+        }
+
+        private static string BuildDriveDisplayText(DriveInfo drive, string location)
+        {
+            string root = drive != null ? drive.Name : TryGetDriveRoot(location);
+            if (string.IsNullOrWhiteSpace(root)) return "-";
+
+            string volumeLabel = "本地磁盘";
+            if (drive != null)
+            {
+                try
+                {
+                    if (drive.IsReady && !string.IsNullOrWhiteSpace(drive.VolumeLabel)) volumeLabel = drive.VolumeLabel;
+                }
+                catch
+                {
+                    volumeLabel = "本地磁盘";
+                }
+            }
+
+            return "[" + root.TrimEnd('\\') + "] " + volumeLabel;
+        }
+
+        private static DriveInfo TryResolveDriveInfo(string location)
+        {
+            string root = TryGetDriveRoot(location);
+            if (string.IsNullOrWhiteSpace(root)) return null;
+
+            DriveInfo[] drives;
+            try
+            {
+                drives = DriveInfo.GetDrives();
+            }
+            catch
+            {
+                return null;
+            }
+
+            for (int i = 0; i < drives.Length; i++)
+            {
+                if (string.Equals(drives[i].Name, root, StringComparison.OrdinalIgnoreCase)) return drives[i];
+            }
+            return null;
+        }
+
+        private static string TryGetDriveRoot(string location)
+        {
+            if (string.IsNullOrWhiteSpace(location)) return null;
+            string value = location.Trim();
+
+            try
+            {
+                string root = Path.GetPathRoot(value);
+                if (!string.IsNullOrWhiteSpace(root)) return root;
+            }
+            catch
+            {
+            }
+
+            if (value.Length >= 2 && value[1] == ':')
+            {
+                return char.ToUpperInvariant(value[0]) + ":\\"; 
+            }
+            return null;
+        }
+
+        private static long ParseMinSizeBytes(string text, int fallbackMb)
+        {
+            int sizeMb = ParseInt(text, fallbackMb);
+            return sizeMb < 0 ? -1L : sizeMb * 1024L * 1024L;
         }
 
         private void ClearScanProviderCache()
@@ -1313,6 +1644,53 @@ namespace AiCleanVolume.Desktop
         private static int MeasureTextWidth(string text, Font font)
         {
             return TextRenderer.MeasureText(text ?? string.Empty, font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
+        }
+
+        private static int MeasureSelectWidth(Font font, params string[] options)
+        {
+            int maxTextWidth = 0;
+            for (int i = 0; i < options.Length; i++)
+            {
+                maxTextWidth = Math.Max(maxTextWidth, MeasureTextWidth(options[i], font));
+            }
+
+            return maxTextWidth + 40;
+        }
+
+        private static Label CreateToolbarCaption(string text)
+        {
+            Label label = new Label();
+            label.Dock = DockStyle.Fill;
+            label.TextAlign = ContentAlignment.MiddleLeft;
+            label.Text = text;
+            label.Font = new Font("Microsoft YaHei UI", 9.5F);
+            label.ForeColor = TextSecondaryColor;
+            label.BackColor = Color.Transparent;
+            return label;
+        }
+
+        private static Label CreateSummaryCaption(string text)
+        {
+            Label label = new Label();
+            label.Dock = DockStyle.Fill;
+            label.TextAlign = ContentAlignment.MiddleLeft;
+            label.Text = text;
+            label.Font = new Font("Microsoft YaHei UI", 9F);
+            label.ForeColor = TextSecondaryColor;
+            label.BackColor = Color.Transparent;
+            return label;
+        }
+
+        private static Label CreateSummaryValueLabel(bool bold)
+        {
+            Label label = new Label();
+            label.Dock = DockStyle.Fill;
+            label.TextAlign = ContentAlignment.MiddleLeft;
+            label.Font = new Font("Microsoft YaHei UI", bold ? 10F : 9.5F, bold ? FontStyle.Bold : FontStyle.Regular);
+            label.ForeColor = TextPrimaryColor;
+            label.BackColor = Color.Transparent;
+            label.Text = "-";
+            return label;
         }
 
         private static int ParseInt(string text, int fallback)
@@ -1383,6 +1761,20 @@ namespace AiCleanVolume.Desktop
             button.Radius = 6;
             button.BorderWidth = 1F;
             button.Margin = new Padding(8, 12, 0, 12);
+            return button;
+        }
+
+        private static AntdUI.Button CreateToolbarActionButton(string text, AntdUI.TTypeMini type)
+        {
+            AntdUI.Button button = new AntdUI.Button();
+            button.AutoSizeMode = AntdUI.TAutoSize.None;
+            button.Text = text;
+            button.Type = type;
+            button.Width = 92;
+            button.Height = 36;
+            button.Radius = 6;
+            button.BorderWidth = 1F;
+            button.Margin = Padding.Empty;
             return button;
         }
 
