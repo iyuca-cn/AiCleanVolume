@@ -7,33 +7,26 @@ namespace AiCleanVolume.Desktop.ViewModels
     public sealed class StorageEntryRow : AntdUI.NotifyProperty
     {
         public StorageEntryRow(StorageItem item)
+            : this(item, 0)
         {
-            Children = new List<StorageEntryRow>();
+        }
+
+        public StorageEntryRow(StorageItem item, int depth)
+        {
+            Children = new List<object>();
             Item = item;
+            Depth = depth;
             RefreshFromItem();
         }
 
-        private StorageEntryRow(string placeholderText)
-        {
-            Children = new List<StorageEntryRow>();
-            IsPlaceholder = true;
-            name = placeholderText;
-            path = string.Empty;
-            size = string.Empty;
-            bytes = 0;
-            files = 0;
-            dirs = 0;
-            kind = string.Empty;
-        }
-
         public StorageItem Item { get; private set; }
-        public List<StorageEntryRow> Children { get; private set; }
-        public bool IsPlaceholder { get; private set; }
+        public List<object> Children { get; private set; }
         public bool IsLoadingChildren { get; set; }
+        public int Depth { get; private set; }
 
         public void RefreshFromItem()
         {
-            if (IsPlaceholder || Item == null) return;
+            if (Item == null) return;
 
             name = Item.Name;
             path = Item.Path;
@@ -43,14 +36,6 @@ namespace AiCleanVolume.Desktop.ViewModels
             dirs = Item.TotalDirectoryCount;
             kind = Item.IsDirectory ? "文件夹" : "文件";
             ReloadChildren();
-        }
-
-        public void ShowLoadingPlaceholder()
-        {
-            if (IsPlaceholder) return;
-            IsLoadingChildren = true;
-            Children.Clear();
-            Children.Add(new StorageEntryRow("正在加载..."));
         }
 
         public void ReloadChildren()
@@ -63,12 +48,12 @@ namespace AiCleanVolume.Desktop.ViewModels
             {
                 for (int i = 0; i < Item.Children.Count; i++)
                 {
-                    Children.Add(new StorageEntryRow(Item.Children[i]));
+                    Children.Add(new StorageEntryRow(Item.Children[i], Depth + 1));
                 }
                 return;
             }
 
-            if (Item.HasChildren) Children.Add(new StorageEntryRow("展开后加载"));
+            if (Item.HasChildren) Children.Add(ExpandMarker.Instance);
         }
 
         public string name { get; set; }
@@ -78,5 +63,14 @@ namespace AiCleanVolume.Desktop.ViewModels
         public int files { get; set; }
         public int dirs { get; set; }
         public string path { get; set; }
+
+        private sealed class ExpandMarker
+        {
+            private ExpandMarker()
+            {
+            }
+
+            public static readonly ExpandMarker Instance = new ExpandMarker();
+        }
     }
 }

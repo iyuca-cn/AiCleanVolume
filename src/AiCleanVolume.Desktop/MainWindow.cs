@@ -37,6 +37,7 @@ namespace AiCleanVolume.Desktop
 
         private readonly SettingsStore settingsStore;
         private readonly IScanProvider scanProvider;
+        private readonly StorageTreePrefetchCoordinator storageTreePrefetch;
         private readonly CandidatePlanner candidatePlanner;
         private readonly IAiCleanupAdvisor aiAdvisor;
         private readonly IDeletionSandbox deletionSandbox;
@@ -47,6 +48,7 @@ namespace AiCleanVolume.Desktop
         private ApplicationSettings settings;
         private StorageItem currentRoot;
         private ScanRequest currentTreeRequest;
+        private int currentTreeVersion;
         private List<CleanupSuggestionRow> suggestionRows;
 
         private AntdUI.PageHeader appBar;
@@ -107,6 +109,7 @@ namespace AiCleanVolume.Desktop
             deletionSandbox = new DeletionSandbox();
             privilegeService = new WindowsPrivilegeService();
             scanProvider = new FolderSizeRankerScanProvider();
+            storageTreePrefetch = new StorageTreePrefetchCoordinator(scanProvider);
             aiAdvisor = new OpenAiCompatibleAdvisor(new HeuristicCleanupAdvisor());
             deletionService = new RecycleBinDeletionService();
             explorerService = new ShellExplorerService();
@@ -824,6 +827,9 @@ namespace AiCleanVolume.Desktop
             SaveSettingsFromUi();
             ScanRequest request = BuildScanRequest(1);
             StorageItem result = null;
+            ClearScanProviderCache();
+            storageTreePrefetch.Invalidate();
+            currentTreeVersion++;
 
             RunBackground("正在扫描空间占用…", delegate
             {
@@ -834,6 +840,7 @@ namespace AiCleanVolume.Desktop
                 currentTreeRequest = CreateScanRequest(result.Path, 1, request);
                 List<StorageEntryRow> rows = new List<StorageEntryRow> { new StorageEntryRow(result) };
                 storageTable.DataSource = rows;
+                storageTreePrefetch.BeginSession(result, currentTreeRequest, LogBackground);
                 rootValueLabel.Text = result.Path;
                 scanValueLabel.Text = DateTime.Now.ToString("HH:mm:ss");
                 Log("扫描完成：" + result.Path + "，大小 " + StorageFormatting.FormatBytes(result.Bytes));
@@ -945,14 +952,26 @@ namespace AiCleanVolume.Desktop
             if (!e.Expand) return;
 
             StorageEntryRow row = e.Record as StorageEntryRow;
-            if (row == null || row.IsPlaceholder || row.Item == null) return;
-            if (!row.Item.IsDirectory || row.Item.ChildrenLoaded || !row.Item.HasChildren || row.IsLoadingChildren) return;
+            if (row == null || row.Item == null) return;
+            if (!row.Item.IsDirectory || row.Item.ChildrenLoaded || !row.Item.HasChildren) return;
             if (currentTreeRequest == null) return;
 
-            row.ShowLoadingPlaceholder();
-            storageTable.Refresh();
+            StorageItem cached;
+            if (storageTreePrefetch.TryGetCached(row.Item.Path, out cached))
+            {
+                ApplyScannedNode(row.Item, cached);
+                row.RefreshFromItem();
+                storageTreePrefetch.PredictFrom(row.Item, row.Depth);
+                storageTable.Refresh();
+                return;
+            }
+
+            if (row.IsLoadingChildren) return;
+
+            row.IsLoadingChildren = true;
 
             ScanRequest request = CreateScanRequest(row.Item.Path, 1, currentTreeRequest);
+            int treeVersion = currentTreeVersion;
             ThreadPool.QueueUserWorkItem(delegate
             {
                 StorageItem loaded = null;
@@ -969,7 +988,7 @@ namespace AiCleanVolume.Desktop
 
                 BeginInvoke((MethodInvoker)delegate
                 {
-                    if (IsDisposed) return;
+                    if (IsDisposed || treeVersion != currentTreeVersion) return;
 
                     if (error != null)
                     {
@@ -980,8 +999,10 @@ namespace AiCleanVolume.Desktop
                         return;
                     }
 
+                    storageTreePrefetch.Remember(loaded);
                     ApplyScannedNode(row.Item, loaded);
                     row.RefreshFromItem();
+                    storageTreePrefetch.PredictFrom(row.Item, row.Depth);
                     storageTable.Refresh();
                 });
             });
@@ -1036,7 +1057,7 @@ namespace AiCleanVolume.Desktop
         private void StorageTable_CellDoubleClick(object sender, AntdUI.TableClickEventArgs e)
         {
             StorageEntryRow row = e.Record as StorageEntryRow;
-            if (row == null || row.IsPlaceholder || row.Item == null) return;
+            if (row == null || row.Item == null) return;
             explorerService.OpenPath(row.path, !row.Item.IsDirectory);
         }
 
@@ -1210,6 +1231,28 @@ namespace AiCleanVolume.Desktop
             string line = "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + message;
             if (string.IsNullOrWhiteSpace(logInput.Text)) logInput.Text = line;
             else logInput.Text += Environment.NewLine + line;
+        }
+
+        private void LogBackground(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message) || IsDisposed) return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    if (!IsDisposed) Log(message);
+                });
+                return;
+            }
+
+            Log(message);
+        }
+
+        private void ClearScanProviderCache()
+        {
+            FolderSizeRankerScanProvider provider = scanProvider as FolderSizeRankerScanProvider;
+            if (provider != null) provider.ClearCache();
         }
 
         private static IList<string> ParseLines(string text)
