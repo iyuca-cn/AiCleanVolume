@@ -36,10 +36,40 @@ ScaffoldingReadMe.txt
 # NuGet Symbol Packages
 *.snupkg
 
+# Visual Studio / IDE state
+.vs/
+*.suo
+*.user
+*.userosscache
+*.rsuser
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+*.opendb
+*.aps
+ipch/
+
+# Rider / ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
 # Others
 ~$*
 *~
 CodeCoverage/
+TestResults/
+*.coverage
+*.coveragexml
+coverage/
+publish/
+AppPackages/
+BundleArtifacts/
+*.cache
+*.tmp
+*.temp
+*.tlog
+*.lastcodeanalysissucceeded
 
 # MSBuild Binary and Structured Log
 *.binlog
