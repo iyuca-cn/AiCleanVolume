@@ -1,0 +1,237 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+
+namespace AntdUI
+{
+    public interface Canvas : IDisposable
+    {
+        #region MeasureString
+
+        Size MeasureString(string? text, Font font);
+        Size MeasureString(string? text, Font font, int width);
+        [Obsolete("use FormatFlags")]
+        Size MeasureString(string? text, Font font, int width, StringFormat format);
+        Size MeasureString(string? text, Font font, int width, FormatFlags format = FormatFlags.Default);
+
+        #endregion
+
+        #region String
+
+        [Obsolete("use FormatFlags")]
+        void String(string? text, Font font, Color color, Rectangle rect, StringFormat format);
+        [Obsolete("use FormatFlags")]
+        void String(string? text, Font font, Brush brush, Rectangle rect, StringFormat format);
+        [Obsolete("use FormatFlags")]
+        void String(string? text, Font font, Color color, RectangleF rect, StringFormat format);
+        [Obsolete("use FormatFlags")]
+        void String(string? text, Font font, Brush brush, RectangleF rect, StringFormat format);
+
+        void String(string? text, Font font, Color color, Rectangle rect, FormatFlags format = FormatFlags.Default);
+        void String(string? text, Font font, Brush brush, Rectangle rect, FormatFlags format = FormatFlags.Default);
+        void String(string? text, Font font, Color color, RectangleF rect, FormatFlags format = FormatFlags.Default);
+        void String(string? text, Font font, Brush brush, RectangleF rect, FormatFlags format = FormatFlags.Default);
+
+        void String(string? text, Font font, Color color, int x, int y);
+        void String(string? text, Font font, Brush brush, int x, int y);
+        void String(string? text, Font font, Color color, float x, float y);
+        void String(string? text, Font font, Brush brush, float x, float y);
+        void String(string? text, Font font, Color color, Point point);
+        void String(string? text, Font font, Brush brush, Point point);
+        void String(string? text, Font font, Color color, PointF point);
+        void String(string? text, Font font, Brush brush, PointF point);
+
+        #endregion
+
+        #region MeasureText
+
+        Size MeasureText(string? text, Font font);
+        Size MeasureText(string? text, Font font, int width);
+        [Obsolete("use FormatFlags")]
+        Size MeasureText(string? text, Font font, int width, StringFormat format);
+        Size MeasureText(string? text, Font font, int width, FormatFlags format = FormatFlags.Default);
+        Region[] MeasureCharacterRanges(string? text, Font font, Rectangle rect, FormatFlags format = FormatFlags.Default);
+        Region[] MeasureCharacterRanges(string? text, Font font, Rectangle rect, StringFormat format);
+
+        #endregion
+
+        #region DrawText
+
+        [Obsolete("use FormatFlags")]
+        void DrawText(string? text, Font font, Color color, Rectangle rect, StringFormat format);
+        [Obsolete("use FormatFlags")]
+        void DrawText(string? text, Font font, Brush brush, Rectangle rect, StringFormat format);
+
+        void DrawText(string? text, Font font, Color color, Rectangle rect, FormatFlags format = FormatFlags.Default);
+        void DrawText(string? text, Font font, Brush brush, Rectangle rect, FormatFlags format = FormatFlags.Default);
+
+        #endregion
+
+        #region Image
+
+        bool Image(Image image, Rectangle destRect, int srcX, int srcY, int srcWidth, int srcHeight, GraphicsUnit srcUnit, ImageAttributes? imageAttr);
+
+        bool Image(Image image, float x, float y, float w, float h);
+        bool Image(Image image, int x, int y, int w, int h);
+        bool Image(Image image, int x, int y);
+        bool Icon(Icon icon, Rectangle rect);
+
+        bool Image(Image image, Rectangle rect);
+        bool Image(Image image, RectangleF rect);
+        bool Image(Image image, Rectangle destRect, Rectangle srcRect);
+        bool Image(Image image, RectangleF destRect, RectangleF srcRect);
+        bool Image(Image image, Rectangle destRect, Rectangle srcRect, GraphicsUnit srcUnit);
+        bool Image(Image image, RectangleF destRect, RectangleF srcRect, GraphicsUnit srcUnit);
+
+        #region 图片透明度
+
+        bool Image(Image bmp, Rectangle rect, float opacity);
+        bool Image(Image bmp, Rectangle destRect, Rectangle srcRect, float opacity);
+        bool Image(Image bmp, Rectangle destRect, Rectangle srcRect, float opacity, GraphicsUnit srcUnit);
+        bool Image(Image bmp, RectangleF destRect, RectangleF srcRect, float opacity);
+        bool Image(Image bmp, RectangleF destRect, RectangleF srcRect, float opacity, GraphicsUnit srcUnit);
+
+        #endregion
+
+        bool Image(RectangleF rect, Image image, TFit fit, float radius, bool round);
+        bool Image(RectangleF rect, Image image, TFit fit, float radius, TShape shape);
+        bool Image(RectangleF rect, Image image, TFit fit);
+
+        #endregion
+
+        #region Fill
+
+        void Fill(Brush brush, GraphicsPath path);
+        void Fill(Brush brush, Rectangle rect);
+        void Fill(Brush brush, RectangleF rect);
+        void Fill(Brush brush, int x, int y, int w, int h);
+        void Fill(Brush brush, float x, float y, float w, float h);
+
+        void Fill(Color brush, GraphicsPath path);
+        void Fill(Color brush, Rectangle rect);
+        void Fill(Color brush, RectangleF rect);
+        void Fill(Color brush, int x, int y, int w, int h);
+        void Fill(Color brush, float x, float y, float w, float h);
+
+        void FillEllipse(Brush brush, Rectangle rect);
+        void FillEllipse(Brush brush, RectangleF rect);
+        void FillEllipse(Color color, Rectangle rect);
+        void FillEllipse(Color color, RectangleF rect);
+
+        void FillPolygon(Brush brush, Point[] points);
+        void FillPolygon(Brush brush, PointF[] points);
+        void FillPolygon(Color color, Point[] points);
+        void FillPolygon(Color color, PointF[] points);
+
+        void FillPie(Brush brush, Rectangle rect, float startAngle, float sweepAngle);
+        void FillPie(Brush brush, RectangleF rect, float startAngle, float sweepAngle);
+        void FillPie(Brush brush, float x, float y, float w, float h, float startAngle, float sweepAngle);
+
+        void FillClosedCurve(Brush brush, params Point[] points);
+        void FillClosedCurve(Brush brush, params PointF[] points);
+        void FillClosedCurve(Brush brush, Point[] points, FillMode fillmode);
+        void FillClosedCurve(Brush brush, PointF[] points, FillMode fillmode);
+
+        #endregion
+
+        #region Draw
+
+        void Draw(Pen pen, GraphicsPath path);
+        void Draw(Pen pen, Rectangle rect);
+        void Draw(Pen pen, RectangleF rect);
+        void Draw(Color color, float width, GraphicsPath path);
+        void Draw(Brush brush, float width, GraphicsPath path);
+        void Draw(Color color, float width, Rectangle rect);
+        void Draw(Color color, float width, RectangleF rect);
+        void Draw(Color color, float width, DashStyle dashStyle, GraphicsPath path);
+        void Draw(Color color, float width, DashStyle dashStyle, Rectangle rect);
+        void Draw(Color color, float width, DashStyle dashStyle, RectangleF rect);
+
+        void DrawEllipse(Pen pen, Rectangle rect);
+        void DrawEllipse(Pen pen, RectangleF rect);
+        void DrawEllipse(Color color, float width, Rectangle rect);
+        void DrawEllipse(Color color, float width, RectangleF rect);
+
+        void DrawPolygon(Pen pen, Point[] points);
+        void DrawPolygon(Pen pen, PointF[] points);
+        void DrawPolygon(Color color, float width, Point[] points);
+        void DrawPolygon(Color color, float width, PointF[] points);
+
+        void DrawArc(Pen pen, Rectangle rect, float startAngle, float sweepAngle);
+        void DrawArc(Pen pen, RectangleF rect, float startAngle, float sweepAngle);
+
+        void DrawArc(Color color, float width, Rectangle rect, float startAngle, float sweepAngle);
+        void DrawArc(Color color, float width, RectangleF rect, float startAngle, float sweepAngle);
+
+        void DrawPie(Pen pen, Rectangle rect, float startAngle, float sweepAngle);
+        void DrawPie(Pen pen, RectangleF rect, float startAngle, float sweepAngle);
+
+        void DrawPie(Color color, float width, Rectangle rect, float startAngle, float sweepAngle);
+        void DrawPie(Color color, float width, RectangleF rect, float startAngle, float sweepAngle);
+
+        void DrawLine(Color color, float width, Point points, Point points2);
+        void DrawLine(Color color, float width, PointF points, PointF points2);
+        void DrawLine(Color color, float width, int x, int y, int x2, int y2);
+        void DrawLine(Color color, float width, float x, float y, float x2, float y2);
+
+        void DrawLine(Pen pen, Point points, Point points2);
+        void DrawLine(Pen pen, PointF points, PointF points2);
+        void DrawLine(Pen pen, int x, int y, int x2, int y2);
+        void DrawLine(Pen pen, float x, float y, float x2, float y2);
+
+        void DrawLines(Color color, float width, Point[] points);
+        void DrawLines(Color color, float width, PointF[] points);
+
+        void DrawLines(Pen pen, Point[] points);
+        void DrawLines(Pen pen, PointF[] points);
+
+        void DrawCurve(Pen pen, Point[] points);
+        void DrawCurve(Pen pen, PointF[] points);
+        void DrawCurve(Color color, float width, Point[] points);
+        void DrawCurve(Color color, float width, PointF[] points);
+
+        #endregion
+
+        #region Base
+
+        GraphicsState Save();
+        void Restore(GraphicsState state);
+        void SetClip(Rectangle rect);
+        void SetClip(RectangleF rect);
+        void SetClip(GraphicsPath path);
+        void SetClip(Rectangle rect, CombineMode combineMode);
+        void SetClip(RectangleF rect, CombineMode combineMode);
+        void SetClip(GraphicsPath path, CombineMode combineMode);
+        void SetClip(Region region, CombineMode combineMode);
+        void ResetClip();
+        void ResetTransform();
+        void TranslateTransform(float dx, float dy);
+        void TranslateTransform(float dx, float dy, MatrixOrder order);
+        void RotateTransform(float angle);
+        void RotateTransform(float angle, MatrixOrder order);
+        void ScaleTransform(float sx, float sy);
+        void ScaleTransform(float sx, float sy, MatrixOrder order);
+        float DpiX { get; }
+        float DpiY { get; }
+        Matrix Transform { get; set; }
+        Region Clip { get; set; }
+        RectangleF RegionBounds(Region region);
+        CompositingMode CompositingMode { get; set; }
+        SmoothingMode SmoothingMode { get; set; }
+
+        #endregion
+
+        #region DPI
+
+        float Dpi { get; }
+
+        #endregion
+    }
+}

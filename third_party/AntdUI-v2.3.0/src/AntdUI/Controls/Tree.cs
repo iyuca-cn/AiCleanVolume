@@ -1,0 +1,2659 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Design;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
+
+namespace AntdUI
+{
+    /// <summary>
+    /// Tree 树形控件
+    /// </summary>
+    /// <remarks>多层次的结构列表。</remarks>
+    [Description("Tree 树形控件")]
+    [ToolboxItem(true)]
+    [DefaultProperty("Items")]
+    [DefaultEvent("SelectChanged")]
+    public class Tree : IControl, IEventListener
+    {
+        #region 属性
+
+        /// <summary>
+        /// 悬停背景颜色
+        /// </summary>
+        [Description("悬停背景颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? BackHover { get; set; }
+
+        /// <summary>
+        /// 激活背景颜色
+        /// </summary>
+        [Description("激活背景颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? BackActive { get; set; }
+
+        Color? fore;
+        /// <summary>
+        /// 文字颜色
+        /// </summary>
+        [Description("文字颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public new Color? ForeColor
+        {
+            get => fore;
+            set
+            {
+                if (fore == value) return;
+                fore = value;
+                Invalidate();
+            }
+        }
+
+        /// <summary>
+        /// 激活字体颜色
+        /// </summary>
+        [Description("激活字体颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? ForeActive { get; set; }
+
+        float iconratio = 1F;
+        /// <summary>
+        /// 图标比例
+        /// </summary>
+        [Description("图标比例"), Category("外观"), DefaultValue(1F)]
+        public float IconRatio
+        {
+            get => iconratio;
+            set
+            {
+                if (iconratio == value) return;
+                iconratio = value;
+                ChangeList(true);
+            }
+        }
+
+        int radius = 6;
+        /// <summary>
+        /// 圆角
+        /// </summary>
+        [Description("圆角"), Category("外观"), DefaultValue(6)]
+        public int Radius
+        {
+            get => radius;
+            set
+            {
+                if (radius == value) return;
+                radius = value;
+                Invalidate();
+            }
+        }
+
+        int _gap = 8;
+        /// <summary>
+        /// 间距
+        /// </summary>
+        [Description("间距"), Category("外观"), DefaultValue(8)]
+        public int Gap
+        {
+            get => _gap;
+            set
+            {
+                if (_gap == value) return;
+                _gap = value;
+                ChangeList(true);
+            }
+        }
+
+        /// <summary>
+        /// 间距缩进
+        /// </summary>
+        [Description("间距缩进"), Category("外观"), DefaultValue(null)]
+        public int? GapIndent { get; set; }
+
+        bool round = false;
+        /// <summary>
+        /// 圆角样式
+        /// </summary>
+        [Description("圆角样式"), Category("外观"), DefaultValue(false)]
+        public bool Round
+        {
+            get => round;
+            set
+            {
+                if (round == value) return;
+                round = value;
+                Invalidate();
+            }
+        }
+
+        bool checkable = false;
+        /// <summary>
+        /// 节点前添加 Checkbox 复选框
+        /// </summary>
+        [Description("节点前添加 Checkbox 复选框"), Category("外观"), DefaultValue(false)]
+        public bool Checkable
+        {
+            get => checkable;
+            set
+            {
+                if (checkable == value) return;
+                checkable = value;
+                ChangeList(true);
+            }
+        }
+
+        /// <summary>
+        /// Checkable 状态下节点选择完全受控（父子节点选中状态不再关联）
+        /// </summary>
+        [Description("Checkable 状态下节点选择完全受控（父子节点选中状态不再关联）"), Category("行为"), DefaultValue(true)]
+        public bool CheckStrictly { get; set; } = true;
+
+        bool blockNode = false;
+        /// <summary>
+        /// 节点占据一行
+        /// </summary>
+        [Description("节点占据一行"), Category("外观"), DefaultValue(false)]
+        public bool BlockNode
+        {
+            get => blockNode;
+            set
+            {
+                if (blockNode == value) return;
+                blockNode = value;
+                ChangeList(true);
+            }
+        }
+
+        /// <summary>
+        /// 支持点选多个节点
+        /// </summary>
+        [Description("支持点选多个节点"), Category("行为"), DefaultValue(false)]
+        public bool Multiple { get; set; }
+
+        TreeItemCollection? items;
+        /// <summary>
+        /// 集合
+        /// </summary>
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)]
+        [Description("集合"), Category("数据")]
+        public TreeItemCollection Items
+        {
+            get
+            {
+                items ??= new TreeItemCollection(this);
+                return items;
+            }
+            set => items = value.BindData(this);
+        }
+
+        TreeItem? selectItem;
+        /// <summary>
+        /// 选择项
+        /// </summary>
+        [Browsable(false), Description("选择项"), Category("数据"), DefaultValue(null)]
+        public TreeItem? SelectItem
+        {
+            get => selectItem;
+            set
+            {
+                if (selectItem == value) return;
+                selectItem = value;
+                if (value == null) USelect(false);
+                else Select(value, false);
+            }
+        }
+
+        bool pauseLayout = false;
+        [Browsable(false), Description("暂停布局"), Category("行为"), DefaultValue(false)]
+        public bool PauseLayout
+        {
+            get => pauseLayout;
+            set
+            {
+                if (pauseLayout == value) return;
+                pauseLayout = value;
+                if (!value) ChangeList(true);
+                OnPropertyChanged(nameof(PauseLayout));
+            }
+        }
+
+        /// <summary>
+        /// 滚动条
+        /// </summary>
+        [Browsable(false)]
+        public ScrollBar ScrollBar;
+
+        bool empty = true;
+        [Description("是否显示空样式"), Category("外观"), DefaultValue(true)]
+        public bool Empty
+        {
+            get => empty;
+            set
+            {
+                if (empty == value) return;
+                empty = value;
+                Invalidate();
+                OnPropertyChanged(nameof(Empty));
+            }
+        }
+
+        string? emptyText;
+        [Description("数据为空显示文字"), Category("外观"), DefaultValue(null)]
+        [Localizable(true)]
+        public string? EmptyText
+        {
+            get => emptyText;
+            set
+            {
+                if (emptyText == value) return;
+                emptyText = value;
+                Invalidate();
+                OnPropertyChanged(nameof(EmptyText));
+            }
+        }
+
+        [Description("数据为空显示图片"), Category("外观"), DefaultValue(null)]
+        public Image? EmptyImage { get; set; }
+
+        #endregion
+
+        #region 事件
+
+        /// <summary>
+        /// Select 属性值更改时发生
+        /// </summary>
+        [Description("Select 属性值更改时发生"), Category("行为")]
+        public event TreeSelectEventHandler? SelectChanged;
+
+        /// <summary>
+        /// Expand 更改前发生
+        /// </summary>
+        [Description("Expand 更改前发生"), Category("行为")]
+        public event TreeExpandEventHandler? BeforeExpand;
+
+        /// <summary>
+        /// Expand 更改后发生
+        /// </summary>
+        [Description("Expand 更改后发生"), Category("行为")]
+        public event TreeCheckedEventHandler? AfterExpand;
+
+        /// <summary>
+        /// Checked 属性值更改时发生
+        /// </summary>
+        [Description("Checked 属性值更改时发生"), Category("行为")]
+        public event TreeCheckedEventHandler? CheckedChanged;
+
+        /// <summary>
+        /// 点击项事件
+        /// </summary>
+        [Description("点击项事件"), Category("行为")]
+        public event TreeSelectEventHandler? NodeMouseClick;
+
+        /// <summary>
+        /// 鼠标按下事件
+        /// </summary>
+        [Description("鼠标按下事件"), Category("行为")]
+        public event TreeSelectEventHandler? NodeMouseDown;
+
+        /// <summary>
+        /// 鼠标松开事件
+        /// </summary>
+        [Description("鼠标松开事件"), Category("行为")]
+        public event TreeSelectEventHandler? NodeMouseUp;
+
+        /// <summary>
+        /// 双击项事件
+        /// </summary>
+        [Description("双击项事件"), Category("行为")]
+        public event TreeSelectEventHandler? NodeMouseDoubleClick;
+
+        /// <summary>
+        /// 移动项事件
+        /// </summary>
+        [Description("移动项事件"), Category("行为")]
+        public event TreeHoverEventHandler? NodeMouseMove;
+
+        #region 重写
+
+        internal void OnSelectChanged(TreeItem item, TreeCType type, MouseEventArgs args) => OnSelectChanged(item, item.Rect("Text", ScrollBar.ValueX, ScrollBar.ValueY), type, args);
+        internal void OnNodeMouseClick(TreeItem item, TreeCType type, MouseEventArgs args) => OnNodeMouseClick(item, item.Rect("Text", ScrollBar.ValueX, ScrollBar.ValueY), type, args);
+        internal void OnNodeMouseDown(TreeItem item, TreeCType type, MouseEventArgs args) => OnNodeMouseDown(item, item.Rect("Text", ScrollBar.ValueX, ScrollBar.ValueY), type, args);
+        internal void OnNodeMouseUp(TreeItem item, TreeCType type, MouseEventArgs args) => OnNodeMouseUp(item, item.Rect("Text", ScrollBar.ValueX, ScrollBar.ValueY), type, args);
+        internal void OnNodeMouseDoubleClick(TreeItem item, TreeCType type, MouseEventArgs args) => OnNodeMouseDoubleClick(item, item.Rect("Text", ScrollBar.ValueX, ScrollBar.ValueY), type, args);
+        internal void OnNodeMouseMove(TreeItem item, bool hover) => OnNodeMouseMove(item, item.Rect("Text", ScrollBar.ValueX, ScrollBar.ValueY), hover);
+
+        protected virtual void OnSelectChanged(TreeItem item, Rectangle rect, TreeCType type, MouseEventArgs args) => SelectChanged?.Invoke(this, new TreeSelectEventArgs(item, rect, type, args));
+        protected virtual void OnNodeMouseClick(TreeItem item, Rectangle rect, TreeCType type, MouseEventArgs args) => NodeMouseClick?.Invoke(this, new TreeSelectEventArgs(item, rect, type, args));
+        protected virtual void OnNodeMouseDown(TreeItem item, Rectangle rect, TreeCType type, MouseEventArgs args) => NodeMouseDown?.Invoke(this, new TreeSelectEventArgs(item, rect, type, args));
+        protected virtual void OnNodeMouseUp(TreeItem item, Rectangle rect, TreeCType type, MouseEventArgs args) => NodeMouseUp?.Invoke(this, new TreeSelectEventArgs(item, rect, type, args));
+        protected virtual void OnNodeMouseDoubleClick(TreeItem item, Rectangle rect, TreeCType type, MouseEventArgs args) => NodeMouseDoubleClick?.Invoke(this, new TreeSelectEventArgs(item, rect, type, args));
+        protected virtual void OnNodeMouseMove(TreeItem item, Rectangle rect, bool hover) => NodeMouseMove?.Invoke(this, new TreeHoverEventArgs(item, rect, hover));
+        protected virtual void OnCheckedChanged(TreeItem item, bool value) => CheckedChanged?.Invoke(this, new TreeCheckedEventArgs(item, value));
+        protected virtual bool OnBeforeExpand(TreeItem item, bool value)
+        {
+            if (BeforeExpand == null) return true;
+            else
+            {
+                var arge = new TreeExpandEventArgs(item, value);
+                BeforeExpand(this, arge);
+                return arge.CanExpand;
+            }
+        }
+        protected virtual void OnAfterExpand(TreeItem item, bool value) => AfterExpand?.Invoke(this, new TreeCheckedEventArgs(item, value));
+        internal void OnICheckedChanged(TreeItem item, bool value) => OnCheckedChanged(item, value);
+        internal bool OnIBeforeExpand(TreeItem item, bool value) => OnBeforeExpand(item, value);
+        internal void OnIAfterExpand(TreeItem item, bool value) => OnAfterExpand(item, value);
+
+        #endregion
+
+        #endregion
+
+        #region 布局
+
+        protected override void OnSizeChanged(EventArgs e)
+        {
+            ChangeList();
+            base.OnSizeChanged(e);
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ChangeList();
+            this.AddListener();
+        }
+
+        public void HandleEvent(EventType id, object? tag)
+        {
+            switch (id)
+            {
+                case EventType.LANG:
+                    ChangeList();
+                    break;
+            }
+        }
+
+        bool CanLayout()
+        {
+            if (IsHandleCreated)
+            {
+                var rect = ClientRectangle;
+                if (pauseLayout || items == null || items.Count == 0 || rect.Width == 0 || rect.Height == 0) return false;
+                return true;
+            }
+            return false;
+        }
+        internal void ChangeList(bool print = false)
+        {
+            if (CanLayout())
+            {
+                var rect = ClientRectangle;
+                int x = 0, y = 0;
+                bool has = HasSub(items!);
+                this.GDI(g =>
+                {
+                    var size = g.MeasureString(Config.NullText, Font);
+                    int icon_size = (int)(size.Height * iconratio), depth_gap = GapIndent.HasValue ? (int)(GapIndent.Value * Dpi) : icon_size, gap = (int)(_gap * Dpi), gapI = gap / 2, height = icon_size + gap * 2;
+                    check_radius = icon_size * .2F;
+                    if (CheckStrictly && has && items![0].PARENT == null && items[0].ParentItem == null)
+                    {
+                        //新数据
+                        var dir = new List<TreeItem>();
+                        TestSub(ref dir, items);
+                        foreach (var item in dir)
+                        {
+                            if (item.items == null) item.CheckState = CheckState.Unchecked;
+                            else
+                            {
+                                int count = 0, check_count = 0;
+                                foreach (var sub in item.items)
+                                {
+                                    if (sub.Checkable)
+                                    {
+                                        count++;
+                                        if (sub.CheckState == CheckState.Checked || sub.CheckState == CheckState.Indeterminate) check_count++;
+                                    }
+                                }
+                                if (check_count > 0) item.CheckState = check_count == count ? CheckState.Checked : CheckState.Indeterminate;
+                                else item.CheckState = CheckState.Unchecked;
+                            }
+                        }
+                    }
+                    ChangeList(g, rect, null, items, has, ref x, ref y, height, depth_gap, icon_size, gap, gapI, 0, true);
+                });
+                ScrollBar.SetVrSize(x, y);
+                ScrollBar.SizeChange(rect);
+            }
+            if (print) Invalidate();
+        }
+
+        bool HasSub(TreeItemCollection items)
+        {
+            foreach (var it in items)
+            {
+                if (it.CanExpand) return true;
+            }
+            return false;
+        }
+        void TestSub(ref List<TreeItem> dir, TreeItemCollection? items)
+        {
+            if (items == null) return;
+            foreach (var it in items)
+            {
+                if (it.CanExpand)
+                {
+                    dir.Insert(0, it);
+                    TestSub(ref dir, it.items);
+                }
+            }
+        }
+
+        void ChangeList(Canvas g, Rectangle rect, TreeItem? Parent, TreeItemCollection? items, bool has_sub, ref int x, ref int y, int height, int depth_gap, int icon_size, int gap, int gapI, int depth, bool expand)
+        {
+            if (items == null) return;
+            int i = 0;
+            foreach (var it in items)
+            {
+                it.Index = i;
+                i++;
+                it.PARENT = this;
+                it.ParentItem = Parent;
+                if (it.Visible)
+                {
+                    it.SetRect(g, Font, depth, checkable, blockNode, has_sub, new Rectangle(0, y, rect.Width, height), depth_gap, icon_size, gap);
+                    if (expand)
+                    {
+                        if (it.subtxt_rect.Right > x) x = it.subtxt_rect.Right;
+                        else if (it.txt_rect.Right > x) x = it.txt_rect.Right;
+                    }
+                    y += it.txt_rect.Height + gapI;
+                    if (it.CanExpand)
+                    {
+                        if (it.ExpandThread && it.ExpandProg > 0)
+                        {
+                            if (it.ExpandHeightTMP.HasValue)
+                            {
+                                it.ExpandRHeight = (int)(it.ExpandHeightTMP.Value * it.ExpandProg);
+                                y += it.ExpandRHeight;
+                            }
+                            else
+                            {
+                                int y_item = y;
+                                ChangeList(g, rect, it, it.items, has_sub, ref x, ref y, height, depth_gap, icon_size, gap, gapI, depth + 1, expand && it.Expand);
+                                it.SubY = y_item - gapI / 2;
+                                it.SubHeight = y - y_item;
+                                it.ExpandHeightTMP = it.ExpandHeight = y - y_item;
+                                it.ExpandRHeight = (int)(it.ExpandHeight * it.ExpandProg);
+                                y = y_item + it.ExpandRHeight;
+                            }
+                        }
+                        else if (it.Expand)
+                        {
+                            int y_item = y;
+                            ChangeList(g, rect, it, it.items, has_sub, ref x, ref y, height, depth_gap, icon_size, gap, gapI, depth + 1, expand && it.Expand);
+                            it.SubY = y_item - gapI / 2;
+                            it.SubHeight = y - y_item;
+                            it.ExpandHeight = y - y_item;
+                            it.ExpandRHeight = it.ExpandHeight;
+                            y = y_item + it.ExpandRHeight;
+                        }
+                    }
+                    if (it.Loading && it.ThreadLoading == null) it.StartLoading(this);
+                }
+            }
+        }
+
+        #endregion
+
+        #region 渲染
+
+        float check_radius = 0F;
+        public Tree()
+        {
+            ScrollBar = new ScrollBar(this, true, true);
+        }
+
+        protected override void OnDraw(DrawEventArgs e)
+        {
+            if (items == null || items.Count == 0)
+            {
+                if (Empty) e.Canvas.PaintEmpty(e.Rect, Font, fore ?? Colour.Text.Get(nameof(Tree), "emptyFore", ColorScheme), EmptyText, EmptyImage, 0);
+                base.OnDraw(e);
+                return;
+            }
+            var g = e.Canvas;
+            int sx = ScrollBar.ValueX, sy = ScrollBar.ValueY;
+            g.TranslateTransform(-sx, -sy);
+            float _radius = radius * Dpi;
+            using (var brush_fore = new SolidBrush(fore ?? Colour.TextBase.Get(nameof(Tree), ColorScheme)))
+            using (var brush_fore_active = new SolidBrush(ForeActive ?? Colour.Primary.Get(nameof(Tree), ColorScheme)))
+            using (var brush_hover = new SolidBrush(BackHover ?? Colour.FillSecondary.Get(nameof(Tree), ColorScheme)))
+            using (var brush_active = new SolidBrush(BackActive ?? Colour.PrimaryBg.Get(nameof(Tree), ColorScheme)))
+            using (var brush_TextTertiary = new SolidBrush(Colour.TextTertiary.Get(nameof(Tree), "subFore", ColorScheme)))
+            {
+                PaintItem(g, e.Rect, -sx, -sy, sx, sy, items, brush_fore, brush_fore_active, brush_hover, brush_active, brush_TextTertiary, _radius);
+            }
+            g.ResetTransform();
+            ScrollBar.Paint(g, ColorScheme);
+            base.OnDraw(e);
+        }
+        void PaintItem(Canvas g, Rectangle rect, int tx, int ty, int sx, int sy, TreeItemCollection items, SolidBrush fore, SolidBrush fore_active, SolidBrush hover, SolidBrush active, SolidBrush brushTextTertiary, float radius)
+        {
+            foreach (var it in items)
+            {
+                it.show = it.Visible && rect.IsItemVisibleExpand(sx, sy, it.rect, it.Expand, it.SubHeight);
+                if (it.show)
+                {
+                    PaintItem(g, it, tx, ty, fore, fore_active, hover, active, brushTextTertiary, radius, sx, sy);
+                    if ((it.Expand || it.ExpandThread) && it.items != null && it.items.Count > 0)
+                    {
+                        if (it.ExpandThread)
+                        {
+                            if (it.ExpandTemp == null)
+                            {
+                                it.ExpandTemp = new Bitmap(rect.Width, it.ExpandHeight);
+                                using (var g2 = Graphics.FromImage(it.ExpandTemp).HighLay(Dpi, true))
+                                {
+                                    g2.TranslateTransform(tx, -it.rect.Bottom);
+                                    PaintItem(g2, rect, tx, -it.rect.Bottom, sx, sy, it.items, fore, fore_active, hover, active, brushTextTertiary, radius);
+                                }
+                            }
+                            g.Image(it.ExpandTemp, new Rectangle(rect.X, it.rect.Bottom, it.ExpandTemp.Width, it.ExpandRHeight), new Rectangle(0, 0, it.ExpandTemp.Width, it.ExpandRHeight), it.ExpandProg);
+                        }
+                        else PaintItem(g, rect, tx, ty, sx, sy, it.items, fore, fore_active, hover, active, brushTextTertiary, radius);
+                    }
+                }
+                else ShowFalse(it.items);
+            }
+        }
+
+        void ShowFalse(TreeItemCollection? items)
+        {
+            if (items == null) return;
+            foreach (var it in items)
+            {
+                it.show = false;
+                ShowFalse(it.items);
+            }
+        }
+
+        readonly FormatFlags s_c = FormatFlags.Center | FormatFlags.EllipsisCharacter, s_l = FormatFlags.Left | FormatFlags.VerticalCenter | FormatFlags.NoWrapEllipsis;
+        void PaintItem(Canvas g, TreeItem item, int tx, int ty, SolidBrush fore, SolidBrush fore_active, SolidBrush hover, SolidBrush active, SolidBrush brushTextTertiary, float radius, int sx, int sy)
+        {
+            if (item.Select)
+            {
+                PaintBack(g, active, item.rect, radius);
+                if (item.CanExpand) PaintArrow(g, item, tx, ty, fore_active, sx, sy);
+                PaintItemText(g, item, fore_active, brushTextTertiary);
+            }
+            else
+            {
+                if (item.Back.HasValue)
+                {
+                    using (var brush = new SolidBrush(item.Back.Value))
+                    {
+                        PaintBack(g, brush, item.rect, radius);
+                    }
+                }
+
+                if (item.AnimationHover)
+                {
+                    using (var brush = new SolidBrush(Helper.ToColorN(item.AnimationHoverValue, hover.Color)))
+                    {
+                        PaintBack(g, brush, item.rect, radius);
+                    }
+                }
+                else if (item.Hover) PaintBack(g, hover, item.rect, radius);
+                if (item.CanExpand) PaintArrow(g, item, tx, ty, fore, sx, sy);
+                if (item.Enabled) PaintItemText(g, item, fore, brushTextTertiary);
+                else
+                {
+                    using (var brush = new SolidBrush(Colour.TextQuaternary.Get(nameof(Tree), ColorScheme)))
+                    {
+                        PaintItemText(g, item, brush, brushTextTertiary);
+                    }
+                }
+            }
+            if (checkable && item.Checkable)
+            {
+                using (var path_check = Helper.RoundPath(item.check_rect, check_radius))
+                {
+                    var bor2 = 2F * Dpi;
+                    if (item.Enabled)
+                    {
+                        if (item.AnimationCheck)
+                        {
+                            var alpha = 255 * item.AnimationCheckValue;
+
+                            if (item.CheckState == CheckState.Indeterminate || (item.checkStateOld == CheckState.Indeterminate && !item.Checked))
+                            {
+                                g.Draw(Colour.BorderColor.Get(nameof(Tree), ColorScheme), bor2, path_check);
+                                g.Fill(Helper.ToColor(alpha, Colour.Primary.Get(nameof(Tree), ColorScheme)), Checkbox.PaintBlock(item.check_rect));
+                            }
+                            else
+                            {
+                                float dot = item.check_rect.Width * 0.3F;
+
+                                g.Fill(Helper.ToColor(alpha, Colour.Primary.Get(nameof(Tree), ColorScheme)), path_check);
+                                g.DrawLines(Helper.ToColor(alpha, Colour.BgBase.Get(nameof(Tree), ColorScheme)), 3F * Dpi, PaintArrow(item.check_rect));
+
+                                if (item.Checked)
+                                {
+                                    float max = item.check_rect.Height + item.check_rect.Height * item.AnimationCheckValue, alpha2 = 100 * (1F - item.AnimationCheckValue);
+                                    using (var brush = new SolidBrush(Helper.ToColor(alpha2, Colour.Primary.Get(nameof(Tree), ColorScheme))))
+                                    {
+                                        g.FillEllipse(brush, new RectangleF(item.check_rect.X + (item.check_rect.Width - max) / 2F, item.check_rect.Y + (item.check_rect.Height - max) / 2F, max, max));
+                                    }
+                                }
+                                g.Draw(Colour.Primary.Get(nameof(Tree), ColorScheme), 2F * Dpi, path_check);
+                            }
+                        }
+                        else if (item.CheckState == CheckState.Indeterminate)
+                        {
+                            g.Draw(Colour.BorderColor.Get(nameof(Tree), ColorScheme), bor2, path_check);
+                            g.Fill(Colour.Primary.Get(nameof(Tree), ColorScheme), Checkbox.PaintBlock(item.check_rect));
+                        }
+                        else if (item.Checked)
+                        {
+                            g.Fill(Colour.Primary.Get(nameof(Tree), ColorScheme), path_check);
+                            g.DrawLines(Colour.BgBase.Get(nameof(Tree), ColorScheme), bor2, PaintArrow(item.check_rect));
+                        }
+                        else g.Draw(Colour.BorderColor.Get(nameof(Tree), ColorScheme), bor2, path_check);
+                    }
+                    else
+                    {
+                        g.Fill(Colour.FillQuaternary.Get(nameof(Tree), "bgDisabled", ColorScheme), path_check);
+                        if (item.CheckState == CheckState.Indeterminate) g.Fill(Colour.TextQuaternary.Get(nameof(Tree), "foreDisabled", ColorScheme), Checkbox.PaintBlock(item.check_rect));
+                        else if (item.Checked) g.DrawLines(Colour.TextQuaternary.Get(nameof(Tree), "foreDisabled", ColorScheme), bor2, PaintArrow(item.check_rect));
+                        g.Draw(Colour.BorderColorDisable.Get(nameof(Tree), "borderColorDisabled", ColorScheme), bor2, path_check);
+                    }
+                }
+            }
+        }
+        void PaintItemText(Canvas g, TreeItem item, SolidBrush fore, SolidBrush brushTextTertiary)
+        {
+            Color color = fore.Color;
+            if (item.Fore.HasValue)
+            {
+                color = item.Fore.Value;
+                g.DrawText(item.Text, Font, color, item.txt_rect, s_c);
+            }
+            else g.DrawText(item.Text, Font, fore, item.txt_rect, s_c);
+            if (item.SubTitle != null)
+            {
+                if (item.ForeSub.HasValue) g.DrawText(item.SubTitle, Font, item.ForeSub.Value, item.subtxt_rect, s_l);
+                else g.DrawText(item.SubTitle, Font, brushTextTertiary, item.subtxt_rect, s_l);
+            }
+            if (item.Loading)
+            {
+                if (item.ico_rect.Height > 0)
+                {
+                    float loading_size = item.ico_rect.Height * .14F;
+                    var bor3 = 3F * Dpi;
+                    g.DrawEllipse(Colour.Fill.Get(nameof(Tree)), bor3, item.ico_rect);
+                    using (var pen = new Pen(color, loading_size))
+                    {
+                        pen.StartCap = pen.EndCap = LineCap.Round;
+                        g.DrawArc(pen, item.ico_rect, item.AnimationLoadingValue, 100);
+                    }
+                }
+            }
+            else
+            {
+                if (item.Icon != null) g.Image(item.Icon, item.ico_rect);
+                if (item.IconSvg != null) g.GetImgExtend(item.IconSvg, item.ico_rect, color);
+            }
+
+        }
+
+        internal PointF[] PaintArrow(RectangleF rect)
+        {
+            float size = rect.Height * 0.15F, size2 = rect.Height * 0.2F, size3 = rect.Height * 0.26F;
+            return new PointF[] {
+                new PointF(rect.X+size,rect.Y+rect.Height/2),
+                new PointF(rect.X+rect.Width*0.4F,rect.Y+(rect.Height-size3)),
+                new PointF(rect.X+rect.Width-size2,rect.Y+size2),
+            };
+        }
+
+        void PaintArrow(Canvas g, TreeItem item, int tx, int ty, SolidBrush color, int sx, int sy)
+        {
+            using (var pen = new Pen(color, 2F))
+            {
+                pen.StartCap = pen.EndCap = LineCap.Round;
+
+                if (item.ExpandThread) PaintArrow(g, item, tx, ty, pen, sx, sy, -90F + (90F * item.ExpandProg));
+                else if (item.Expand) g.DrawLines(pen, item.arrow_rect.TriangleLinesVertical(-1, .4F));
+                else PaintArrow(g, item, tx, ty, pen, sx, sy, -90F);
+            }
+        }
+
+        void PaintArrow(Canvas g, TreeItem item, int tx, int ty, Pen pen, int sx, int sy, float rotate)
+        {
+            int size_arrow = item.arrow_rect.Width / 2;
+            g.TranslateTransform(item.arrow_rect.X + size_arrow, item.arrow_rect.Y + size_arrow);
+            g.RotateTransform(rotate);
+            g.DrawLines(pen, new Rectangle(-size_arrow, -size_arrow, item.arrow_rect.Width, item.arrow_rect.Height).TriangleLinesVertical(-1, .4F));
+            g.ResetTransform();
+            g.TranslateTransform(tx, ty);
+        }
+
+        void PaintBack(Canvas g, SolidBrush brush, Rectangle rect, float radius)
+        {
+            if (round || radius > 0)
+            {
+                using (var path = rect.RoundPath(radius, round))
+                {
+                    g.Fill(brush, path);
+                }
+            }
+            else g.Fill(brush, rect);
+        }
+
+        #endregion
+
+        #region 鼠标
+
+        TreeItem? MDown;
+        bool doubleClick = false;
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            doubleClick = e.Clicks > 1;
+            MDown = null;
+            if (ScrollBar.MouseDownY(e.X, e.Y) && ScrollBar.MouseDownX(e.X, e.Y))
+            {
+                if (items == null || items.Count == 0) return;
+                OnTouchDown(e.X, e.Y);
+                foreach (var it in items)
+                {
+                    if (IMouseDown(e, it)) return;
+                }
+            }
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (ScrollBar.MouseUpY() && ScrollBar.MouseUpX() && OnTouchUp())
+            {
+                if (items == null || items.Count == 0 || MDown == null) return;
+                foreach (var it in items)
+                {
+                    if (IMouseUp(e, it, MDown)) return;
+                }
+            }
+        }
+        bool IMouseDown(MouseEventArgs e, TreeItem item)
+        {
+            try
+            {
+                var down = item.Contains(e.X, e.Y, ScrollBar.ValueX, ScrollBar.ValueY, checkable, blockNode);
+                if (down > 0)
+                {
+                    MDown = item;
+                    OnNodeMouseDown(item, down, e);
+                    return true;
+                }
+                if (item.CanExpand && item.Expand)
+                {
+                    foreach (var sub in item.items!)
+                    {
+                        if (IMouseDown(e, sub)) return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        bool _multiple = false;
+        TreeItem? shift_index;
+        bool IMouseUp(MouseEventArgs e, TreeItem item, TreeItem MDown)
+        {
+            try
+            {
+                bool can = item.CanExpand;
+                if (MDown == item)
+                {
+                    var down = item.Contains(e.X, e.Y, ScrollBar.ValueX, ScrollBar.ValueY, checkable, blockNode);
+                    if (down > 0)
+                    {
+                        if (e.Button == MouseButtons.Left)
+                        {
+                            if (down == TreeCType.Check && item.Enabled)
+                            {
+                                if (CheckStrictly)
+                                {
+                                    bool targetChecked = ShouldCheckTarget(item);
+                                    item.CheckState = SetCheck(item, targetChecked);
+                                    SetCheckStrictly(item.ParentItem);
+                                }
+                                else item.Checked = !item.Checked;
+                            }
+                            else if (down == TreeCType.Arrow && can) item.Expand = !item.Expand;
+                            else
+                            {
+                                if (doubleClick && can) item.Expand = !item.Expand;
+                                else
+                                {
+                                    selectItem = item;
+                                    if (Multiple && ModifierKeys.HasFlag(Keys.Shift))
+                                    {
+                                        _multiple = true;
+                                        if (shift_index == null) item.SetSelect();
+                                        else
+                                        {
+                                            if (item == shift_index) item.SetSelect();
+                                            else if (shift_index.rect.Y > item.rect.Y) SetSelects(items!, item, shift_index);
+                                            else SetSelects(items!, shift_index, item);
+                                        }
+                                    }
+                                    else if (Multiple && ModifierKeys.HasFlag(Keys.Control))
+                                    {
+                                        _multiple = true;
+                                        item.SetSelect();
+                                    }
+                                    else
+                                    {
+                                        if (_multiple)
+                                        {
+                                            _multiple = false;
+                                            if (item.Select) USelect(false);
+                                            item.Select = true;
+                                        }
+                                        else item.Select = true;
+                                    }
+                                    shift_index = item;
+                                    OnSelectChanged(item, down, e);
+                                    Invalidate();
+                                }
+                            }
+                        }
+                        OnNodeMouseUp(item, down, e);
+                        if (doubleClick) OnNodeMouseDoubleClick(item, down, e);
+                        else OnNodeMouseClick(item, down, e);
+                    }
+                    return true;
+                }
+                if (can && item.Expand)
+                {
+                    foreach (var sub in item.items!)
+                    {
+                        if (IMouseUp(e, sub, MDown)) return true;
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        bool SetSelects(TreeItemCollection items, TreeItem first, TreeItem last)
+        {
+            bool start = false;
+            return SetSelects(items, first, last, ref start);
+        }
+        bool SetSelects(TreeItemCollection items, TreeItem first, TreeItem last, ref bool start)
+        {
+            foreach (var it in items)
+            {
+                if (last == it)
+                {
+                    it.SetSelect();
+                    return true;
+                }
+                else if (first == it) start = true;
+                if (start) it.SetSelect();
+                if (it.items != null && it.items.Count > 0)
+                {
+                    if (SetSelects(it.items, first, last, ref start)) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 获取当前节点是否该被选中
+        /// </summary>
+        bool ShouldCheckTarget(TreeItem item)
+        {
+            if (item.items == null || item.items.Count == 0) return !item.Checked;
+            bool hasUncheckedItem = false;
+            foreach (var sub in item.items)
+            {
+                if (sub.items != null && sub.items.Count > 0) return ShouldCheckTarget(sub);
+                if (sub.Enabled)
+                {
+                    if (!sub.Checked)
+                    {
+                        hasUncheckedItem = true;
+                        return true;
+                    }
+                }
+            }
+            return hasUncheckedItem;
+        }
+
+        /// <summary>
+        /// 反选节点
+        /// </summary>
+        CheckState ReverseCheck(TreeItem item)
+        {
+            // 处理叶子节点
+            if (item.items == null || item.items.Count == 0)
+            {
+                item.Checked = !item.Checked;
+                return item.CheckState;
+            }
+            bool checkChanged = false;
+            CheckState? lastState = null;
+
+            // 处理子节点
+            foreach (var sub in item.items)
+            {
+                // 检查状态是否发生变化
+                if (lastState.HasValue)
+                {
+                    if (sub.CheckState != lastState.Value) checkChanged = true;
+                }
+                else lastState = sub.CheckState;
+
+                // 递归处理子节点
+                if (sub.items != null && sub.items.Count > 0)
+                {
+                    var oldState = sub.CheckState;
+                    sub.CheckState = ReverseCheck(sub);
+                    // 检查递归调用后状态是否改变
+                    if (sub.CheckState != oldState) checkChanged = true;
+                }
+                // 对于叶子节点，切换选中状态
+                else if (sub.Enabled)
+                {
+                    bool oldChecked = sub.Checked;
+                    sub.Checked = !sub.Checked;
+                    // 检查选中状态是否改变
+                    if (sub.Checked != oldChecked) checkChanged = true;
+                }
+            }
+            // 返回适当的检查状态
+            return checkChanged ? CheckState.Indeterminate : lastState ?? CheckState.Unchecked;
+        }
+
+        public CheckState SetCheck(TreeItem item, bool value)
+        {
+            bool hasDisabledNodes = false;
+            if (item.items != null && item.items.Count > 0)
+            {
+                bool disabledCheckChanged = false;
+                CheckState? lastDisabledState = null;
+                int itemCount = item.items.Count;
+                foreach (var it in item.items)
+                {
+                    if (it.Enabled)
+                    {
+                        // 启用节点：设置状态并递归
+                        var childResult = SetCheck(it, value);
+                        it.CheckState = childResult;
+                        if (childResult == CheckState.Indeterminate) hasDisabledNodes = true;
+                    }
+                    else
+                    {
+                        itemCount--;
+                        // 检查状态是否发生变化
+                        if (lastDisabledState.HasValue)
+                        {
+                            if (it.CheckState != lastDisabledState.Value) disabledCheckChanged = true;
+                        }
+                        else lastDisabledState = it.CheckState;
+
+                        // 当前为禁用节点，检查其当前状态是否与目标一致
+                        if ((value && !it.Checked) || (!value && it.Checked)) hasDisabledNodes = true;
+                    }
+                }
+                if (itemCount == 0 && lastDisabledState.HasValue) return disabledCheckChanged ? CheckState.Indeterminate : lastDisabledState.Value;
+            }
+            return hasDisabledNodes ? CheckState.Indeterminate : (value ? CheckState.Checked : CheckState.Unchecked);
+        }
+
+        public void SetCheckStrictly(TreeItem? item)
+        {
+            if (item == null) return;
+            if (item.items == null)
+            {
+                item.CheckState = CheckState.Unchecked;
+                SetCheckStrictly(item.ParentItem);
+                return;
+            }
+            int count = 0, check_all_count = 0, check_count = 0;
+            foreach (var sub in item.items)
+            {
+                if (sub.Checkable)
+                {
+                    count++;
+                    if (sub.CheckState == CheckState.Checked)
+                    {
+                        check_count++;
+                        check_all_count++;
+                    }
+                    else if (sub.CheckState == CheckState.Indeterminate) check_all_count++;
+                }
+            }
+            if (check_all_count > 0) item.CheckState = check_count == count ? CheckState.Checked : CheckState.Indeterminate;
+            else item.CheckState = CheckState.Unchecked;
+            SetCheckStrictly(item.ParentItem);
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            if (ScrollBar.MouseMoveY(e.X, e.Y) && ScrollBar.MouseMoveX(e.X, e.Y))
+            {
+                if (OnTouchMove(e.X, e.Y))
+                {
+                    if (items == null || items.Count == 0) return;
+                    try
+                    {
+                        int hand = 0;
+                        foreach (var it in items) IMouseMove(it, true, e.X, e.Y, ref hand);
+                        SetCursor(hand > 0);
+                    }
+                    catch { }
+                }
+            }
+            else ILeave();
+        }
+
+        void IMouseMove(TreeItem item, bool expend, int x, int y, ref int hand)
+        {
+            if (item.show)
+            {
+                if (expend && item.Contains(x, y, ScrollBar.ValueX, ScrollBar.ValueY, checkable, blockNode) > 0) hand++;
+                try
+                {
+                    if (item.items != null)
+                    {
+                        foreach (var sub in item.items.Safe) IMouseMove(sub, item.Expand, x, y, ref hand);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            ScrollBar.Leave();
+            ILeave();
+        }
+        protected override void OnLeave(EventArgs e)
+        {
+            base.OnLeave(e);
+            ScrollBar.Leave();
+            ILeave();
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            ScrollBar.MouseWheel(e);
+            base.OnMouseWheel(e);
+        }
+        protected override bool OnTouchScrollX(int value) => ScrollBar.MouseWheelXCore(value);
+        protected override bool OnTouchScrollY(int value) => ScrollBar.MouseWheelYCore(value);
+
+        void ILeave()
+        {
+            SetCursor(false);
+            if (items == null || items.Count == 0) return;
+            try
+            {
+                int count = 0;
+                foreach (var it in items)
+                {
+                    ILeave(it, ref count);
+                }
+                if (count > 0) Invalidate();
+            }
+            catch { }
+        }
+        void ILeave(TreeItem item, ref int count)
+        {
+            if (item.Hover) count++;
+            item.Hover = false;
+            if (item.items == null) return;
+            foreach (var sub in item.items) ILeave(sub, ref count);
+        }
+        void IUSelect(TreeItem item)
+        {
+            item.Select = false;
+            if (item.items == null) return;
+            foreach (var sub in item.items) IUSelect(sub);
+        }
+
+        #endregion
+
+        #region 键盘
+
+        protected override bool ProcessCmdKey(ref System.Windows.Forms.Message msg, Keys keyData)
+        {
+            var r = base.ProcessCmdKey(ref msg, keyData);
+            switch (keyData)
+            {
+                case Keys.Up:
+                    if (selectItem == null)
+                    {
+                        if (items != null)
+                        {
+                            Select(items[0]);
+                            return true;
+                        }
+                    }
+                    else if (FindUp(selectItem)) return true;
+                    break;
+                case Keys.Down:
+                    if (selectItem == null)
+                    {
+                        if (items != null)
+                        {
+                            Select(items[items.Count - 1]);
+                            return true;
+                        }
+                    }
+                    else if (FindDown(selectItem)) return true;
+                    break;
+                case Keys.Left:
+                    if (selectItem != null && FindLeft(selectItem)) return true;
+                    break;
+                case Keys.Right:
+                    if (selectItem != null && FindRight(selectItem)) return true;
+                    break;
+                case Keys.Enter:
+                    if (selectItem != null)
+                    {
+                        var item = selectItem;
+                        if (item.CanExpand) item.Expand = !item.Expand;
+                        else Select(item);
+                    }
+                    break;
+            }
+            return r;
+        }
+
+        bool FindUp(TreeItem item)
+        {
+            var p1 = item.ParentItem;
+            if (p1 == null)
+            {
+                int index = items!.IndexOf(item) - 1;
+                if (index >= 0)
+                {
+                    Select(items[index]);
+                    return true;
+                }
+            }
+            else
+            {
+                int index = p1.items!.IndexOf(item) - 1;
+                if (index >= 0) Select(FindUpExpand(p1.items[index]));
+                else Select(p1);
+                return true;
+            }
+            return false;
+        }
+        TreeItem FindUpExpand(TreeItem it)
+        {
+            if (it.CanExpand && it.Expand) return FindUpExpand(it.items![it.items.Count - 1]);
+            return it;
+        }
+        bool FindDown(TreeItem item, bool canex = true)
+        {
+            if (canex && item.CanExpand && item.Expand)
+            {
+                Select(item.items![0]);
+                return true;
+            }
+            var p1 = item.ParentItem;
+            if (p1 == null)
+            {
+                int index = items!.IndexOf(item) + 1;
+                if (index < items.Count)
+                {
+                    Select(items[index]);
+                    return true;
+                }
+            }
+            else
+            {
+                int index = p1.items!.IndexOf(item) + 1;
+                if (index < p1.items.Count)
+                {
+                    Select(p1.items[index]);
+                    return true;
+                }
+                else
+                {
+                    if (p1.ParentItem == null)
+                    {
+                        var sub = items!;
+                        int index2 = sub.Count + 1;
+                        if (index2 < sub.Count)
+                        {
+                            var r = FindDown(sub[sub.Count + 1]);
+                            if (r) return true;
+                        }
+                        else
+                        {
+                            var r = FindDown(p1, false);
+                            if (r) return true;
+                        }
+                    }
+                    else
+                    {
+                        var sub = p1.ParentItem.items!;
+                        int index2 = sub.Count + 1;
+                        if (index2 < sub.Count)
+                        {
+                            var r = FindDown(sub[index2]);
+                            if (r) return true;
+                        }
+                        else
+                        {
+                            var r = FindDown(p1, false);
+                            if (r) return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        bool FindLeft(TreeItem item)
+        {
+            if (item.CanExpand && item.Expand) item.Expand = false;
+            return true;
+        }
+        bool FindRight(TreeItem item)
+        {
+            if (item.CanExpand && !item.Expand) item.Expand = true;
+            return true;
+        }
+
+        #endregion
+
+        #region 方法
+
+        #region 选择指定项
+
+        /// <summary>
+        /// 选择指定项
+        /// </summary>
+        public bool Select(TreeItem item, bool focus = true) => Select(items, item, null, focus);
+
+        bool Select(TreeItemCollection? items, TreeItem item, List<TreeItem>? list, bool focus)
+        {
+            if (items == null || items.Count == 0) return false;
+            if (list == null)
+            {
+                foreach (var it in items)
+                {
+                    if (it == item)
+                    {
+                        Select(it, list, focus);
+                        return true;
+                    }
+                    if (it.Expand)
+                    {
+                        if (Select(it.items, item, null, focus)) return true;
+                    }
+                    else
+                    {
+                        if (Select(it.items, item, new List<TreeItem>() { it }, focus)) return true;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var it in items)
+                {
+                    if (it == item)
+                    {
+                        Select(it, list, focus);
+                        return true;
+                    }
+                    var list_nb = new List<TreeItem>(list);
+                    if (!it.Expand) list_nb.Add(it);
+                    if (Select(it.items, item, list_nb, focus)) return true;
+                }
+            }
+            return false;
+        }
+        void Select(TreeItem it, List<TreeItem>? list, bool focus)
+        {
+            int count = 0;
+            if (list != null)
+            {
+                foreach (var sub in list)
+                {
+                    if (sub.ISetExpand(true)) count++;
+                }
+            }
+            selectItem = it;
+            it.SetSelectNR(true);
+            if (count > 0) ChangeList(true);
+            else Invalidate();
+            OnSelectChanged(it, TreeCType.None, new MouseEventArgs(MouseButtons.None, 0, 0, 0, 0));
+            if (focus) Focus(it);
+        }
+
+        /// <summary>
+        /// 选择指定项（ID）
+        /// </summary>
+        public bool SelectID(string id, bool focus = true) => SelectID(items, id, null, focus);
+
+        bool SelectID(TreeItemCollection? items, string id, List<TreeItem>? list, bool focus)
+        {
+            if (items == null || items.Count == 0) return false;
+            if (list == null)
+            {
+                foreach (var it in items)
+                {
+                    if (it.ID == id)
+                    {
+                        Select(it, list, focus);
+                        return true;
+                    }
+                    if (it.Expand)
+                    {
+                        if (SelectID(it.items, id, null, focus)) return true;
+                    }
+                    else
+                    {
+                        if (SelectID(it.items, id, new List<TreeItem>() { it }, focus)) return true;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var it in items)
+                {
+                    if (it.ID == id)
+                    {
+                        Select(it, list, focus);
+                        return true;
+                    }
+                    var list_nb = new List<TreeItem>(list);
+                    if (!it.Expand) list_nb.Add(it);
+                    if (SelectID(it.items, id, list_nb, focus)) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 选择指定项（Name）
+        /// </summary>
+        public bool SelectName(string name, bool focus = true) => SelectName(items, name, null, focus);
+
+        bool SelectName(TreeItemCollection? items, string name, List<TreeItem>? list, bool focus)
+        {
+            if (items == null || items.Count == 0) return false;
+            if (list == null)
+            {
+                foreach (var it in items)
+                {
+                    if (it.Name == name)
+                    {
+                        Select(it, list, focus);
+                        return true;
+                    }
+                    if (it.Expand)
+                    {
+                        if (SelectName(it.items, name, null, focus)) return true;
+                    }
+                    else
+                    {
+                        if (SelectName(it.items, name, new List<TreeItem>() { it }, focus)) return true;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var it in items)
+                {
+                    if (it.Name == name)
+                    {
+                        Select(it, list, focus);
+                        return true;
+                    }
+                    var list_nb = new List<TreeItem>(list);
+                    if (!it.Expand) list_nb.Add(it);
+                    if (SelectName(it.items, name, list_nb, focus)) return true;
+                }
+            }
+            return false;
+        }
+
+        #endregion
+
+        /// <summary>
+        /// 设置全部 Visible
+        /// </summary>
+        public void VisibleAll(bool value = true) => VisibleAll(value, items);
+        public void VisibleAll(bool value, TreeItemCollection? items)
+        {
+            if (items == null) return;
+            foreach (var it in items)
+            {
+                it.Visible = value;
+                VisibleAll(value, it.items);
+            }
+        }
+
+        /// <summary>
+        /// 取消全部选择
+        /// </summary>
+        public void USelect(bool clear = true)
+        {
+            if (clear) selectItem = null;
+            if (items == null || items.Count == 0) return;
+            foreach (var it in items) IUSelect(it);
+        }
+
+        /// <summary>
+        /// 移除菜单
+        /// </summary>
+        /// <param name="item">项</param>
+        public void Remove(TreeItem item) => Remove(item, items);
+        void Remove(TreeItem item, TreeItemCollection? items)
+        {
+            if (items == null) return;
+            foreach (var it in items)
+            {
+                if (it == item)
+                {
+                    items.Remove(it);
+                    return;
+                }
+                Remove(item, it.items);
+            }
+        }
+
+        #region 集合操作
+
+        /// <summary>
+        /// 展开全部
+        /// </summary>
+        /// <param name="value">true 展开、false 收起</param>
+        public void ExpandAll(bool value = true)
+        {
+            if (ExpandAllCore(items, value)) ChangeList(true);
+        }
+
+        public void ExpandAll(TreeItemCollection? items, bool value = true)
+        {
+            if (ExpandAllCore(items, value)) ChangeList(true);
+        }
+
+        internal bool ExpandAllCore(TreeItemCollection? items, bool value = true)
+        {
+            if (items == null) return false;
+            int count = 0;
+            foreach (var it in items)
+            {
+                if (it.ISetExpand(value)) count++;
+                if (ExpandAllCore(it.items, value)) count++;
+            }
+            return count > 0;
+        }
+
+        /// <summary>
+        /// 反选节点项
+        /// </summary>
+        public void ReverseCheckItem(TreeItem item)
+        {
+            if (Checkable) ReverseCheck(item);
+        }
+
+        #region 获取项
+
+        /// <summary>
+        /// 获取所有选择项
+        /// </summary>
+        public List<TreeItem> GetSelects()
+        {
+            if (items == null) return new List<TreeItem>(0);
+            return GetSelects(items);
+        }
+
+        List<TreeItem> GetSelects(TreeItemCollection items)
+        {
+            var list = new List<TreeItem>(items.Count);
+            foreach (var it in items)
+            {
+                if (it.Select) list.Add(it);
+                if (it.items != null && it.items.Count > 0)
+                {
+                    var list_sub = GetSelects(it.items);
+                    if (list_sub.Count > 0) list.AddRange(list_sub);
+                }
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// 获取所有选中项
+        /// </summary>
+        /// <param name="Indeterminate">是否包含 Indeterminate</param>
+        public List<TreeItem> GetCheckeds(bool Indeterminate = true)
+        {
+            if (items == null) return new List<TreeItem>(0);
+            return GetCheckeds(items, Indeterminate);
+        }
+        List<TreeItem> GetCheckeds(TreeItemCollection items, bool Indeterminate)
+        {
+            var list = new List<TreeItem>(items.Count);
+            if (Indeterminate)
+            {
+                foreach (var it in items)
+                {
+                    if (it.CheckState != CheckState.Unchecked) list.Add(it);
+                    if (it.items != null && it.items.Count > 0)
+                    {
+                        var list_sub = GetCheckeds(it.items, Indeterminate);
+                        if (list_sub.Count > 0) list.AddRange(list_sub);
+                    }
+                }
+            }
+            else
+            {
+                foreach (var it in items)
+                {
+                    if (it.Checked) list.Add(it);
+                    if (it.items != null && it.items.Count > 0)
+                    {
+                        var list_sub = GetCheckeds(it.items, Indeterminate);
+                        if (list_sub.Count > 0) list.AddRange(list_sub);
+                    }
+                }
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// 全选/全不选
+        /// </summary>
+        public void SetCheckeds()
+        {
+            if (items == null) return;
+            var list = GetCheckeds();
+            SetCheckeds(list.Count == 0);
+        }
+
+        /// <summary>
+        /// 全选/全不选
+        /// </summary>
+        public void SetCheckeds(bool check) => SetCheckeds(items, check);
+        public void SetCheckeds(TreeItemCollection? items, bool check)
+        {
+            if (items == null) return;
+            foreach (var it in items)
+            {
+                it.Checked = check;
+                SetCheckeds(it.items, check);
+            }
+        }
+
+        public void Focus(TreeItem item, int gap = 0, bool force = false)
+        {
+            if (ScrollBar.ShowY && (force || !item.show)) ScrollBar.ValueY = item.rect.Y - gap - (int)(_gap * Dpi);
+        }
+
+        #endregion
+
+        #endregion
+
+        #region 查找
+
+        /// <summary>
+        /// 根据节点id查询节点
+        /// </summary>
+        public TreeItem? FindID(string id) => FindID(items, id);
+
+        TreeItem? FindID(TreeItemCollection? items, string id)
+        {
+            if (items == null) return null;
+            foreach (var sub in items)
+            {
+                if (sub.ID == id) return sub;
+                var preItem = FindID(sub.items, id);
+                if (preItem != null) return preItem;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 根据节点name查询节点
+        /// </summary>
+        public TreeItem? FindName(string id) => FindName(items, id);
+
+        TreeItem? FindName(TreeItemCollection? items, string id)
+        {
+            if (items == null) return null;
+            foreach (var sub in items)
+            {
+                if (sub.Name == id) return sub;
+                var preItem = FindName(sub.items, id);
+                if (preItem != null) return preItem;
+            }
+            return null;
+        }
+
+        #endregion
+
+        #region 搜索
+
+        /// <summary>
+        /// 搜索筛选
+        /// </summary>
+        /// <param name="search">搜索文本</param>
+        public void Search(string? search)
+        {
+            var old = pauseLayout;
+            PauseLayout = true;
+            if (search == null || string.IsNullOrEmpty(search)) FunSearch(items);
+            else FunSearch(items, search);
+            PauseLayout = old;
+        }
+        void FunSearch(TreeItemCollection? items)
+        {
+            if (items == null) return;
+            foreach (var item in items)
+            {
+                FunSearch(item.items);
+                item.Visible = true;
+            }
+        }
+        int FunSearch(TreeItemCollection? items, string search)
+        {
+            if (items == null) return 0;
+            int total = 0;
+            foreach (var item in items)
+            {
+                int count = FunSearch(item.items, search);
+                total += count;
+                var pinyin = item.Text;
+                if (pinyin == null) item.Visible = count > 0;
+                else
+                {
+                    if (item.PY == null)
+                    {
+                        item.PY = new string[] {
+                            pinyin.ToLower(),
+                            Pinyin.GetPinyin(pinyin).ToLower(),
+                            Pinyin.GetInitials(pinyin).ToLower()
+                        };
+                    }
+                    int score = Helper.SearchContains(search, pinyin, item.PY, out _);
+                    if (score > 0)
+                    {
+                        item.Visible = true;
+                        total++;
+                    }
+                    else item.Visible = count > 0;
+                }
+            }
+            return total;
+        }
+
+        #endregion
+
+        public TreeItem? HitTest(int x, int y, out TreeCType type)
+        {
+            if (items == null || items.Count == 0)
+            {
+                type = TreeCType.None;
+                return null;
+            }
+            foreach (var it in items)
+            {
+                if (IHitTest(x, y, it, out var md, out type)) return md;
+            }
+            type = TreeCType.None;
+            return null;
+        }
+        bool IHitTest(int x, int y, TreeItem item, out TreeItem? mdown, out TreeCType down)
+        {
+            down = item.Contains(x, y, ScrollBar.ValueX, ScrollBar.ValueY, checkable, blockNode);
+            if (down > 0)
+            {
+                mdown = item;
+                return true;
+            }
+            if (item.CanExpand && item.Expand)
+            {
+                foreach (var sub in item.items!)
+                {
+                    if (IHitTest(x, y, sub, out mdown, out down)) return true;
+                }
+            }
+            mdown = null;
+            return false;
+        }
+
+        #endregion
+
+        protected override void Dispose(bool disposing)
+        {
+            ScrollBar.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    public class TreeItemCollection : iCollection<TreeItem>
+    {
+        public TreeItemCollection(Tree it)
+        {
+            BindData(it);
+        }
+        public TreeItemCollection(TreeItem it)
+        {
+            BindData(it);
+        }
+
+        internal TreeItemCollection BindData(Tree it)
+        {
+            action = render =>
+            {
+                if (render) it.ChangeList(true);
+                else it.Invalidate();
+            };
+            return this;
+        }
+
+        internal TreeItemCollection BindData(TreeItem it)
+        {
+            action = render =>
+            {
+                if (it.PARENT == null) return;
+                if (render) it.PARENT.ChangeList(true);
+                else it.PARENT.Invalidate();
+            };
+            return this;
+        }
+    }
+
+    public class TreeItem
+    {
+        public TreeItem() { }
+        public TreeItem(string text)
+        {
+            Text = text;
+        }
+        public TreeItem(string text, Image? icon)
+        {
+            Text = text;
+            Icon = icon;
+        }
+
+        /// <summary>
+        /// 序号
+        /// </summary>
+        public int Index { get; internal set; }
+
+        /// <summary>
+        /// ID
+        /// </summary>
+        [Description("ID"), Category("数据"), DefaultValue(null)]
+        public string? ID { get; set; }
+
+        /// <summary>
+        /// 名称
+        /// </summary>
+        [Description("名称"), Category("数据"), DefaultValue(null)]
+        public string? Name { get; set; }
+
+        Image? icon;
+        /// <summary>
+        /// 图标
+        /// </summary>
+        [Description("图标"), Category("外观"), DefaultValue(null)]
+        public Image? Icon
+        {
+            get => icon;
+            set
+            {
+                if (icon == value) return;
+                icon = value;
+                Invalidates();
+            }
+        }
+
+        string? iconSvg;
+        /// <summary>
+        /// 图标
+        /// </summary>
+        [Description("图标SVG"), Category("外观"), DefaultValue(null)]
+        public string? IconSvg
+        {
+            get => iconSvg;
+            set
+            {
+                if (iconSvg == value) return;
+                iconSvg = value;
+                Invalidates();
+            }
+        }
+
+        /// <summary>
+        /// 是否包含图片
+        /// </summary>
+        internal bool HasIcon => iconSvg != null || Icon != null || loading;
+
+        string? text;
+        /// <summary>
+        /// 文本
+        /// </summary>
+        [Description("文本"), Category("外观"), DefaultValue(null)]
+        public string? Text
+        {
+            get => Localization.GetLangI(LocalizationText, text, new string?[] { "{id}", ID });
+            set
+            {
+                if (text == value) return;
+                text = value;
+                Invalidates();
+            }
+        }
+
+        [Description("文本"), Category("国际化"), DefaultValue(null)]
+        public string? LocalizationText { get; set; }
+
+        string? subTitle;
+        /// <summary>
+        /// 子标题
+        /// </summary>
+        [Description("子标题"), Category("外观"), DefaultValue(null)]
+        public string? SubTitle
+        {
+            get => Localization.GetLangI(LocalizationSubTitle, subTitle, new string?[] { "{id}", ID });
+            set
+            {
+                if (string.IsNullOrEmpty(value)) value = null;
+                if (subTitle == value) return;
+                subTitle = value;
+                Invalidates();
+            }
+        }
+
+        [Description("子标题"), Category("国际化"), DefaultValue(null)]
+        public string? LocalizationSubTitle { get; set; }
+
+        bool visible = true;
+        /// <summary>
+        /// 是否显示
+        /// </summary>
+        [Description("是否显示"), Category("外观"), DefaultValue(true)]
+        public bool Visible
+        {
+            get => visible;
+            set
+            {
+                if (visible == value) return;
+                visible = value;
+                Invalidates();
+            }
+        }
+
+        #region 加载动画
+
+        internal AnimationTask? ThreadLoading;
+        bool loading = false;
+        public float AnimationLoadingValue = 0;
+        float AnimationLoadingWaveValue = 0;
+        /// <summary>
+        /// 加载状态
+        /// </summary>
+        [Description("加载状态"), Category("外观"), DefaultValue(false)]
+        public bool Loading
+        {
+            get => loading;
+            set
+            {
+                if (loading == value) return;
+                loading = value;
+                ThreadLoading?.Dispose();
+                if (PARENT == null) return;
+                if (loading) StartLoading(PARENT);
+                else PARENT.Invalidate();
+            }
+        }
+
+        internal void StartLoading(Tree tree)
+        {
+            ThreadLoading = new AnimationTask(new AnimationLinearConfig(tree, i =>
+            {
+                AnimationLoadingWaveValue += 1;
+                if (AnimationLoadingWaveValue > 100) AnimationLoadingWaveValue = 0;
+                AnimationLoadingValue = i;
+                Invalidate();
+                return loading;
+            }, 10, 360, 10).SetEnd(Invalidate));
+        }
+
+        #endregion
+
+        /// <summary>
+        /// 用户定义数据
+        /// </summary>
+        [Description("用户定义数据"), Category("数据"), DefaultValue(null)]
+        public object? Tag { get; set; }
+
+        internal TreeItemCollection? items;
+        /// <summary>
+        /// 获取列表中所有列表项的集合
+        /// </summary>
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)]
+        [Description("子集合"), Category("外观")]
+        public TreeItemCollection Sub
+        {
+            get
+            {
+                items ??= new TreeItemCollection(this);
+                return items;
+            }
+            set => items = value.BindData(this);
+        }
+
+        #region 禁用
+
+        bool enabled = true;
+        /// <summary>
+        /// 禁掉响应
+        /// </summary>
+        [Description("禁掉响应"), Category("行为"), DefaultValue(true)]
+        public bool Enabled
+        {
+            get => enabled;
+            set
+            {
+                if (enabled == value) return;
+                enabled = value;
+                Invalidate();
+            }
+        }
+
+        #endregion
+
+        #region 展开
+
+        AnimationTask? ThreadExpand;
+        bool expand = false;
+        /// <summary>
+        /// 展开
+        /// </summary>
+        [Description("展开"), Category("行为"), DefaultValue(false)]
+        public bool Expand
+        {
+            get => expand;
+            set
+            {
+                if (expand == value) return;
+                if (PARENT?.OnIBeforeExpand(this, value) ?? true)
+                {
+                    expand = value;
+                    PARENT?.OnIAfterExpand(this, value);
+                    ExpandHeightTMP = null;
+                    if (items != null && items.Count > 0)
+                    {
+                        if (PARENT != null && PARENT.IsHandleCreated && Config.HasAnimation(nameof(Tree)))
+                        {
+                            ThreadExpand?.Dispose();
+                            ExpandTemp?.Dispose();
+                            ExpandTemp = null;
+                            var oldval = ThreadExpand?.Tag;
+                            ExpandThread = true;
+                            int t = Animation.TotalFrames(10, 200);
+                            ThreadExpand = new AnimationTask(new AnimationFixed2Config((i, val) =>
+                            {
+                                ExpandProg = val;
+                                Invalidates();
+                            }, 10, t, oldval, value).SetEnd(() =>
+                            {
+                                ExpandProg = 1F;
+                                ExpandThread = false;
+                                ExpandTemp?.Dispose();
+                                ExpandTemp = null;
+                                Invalidates();
+                            }));
+                        }
+                        else
+                        {
+                            ExpandProg = 1F;
+                            Invalidates();
+                        }
+                    }
+                    else
+                    {
+                        ExpandProg = 1F;
+                        Invalidates();
+                    }
+                }
+            }
+        }
+
+        internal bool ISetExpand(bool value)
+        {
+            if (expand == value) return false;
+            if (PARENT?.OnIBeforeExpand(this, value) ?? true)
+            {
+                expand = value;
+                PARENT?.OnIAfterExpand(this, value);
+                ExpandHeightTMP = null;
+                ThreadExpand?.Dispose();
+                ExpandTemp?.Dispose();
+                ThreadExpand = null;
+                ExpandTemp = null;
+                return true;
+            }
+            return false;
+        }
+
+        [Description("是否可以展开"), Category("行为"), DefaultValue(false)]
+        public bool CanExpand => ICanExpand ?? visible && items != null && items.Count > 0;
+
+        internal bool? ICanExpand { get; set; }
+
+        #endregion
+
+        #region 选中状态
+
+        bool checkable = true;
+        /// <summary>
+        /// 节点前添加 Checkbox 复选框
+        /// </summary>
+        [Description("节点前添加 Checkbox 复选框"), Category("外观"), DefaultValue(true)]
+        public bool Checkable
+        {
+            get => checkable;
+            set
+            {
+                if (checkable == value) return;
+                checkable = value;
+                Invalidates();
+            }
+        }
+
+        internal bool AnimationCheck = false;
+        internal float AnimationCheckValue = 0;
+
+        AnimationTask? ThreadCheck;
+
+        bool _checked = false;
+        [Description("选中状态"), Category("行为"), DefaultValue(false)]
+        public bool Checked
+        {
+            get => _checked;
+            set
+            {
+                if (_checked == value) return;
+                _checked = value;
+                PARENT?.OnICheckedChanged(this, value);
+                OnCheck();
+                CheckState = value ? CheckState.Checked : CheckState.Unchecked;
+            }
+        }
+
+        internal CheckState checkStateOld = CheckState.Unchecked;
+        CheckState checkState = CheckState.Unchecked;
+        [Description("选中状态"), Category("行为"), DefaultValue(CheckState.Unchecked)]
+        public CheckState CheckState
+        {
+            get => checkState;
+            set
+            {
+                if (checkState == value) return;
+                checkState = value;
+                bool __checked = value == CheckState.Checked;
+                if (_checked != __checked)
+                {
+                    _checked = __checked;
+                    PARENT?.OnICheckedChanged(this, __checked);
+                    OnCheck();
+                }
+                if (value != CheckState.Unchecked) checkStateOld = value;
+            }
+        }
+
+        void OnCheck()
+        {
+            ThreadCheck?.Dispose();
+            ThreadCheck = null;
+            if (PARENT != null && PARENT.IsHandleCreated && (ParentItem == null || ParentItem.expand) && show && Config.HasAnimation(nameof(Tree)))
+            {
+                if (!_checked && checkStateOld == CheckState.Checked && CheckState == CheckState.Indeterminate)
+                {
+                    AnimationCheckValue = 1F;
+                    Invalidate();
+                }
+                else
+                {
+                    AnimationCheck = true;
+                    ThreadCheck = new AnimationTask(new AnimationLinearFConfig(PARENT, i =>
+                    {
+                        AnimationCheckValue = i;
+                        PARENT.Invalidate();
+                        return true;
+                    }, 20).SetValue(AnimationCheckValue, _checked, 0.2F).SetEnd(() => AnimationCheck = false));
+                }
+            }
+            else
+            {
+                AnimationCheckValue = _checked ? 1F : 0F;
+                Invalidate();
+            }
+        }
+
+        public void CheckedStrictly(bool value = true, bool handsub = true)
+        {
+            if (PARENT == null) return;
+            Checked = value;
+            if (handsub) PARENT.SetCheck(this, value);
+            PARENT.SetCheckStrictly(ParentItem);
+        }
+
+        #endregion
+
+        #region 样式
+
+        Color? fore;
+        /// <summary>
+        /// 文本颜色
+        /// </summary>
+        [Description("文本颜色"), Category("外观"), DefaultValue(null)]
+        public Color? Fore
+        {
+            get => fore;
+            set
+            {
+                if (fore == value) return;
+                fore = value;
+                Invalidate();
+            }
+        }
+
+        Color? foreSub;
+        /// <summary>
+        /// 子文本颜色
+        /// </summary>
+        [Description("子文本颜色"), Category("外观"), DefaultValue(null)]
+        public Color? ForeSub
+        {
+            get => foreSub;
+            set
+            {
+                if (foreSub == value) return;
+                foreSub = value;
+                Invalidate();
+            }
+        }
+
+        Color? back;
+        /// <summary>
+        /// 背景颜色
+        /// </summary>
+        [Description("背景颜色"), Category("外观"), DefaultValue(null)]
+        public Color? Back
+        {
+            get => back;
+            set
+            {
+                if (back == value) return;
+                back = value;
+                Invalidate();
+            }
+        }
+
+        #endregion
+
+        #region 方法
+
+        public void Remove()
+        {
+            if (ParentItem == null) PARENT?.Items.Remove(this);
+            else ParentItem.items?.Remove(this);
+        }
+
+        #endregion
+
+        #region 悬浮态
+
+        bool hover = false;
+        /// <summary>
+        /// 是否悬浮
+        /// </summary>
+        internal bool Hover
+        {
+            get => hover;
+            set
+            {
+                if (hover == value) return;
+                hover = value;
+                PARENT?.OnNodeMouseMove(this, value);
+                if (Config.HasAnimation(nameof(Tree)))
+                {
+                    ThreadHover?.Dispose();
+                    AnimationHover = true;
+                    ThreadHover = new AnimationTask(new AnimationFixedConfig(i =>
+                    {
+                        AnimationHoverValue = i;
+                        Invalidate();
+                    }, 20, Animation.TotalFrames(20, 200), value, AnimationType.Ball).SetEnd(() => AnimationHover = false));
+                }
+                else Invalidate();
+            }
+        }
+
+        #endregion
+
+        #region 激活态
+
+        bool select = false;
+        [Description("激活状态"), Category("行为"), DefaultValue(false)]
+        public bool Select
+        {
+            get => select;
+            set
+            {
+                if (select == value) return;
+                if (value && PARENT != null)
+                {
+                    PARENT.USelect(false);
+                    PARENT.SelectItem = this;
+                }
+                select = value;
+                Invalidate();
+            }
+        }
+
+        internal void SetSelectNR(bool value = true)
+        {
+            if (select == value) return;
+            if (value && PARENT != null)
+            {
+                PARENT.USelect(false);
+                PARENT.SelectItem = this;
+            }
+            select = value;
+        }
+
+        internal void SetSelect(bool value = true)
+        {
+            if (select == value) return;
+            select = value;
+            Invalidate();
+        }
+
+        #endregion
+
+        public int Depth { get; private set; }
+
+        public TreeItem? ParentItem { get; internal set; }
+
+        #region 内部
+
+        internal Tree? PARENT { get; set; }
+
+        #region 布局
+
+        internal void SetRect(Canvas g, Font font, int depth, bool _checkable, bool blockNode, bool has_sub, Rectangle _rect, int depth_gap, int icon_size, int gap)
+        {
+            Depth = depth;
+            var size = g.MeasureText(Text, font);
+            int x = _rect.X + gap + (depth_gap * depth), tmpx = x, usew = 0, y = _rect.Y + (size.Height + gap - icon_size) / 2, ui = icon_size + gap;
+            if (has_sub)
+            {
+                arrow_rect = new Rectangle(x, y, icon_size, icon_size);
+                usew += ui;
+                x += ui;
+            }
+
+            if (_checkable && checkable)
+            {
+                check_rect = new Rectangle(x, y, icon_size, icon_size);
+                usew += ui;
+                x += ui;
+            }
+
+            if (HasIcon)
+            {
+                ico_rect = new Rectangle(x, y, icon_size, icon_size);
+                usew += ui;
+                x += ui;
+            }
+
+            int txt_w = size.Width + gap, txt_h = size.Height + gap, txt_y = _rect.Y;
+            if (subTitle == null)
+            {
+                usew += txt_w;
+                if (blockNode)
+                {
+                    int rw = _rect.Width - x - gap;
+                    txt_rect = new Rectangle(x, txt_y, txt_w, txt_h);
+                    if (rw < txt_w) rw = txt_w;
+                    rect = new Rectangle(x, txt_rect.Y, rw, txt_rect.Height);
+                }
+                else
+                {
+                    txt_rect = new Rectangle(x, txt_y, txt_w, txt_h);
+                    rect = txt_rect;
+                }
+            }
+            else
+            {
+                var sizesub = g.MeasureText(SubTitle, font);
+                usew += txt_w + sizesub.Width + gap;
+                if (blockNode)
+                {
+                    int rw = _rect.Width - x - gap;
+                    txt_rect = new Rectangle(x, txt_y, txt_w, txt_h);
+                    subtxt_rect = new Rectangle(txt_rect.Right, txt_rect.Y, sizesub.Width, txt_rect.Height);
+                    txt_w += sizesub.Width;
+                    if (rw < txt_w) rw = txt_w;
+                    rect = new Rectangle(x, txt_rect.Y, rw, txt_rect.Height);
+                }
+                else
+                {
+                    txt_rect = new Rectangle(x, txt_y, txt_w, txt_h);
+                    subtxt_rect = new Rectangle(txt_rect.Right, txt_rect.Y, sizesub.Width, txt_rect.Height);
+                    rect = new Rectangle(x, txt_y, txt_w + sizesub.Width, txt_h);
+                }
+            }
+            rect_all = new Rectangle(tmpx, rect.Y, usew, rect.Height);
+        }
+        internal Rectangle rect_all { get; set; }
+        internal Rectangle rect { get; set; }
+        internal Rectangle arrow_rect { get; set; }
+
+        internal TreeCType Contains(int x, int y, int sx, int sy, bool _checkable, bool blockNode)
+        {
+            if (visible && enabled)
+            {
+                if (arrow_rect.Contains(x + sx, y + sy) && CanExpand)
+                {
+                    Hover = true;
+                    return TreeCType.Arrow;
+                }
+                else if (_checkable && checkable && check_rect.Contains(x + sx, y + sy))
+                {
+                    Hover = true;
+                    return TreeCType.Check;
+                }
+                else if (rect_all.Contains(x + sx, y + sy) || rect.Contains(x + sx, y + sy))
+                {
+                    Hover = true;
+                    return TreeCType.Item;
+                }
+            }
+            Hover = false;
+            return TreeCType.None;
+        }
+
+        internal float AnimationHoverValue = 0;
+        internal bool AnimationHover = false;
+        AnimationTask? ThreadHover;
+
+        internal Rectangle check_rect { get; set; }
+        internal Rectangle txt_rect { get; set; }
+        internal Rectangle subtxt_rect { get; set; }
+        internal Rectangle ico_rect { get; set; }
+
+        public Rectangle Rect(string type = "", bool actual = true)
+        {
+            if (actual || PARENT == null) return Rect(type, 0, 0);
+            else return Rect(type, PARENT.ScrollBar.ValueX, PARENT.ScrollBar.ValueY);
+        }
+        public Rectangle Rect(int x, int y) => Rect("", x, y);
+        public Rectangle Rect(string type, int x = 0, int y = 0)
+        {
+            if (x > 0 || y > 0)
+            {
+                switch (type)
+                {
+                    case "Text":
+                        return new Rectangle(txt_rect.X - x, txt_rect.Y - y, txt_rect.Width, txt_rect.Height);
+                    case "SubTitle":
+                        return new Rectangle(subtxt_rect.X - x, subtxt_rect.Y - y, subtxt_rect.Width, subtxt_rect.Height);
+                    case "Checked":
+                        return new Rectangle(check_rect.X - x, check_rect.Y - y, check_rect.Width, check_rect.Height);
+                    case "Icon":
+                        return new Rectangle(ico_rect.X - x, ico_rect.Y - y, ico_rect.Width, ico_rect.Height);
+                    case "Arrow":
+                        return new Rectangle(arrow_rect.X - x, arrow_rect.Y - y, arrow_rect.Width, arrow_rect.Height);
+                    default:
+                        return new Rectangle(rect.X - x, rect.Y - y, rect.Width, rect.Height);
+                }
+            }
+            switch (type)
+            {
+                case "Text":
+                    return txt_rect;
+                case "SubTitle":
+                    return subtxt_rect;
+                case "Checked":
+                    return check_rect;
+                case "Icon":
+                    return ico_rect;
+                case "Arrow":
+                    return arrow_rect;
+                default:
+                    return rect;
+            }
+        }
+
+        #endregion
+
+        internal int SubY { get; set; }
+        internal int SubHeight { get; set; }
+        internal int? ExpandHeightTMP { get; set; }
+        internal int ExpandHeight { get; set; }
+        internal int ExpandRHeight { get; set; }
+        internal float ExpandProg { get; set; }
+        internal bool ExpandThread { get; set; }
+        internal Bitmap? ExpandTemp { get; set; }
+        internal bool show { get; set; }
+
+        void Invalidate() => PARENT?.Invalidate();
+        void Invalidates() => PARENT?.ChangeList(true);
+
+        #endregion
+
+        #region 设置
+
+        public TreeItem SetFore(Color? value)
+        {
+            fore = value;
+            return this;
+        }
+        public TreeItem SetBack(Color? value)
+        {
+            back = value;
+            return this;
+        }
+
+        #region 图标
+
+        public TreeItem SetIcon(Image? img)
+        {
+            icon = img;
+            return this;
+        }
+
+        public TreeItem SetIcon(string? svg)
+        {
+            iconSvg = svg;
+            return this;
+        }
+
+        #endregion
+
+        public TreeItem SetID(string? value)
+        {
+            ID = value;
+            return this;
+        }
+
+        public TreeItem SetName(string? value)
+        {
+            Name = value;
+            return this;
+        }
+
+        public TreeItem SetText(string? value, string? localization = null)
+        {
+            text = value;
+            LocalizationText = localization;
+            return this;
+        }
+
+        public TreeItem SetSubTitle(string? value, string? localization = null)
+        {
+            subTitle = value;
+            LocalizationSubTitle = localization;
+            return this;
+        }
+
+        public TreeItem SetVisible(bool value = false)
+        {
+            visible = value;
+            return this;
+        }
+
+        public TreeItem SetEnabled(bool value = false)
+        {
+            enabled = value;
+            return this;
+        }
+
+        public TreeItem SetLoading(bool value = true)
+        {
+            loading = value;
+            return this;
+        }
+
+        public TreeItem SetChecked(bool value = true)
+        {
+            Checked = value;
+            return this;
+        }
+
+        public TreeItem SetChecked(CheckState value)
+        {
+            CheckState = value;
+            return this;
+        }
+
+        public TreeItem SetCheckable(bool value = false)
+        {
+            checkable = value;
+            return this;
+        }
+
+        public TreeItem SetCanExpand(bool value = true)
+        {
+            ICanExpand = value;
+            return this;
+        }
+
+        public TreeItem SetExpand(bool value = true)
+        {
+            expand = value;
+            return this;
+        }
+
+        public TreeItem SetSub(TreeItem value)
+        {
+            Sub.Add(value);
+            return this;
+        }
+
+        public TreeItem SetSub(params TreeItem[] value)
+        {
+            Sub.AddRange(value);
+            return this;
+        }
+
+        public TreeItem SetSub(IList<TreeItem> value)
+        {
+            Sub.AddRange(value);
+            return this;
+        }
+
+        public TreeItem SetTag(object? value)
+        {
+            Tag = value;
+            return this;
+        }
+
+        internal string[]? PY { get; set; }
+        public TreeItem SetPinyin(string? value)
+        {
+            if (value == null) PY = new string[0];
+            else
+            {
+                PY = new string[] {
+                    value.ToLower(),
+                    Pinyin.GetPinyin(value).ToLower(),
+                    Pinyin.GetInitials(value).ToLower()
+                };
+            }
+            return this;
+        }
+
+        #endregion
+
+        public string FullPath(string PathSeparator = "/")
+        {
+            var list = new List<string?>(Depth + 1) { Text };
+            var parent = ParentItem;
+            while (parent != null)
+            {
+                list.Insert(0, parent.Text);
+                parent = parent.ParentItem;
+            }
+            return string.Join(PathSeparator, list);
+        }
+
+        public string FullID(string PathSeparator = "/")
+        {
+            var list = new List<string?>(Depth + 1) { ID };
+            var parent = ParentItem;
+            while (parent != null)
+            {
+                list.Insert(0, parent.ID);
+                parent = parent.ParentItem;
+            }
+            return string.Join(PathSeparator, list);
+        }
+
+        public string FullName(string PathSeparator = "/")
+        {
+            var list = new List<string?>(Depth + 1) { Name };
+            var parent = ParentItem;
+            while (parent != null)
+            {
+                list.Insert(0, parent.Name);
+                parent = parent.ParentItem;
+            }
+            return string.Join(PathSeparator, list);
+        }
+
+        public override string? ToString() => Text;
+    }
+}

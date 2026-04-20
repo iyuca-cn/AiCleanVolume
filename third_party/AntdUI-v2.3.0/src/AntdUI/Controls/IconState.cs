@@ -1,0 +1,112 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Design;
+
+namespace AntdUI
+{
+    /// <summary>
+    /// Icon 状态图标
+    /// </summary>
+    [Description("Icon 状态图标")]
+    [ToolboxItem(true)]
+    public class IconState : IControl
+    {
+        #region 属性
+
+        Color? back;
+        [Description("背景颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? Back
+        {
+            get => back;
+            set
+            {
+                if (back == value) return;
+                back = value;
+                Invalidate();
+                OnPropertyChanged(nameof(Back));
+            }
+        }
+
+        Color? color;
+        [Description("颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? Color
+        {
+            get => color;
+            set
+            {
+                if (color == value) return;
+                color = value;
+                Invalidate();
+                OnPropertyChanged(nameof(Color));
+            }
+        }
+
+        TType state = TType.Success;
+        /// <summary>
+        /// 状态
+        /// </summary>
+        [Description("状态"), Category("外观"), DefaultValue(TType.Success)]
+        public TType State
+        {
+            get => state;
+            set
+            {
+                if (state == value) return;
+                state = value;
+                Invalidate();
+                OnPropertyChanged(nameof(State));
+            }
+        }
+
+        #endregion
+
+        #region 渲染
+
+        protected override void OnDraw(DrawEventArgs e)
+        {
+            var g = e.Canvas;
+            if (state == TType.None) base.OnDraw(e);
+            else
+            {
+                var rect = ClientRectangle.DeflateRect(Padding);
+                int dot_size = rect.Width > rect.Height ? rect.Height : rect.Width;
+                var rect_dot = new Rectangle(rect.X + (rect.Width - dot_size) / 2, rect.Y + (rect.Height - dot_size) / 2, dot_size, dot_size);
+                if (color.HasValue)
+                {
+                    using (var brush = new SolidBrush(color.Value))
+                    {
+                        g.FillEllipse(brush, new RectangleF(rect_dot.X + 1, rect_dot.Y + 1, rect_dot.Width - 2, rect_dot.Height - 2));
+                    }
+                }
+                switch (state)
+                {
+                    case TType.Success:
+                        g.GetImgExtend(SvgDb.IcoSuccess, rect, back ?? Colour.Success.Get("IconComplete", ColorScheme));
+                        break;
+                    case TType.Error:
+                        g.GetImgExtend(SvgDb.IcoError, rect, back ?? Colour.Error.Get("IconError", ColorScheme));
+                        break;
+                    case TType.Info:
+                        g.GetImgExtend(SvgDb.IcoInfo, rect, back ?? Colour.Info.Get("IconInfo", ColorScheme));
+                        break;
+                    case TType.Warn:
+                        g.GetImgExtend(SvgDb.IcoWarn, rect, back ?? Colour.Warning.Get("IconWarn", ColorScheme));
+                        break;
+                    default:
+                        break;
+                }
+                base.OnDraw(e);
+            }
+        }
+
+        #endregion
+    }
+}

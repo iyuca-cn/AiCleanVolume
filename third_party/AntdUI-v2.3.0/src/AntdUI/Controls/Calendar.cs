@@ -1,0 +1,1546 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Design;
+using System.Drawing.Drawing2D;
+using System.Globalization;
+using System.Windows.Forms;
+
+namespace AntdUI
+{
+    /// <summary>
+    /// Calendar 日历
+    /// </summary>
+    /// <remarks>按照日历形式展示数据的容器。</remarks>
+    [Description("Calendar 日历")]
+    [ToolboxItem(true)]
+    [DefaultProperty("Date")]
+    [DefaultEvent("DateChanged")]
+    public class Calendar : IControl, IEventListener
+    {
+        public Calendar()
+        {
+            var key = nameof(Calendar);
+            hover_lefts = new ITaskOpacity(key, this);
+            hover_left = new ITaskOpacity(key, this);
+            hover_rights = new ITaskOpacity(key, this);
+            hover_right = new ITaskOpacity(key, this);
+            hover_year = new ITaskOpacity(key, this);
+            hover_month = new ITaskOpacity(key, this);
+            hover_button = new ITaskOpacity(key, this);
+
+            Culture = new CultureInfo(CultureID);
+            YDR = CultureID.StartsWith("en");
+            Helper.InitLanguage(YDR, out YearFormat, out MonthFormat, out MondayButton, out TuesdayButton, out WednesdayButton, out ThursdayButton, out FridayButton, out SaturdayButton, out SundayButton, out s_f_L, out s_f_R);
+
+            Date = DateTime.Now;
+        }
+
+        #region 属性
+
+        int radius = 6;
+        /// <summary>
+        /// 圆角
+        /// </summary>
+        [Description("圆角"), Category("外观"), DefaultValue(6)]
+        public int Radius
+        {
+            get => radius;
+            set
+            {
+                if (radius == value) return;
+                radius = value;
+                Invalidate();
+                OnPropertyChanged(nameof(Radius));
+            }
+        }
+
+        bool full = false;
+        /// <summary>
+        /// 是否撑满
+        /// </summary>
+        [Description("是否撑满"), Category("外观"), DefaultValue(false)]
+        public bool Full
+        {
+            get => full;
+            set
+            {
+                if (full == value) return;
+                full = value;
+                IOnSizeChanged();
+                Invalidate();
+                OnPropertyChanged(nameof(Full));
+            }
+        }
+
+        bool chinese = false;
+        /// <summary>
+        /// 显示农历
+        /// </summary>
+        [Description("显示农历"), Category("外观"), DefaultValue(false)]
+        public bool ShowChinese
+        {
+            get => chinese;
+            set
+            {
+                if (chinese == value) return;
+                chinese = value;
+                IOnSizeChanged();
+                Invalidate();
+                OnPropertyChanged(nameof(ShowChinese));
+            }
+        }
+
+        bool showButtonToDay = true;
+        /// <summary>
+        /// 显示今天
+        /// </summary>
+        [Description("显示今天"), Category("外观"), DefaultValue(true)]
+        public bool ShowButtonToDay
+        {
+            get => showButtonToDay;
+            set
+            {
+                if (showButtonToDay == value) return;
+                showButtonToDay = value;
+                IOnSizeChanged();
+                Invalidate();
+                OnPropertyChanged(nameof(ShowButtonToDay));
+            }
+        }
+
+        Dictionary<string, DateBadge> badge_list = new Dictionary<string, DateBadge>();
+        /// <summary>
+        /// 日期徽标回调
+        /// </summary>
+        public Func<DateTime[], List<DateBadge>?>? BadgeAction;
+
+        #region 日期
+
+        List<Calendari>? calendar_year, calendar_month, calendar_day;
+
+        DateTime _value = DateTime.Now;
+        /// <summary>
+        /// 控件当前日期
+        /// </summary>
+        [Description("控件当前日期"), Category("数据")]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public DateTime Value
+        {
+            get => _value;
+            set
+            {
+                if (_value == value) return;
+                _value = value;
+                Invalidate();
+                LoadBadge();
+                OnDateChanged(_value);
+                OnPropertyChanged(nameof(Value));
+            }
+        }
+
+        DateTime? minDate;
+        /// <summary>
+        /// 最小日期
+        /// </summary>
+        [Description("最小日期"), Category("数据"), DefaultValue(null)]
+        public DateTime? MinDate
+        {
+            get => minDate;
+            set
+            {
+                if (minDate == value) return;
+                minDate = value;
+                if (minDate.HasValue && _Date > minDate) _Date = minDate.Value;
+                Date = _Date;
+                Invalidate();
+                OnPropertyChanged(nameof(MinDate));
+            }
+        }
+
+        DateTime? maxDate;
+        /// <summary>
+        /// 最大日期
+        /// </summary>
+        [Description("最大日期"), Category("数据"), DefaultValue(null)]
+        public DateTime? MaxDate
+        {
+            get => maxDate;
+            set
+            {
+                if (maxDate == value) return;
+                maxDate = value;
+                if (maxDate.HasValue && _Date < maxDate) _Date = maxDate.Value;
+                Date = _Date;
+                Invalidate();
+                OnPropertyChanged(nameof(MaxDate));
+            }
+        }
+
+        public void SetMinMax(DateTime min, DateTime max)
+        {
+            if (minDate == min && maxDate == max) return;
+            minDate = min;
+            maxDate = max;
+            if (_Date > min) _Date = min;
+            else if (_Date < max) _Date = max;
+            Date = _Date;
+            Invalidate();
+        }
+
+        DateTime _Date;
+        DateTime Date
+        {
+            get => _Date;
+            set
+            {
+                _Date = value;
+                calendar_day = GetCalendar(value);
+
+                #region 添加月
+
+                var _calendar_month = new List<Calendari>(12);
+                int x_m = 0, y_m = 0;
+                for (int i = 0; i < 12; i++)
+                {
+                    var d_m = new DateTime(value.Year, i + 1, 1);
+                    _calendar_month.Add(new Calendari(0, x_m, y_m, d_m.ToString(MonthFormat, Culture), d_m, d_m.ToString("yyyy-MM"), minDate, maxDate));
+                    x_m++;
+                    if (x_m > 2)
+                    {
+                        y_m++;
+                        x_m = 0;
+                    }
+                }
+                calendar_month = _calendar_month;
+
+                #endregion
+
+                #region 添加年
+
+                int syear = value.Year - 1;
+                if (!value.Year.ToString().EndsWith("0"))
+                {
+                    string temp = value.Year.ToString();
+                    syear = int.Parse(temp.Substring(0, temp.Length - 1) + "0") - 1;
+                }
+                var _calendar_year = new List<Calendari>(12);
+                int x_y = 0, y_y = 0;
+                if (syear < 1) syear = 1;
+                for (int i = 0; i < 12; i++)
+                {
+                    try
+                    {
+                        var d_y = new DateTime(syear + i, value.Month, 1);
+                        _calendar_year.Add(new Calendari(i == 0 ? 0 : 1, x_y, y_y, d_y.ToString("yyyy"), d_y, d_y.ToString("yyyy"), minDate, maxDate));
+                        x_y++;
+                        if (x_y > 2)
+                        {
+                            y_y++;
+                            x_y = 0;
+                        }
+                    }
+                    catch { }
+                }
+                year_str = _calendar_year[1].date_str + "-" + _calendar_year[_calendar_year.Count - 2].date_str;
+                calendar_year = _calendar_year;
+
+                #endregion
+
+                IOnSizeChanged();
+
+                LoadBadge();
+
+                hover_left.Enable = Helper.DateExceedMonth(value, -1, minDate, maxDate);
+                hover_right.Enable = Helper.DateExceedMonth(value, 1, minDate, maxDate);
+                hover_lefts.Enable = Helper.DateExceedYear(value, -1, minDate, maxDate);
+                hover_rights.Enable = Helper.DateExceedYear(value, 1, minDate, maxDate);
+            }
+        }
+
+        string year_str = "";
+        List<Calendari> GetCalendar(DateTime now)
+        {
+            var calendaris = new List<Calendari>(28);
+            int days = DateTime.DaysInMonth(now.Year, now.Month);
+            var now1 = new DateTime(now.Year, now.Month, 1);
+            int day_ = 0;
+            switch (now1.DayOfWeek)
+            {
+                case DayOfWeek.Tuesday:
+                    day_ = 1;
+                    break;
+                case DayOfWeek.Wednesday:
+                    day_ = 2;
+                    break;
+                case DayOfWeek.Thursday:
+                    day_ = 3;
+                    break;
+                case DayOfWeek.Friday:
+                    day_ = 4;
+                    break;
+                case DayOfWeek.Saturday:
+                    day_ = 5;
+                    break;
+                case DayOfWeek.Sunday:
+                    day_ = 6;
+                    break;
+            }
+            if (day_ > 0)
+            {
+                var date1 = now.AddMonths(-1);
+                int days2 = DateTime.DaysInMonth(date1.Year, date1.Month);
+                for (int i = 0; i < day_; i++)
+                {
+                    int day3 = days2 - i;
+                    calendaris.Insert(0, new Calendari(0, (day_ - 1) - i, 0, day3.ToString(), new DateTime(date1.Year, date1.Month, day3), minDate, maxDate));
+                }
+            }
+            int x = day_, y = 0;
+            for (int i = 0; i < days; i++)
+            {
+                int day = i + 1;
+                calendaris.Add(new Calendari(1, x, y, day.ToString(), new DateTime(now.Year, now.Month, day), minDate, maxDate));
+                x++;
+                if (x > 6)
+                {
+                    y++;
+                    x = 0;
+                }
+            }
+            if (x < 7)
+            {
+                try
+                {
+                    var date1 = now.AddMonths(1);
+                    int day2 = 0;
+                    for (int i = x; i < 7; i++)
+                    {
+                        int day3 = day2 + 1;
+                        calendaris.Add(new Calendari(2, x, y, day3.ToString(), new DateTime(date1.Year, date1.Month, day3), minDate, maxDate));
+                        x++; day2++;
+                    }
+                    if (y < 5)
+                    {
+                        y++;
+                        for (int i = 0; i < 7; i++)
+                        {
+                            int day3 = day2 + 1;
+                            calendaris.Add(new Calendari(2, i, y, day3.ToString(), new DateTime(date1.Year, date1.Month, day3), minDate, maxDate));
+                            day2++;
+                        }
+                    }
+                }
+                catch { }
+            }
+            return calendaris;
+        }
+
+        /// <summary>
+        /// 加载徽标
+        /// </summary>
+        public void LoadBadge()
+        {
+            if (BadgeAction != null && calendar_day != null)
+            {
+                var oldval = _Date;
+                ITask.Run(() =>
+                {
+                    var dir = BadgeAction(new DateTime[] { calendar_day[0].date, calendar_day[calendar_day.Count - 1].date });
+                    if (_Date == oldval)
+                    {
+                        badge_list.Clear();
+                        if (dir == null)
+                        {
+                            Invalidate();
+                            return;
+                        }
+#if NET40 || NET46 || NET48
+                        foreach (var it in dir) badge_list.Add(it.Date, it);
+#else
+                        foreach (var it in dir) badge_list.TryAdd(it.Date, it);
+#endif
+                        Invalidate();
+                    }
+                });
+            }
+        }
+
+        public void SetBadge(Dictionary<string, DateBadge> dir)
+        {
+            badge_list = dir;
+            Invalidate();
+        }
+        public void SetBadge(IList<DateBadge> dir)
+        {
+            badge_list = new Dictionary<string, DateBadge>(dir.Count);
+            foreach (var it in dir) badge_list.Add(it.Date, it);
+            Invalidate();
+        }
+
+        #endregion
+
+        #region 参数
+
+        CultureInfo Culture;
+        string CultureID = Localization.Get("ID", "zh-CN"),
+            button_text = Localization.Get("ToDay", "今天"),
+            YearFormat, MonthFormat,
+            MondayButton, TuesdayButton, WednesdayButton, ThursdayButton, FridayButton, SaturdayButton, SundayButton;
+        bool YDR = false;
+
+        #endregion
+
+        Color? back;
+        /// <summary>
+        /// 背景颜色
+        /// </summary>
+        [Description("背景颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? Back
+        {
+            get => back;
+            set
+            {
+                if (back == value) return;
+                back = value;
+                Invalidate();
+                OnPropertyChanged(nameof(Back));
+            }
+        }
+
+        string? backExtend;
+        /// <summary>
+        /// 背景渐变色
+        /// </summary>
+        [Description("背景渐变色"), Category("外观"), DefaultValue(null)]
+        public string? BackExtend
+        {
+            get => backExtend;
+            set
+            {
+                if (backExtend == value) return;
+                backExtend = value;
+                Invalidate();
+                OnPropertyChanged(nameof(BackExtend));
+            }
+        }
+
+        Color? fore;
+        /// <summary>
+        /// 文字颜色
+        /// </summary>
+        [Description("文字颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? Fore
+        {
+            get => fore;
+            set
+            {
+                if (fore == value) return;
+                fore = value;
+                Invalidate();
+                OnPropertyChanged(nameof(Fore));
+            }
+        }
+
+        #endregion
+
+        #region 渲染
+
+        readonly FormatFlags s_f = FormatFlags.Default;
+        FormatFlags s_f_L, s_f_R;
+        protected override void OnDraw(DrawEventArgs e)
+        {
+            var g = e.Canvas;
+            var rect_read = ReadRectangle;
+
+            int _radius = (int)(radius * Dpi);
+            using (var path = rect_read.RoundPath(_radius))
+            {
+                using (var brush = backExtend.BrushEx(rect_read, back, Colour.BgElevated.Get(nameof(Calendar), ColorScheme)))
+                {
+                    g.Fill(brush, path);
+                }
+            }
+
+            #region 方向
+
+            using (var pen_arrow = new Pen(Colour.TextTertiary.Get(nameof(Calendar), ColorScheme), 1.6F * Dpi))
+            using (var pen_arrow_hover = new Pen(Colour.Text.Get(nameof(Calendar), ColorScheme), pen_arrow.Width))
+            using (var pen_arrow_enable = new Pen(Colour.FillSecondary.Get(nameof(Calendar), ColorScheme), pen_arrow.Width))
+            {
+                if (hover_lefts.Animation)
+                {
+                    using (var pen_arrow_hovers = new Pen(pen_arrow.Color.BlendColors(hover_lefts.Value, pen_arrow_hover.Color), pen_arrow_hover.Width))
+                    {
+                        g.DrawLines(pen_arrow_hovers, TAlignMini.Left.TriangleLines(new Rectangle(rect_lefts.X - 4, rect_lefts.Y, rect_lefts.Width, rect_lefts.Height), .26F));
+                        g.DrawLines(pen_arrow_hovers, TAlignMini.Left.TriangleLines(new Rectangle(rect_lefts.X + 4, rect_lefts.Y, rect_lefts.Width, rect_lefts.Height), .26F));
+                    }
+                }
+                else if (hover_lefts.Switch)
+                {
+                    g.DrawLines(pen_arrow_hover, TAlignMini.Left.TriangleLines(new Rectangle(rect_lefts.X - 4, rect_lefts.Y, rect_lefts.Width, rect_lefts.Height), .26F));
+                    g.DrawLines(pen_arrow_hover, TAlignMini.Left.TriangleLines(new Rectangle(rect_lefts.X + 4, rect_lefts.Y, rect_lefts.Width, rect_lefts.Height), .26F));
+                }
+                else if (hover_lefts.Enable)
+                {
+                    g.DrawLines(pen_arrow, TAlignMini.Left.TriangleLines(new Rectangle(rect_lefts.X - 4, rect_lefts.Y, rect_lefts.Width, rect_lefts.Height), .26F));
+                    g.DrawLines(pen_arrow, TAlignMini.Left.TriangleLines(new Rectangle(rect_lefts.X + 4, rect_lefts.Y, rect_lefts.Width, rect_lefts.Height), .26F));
+                }
+                else
+                {
+                    g.DrawLines(pen_arrow_enable, TAlignMini.Left.TriangleLines(new Rectangle(rect_lefts.X - 4, rect_lefts.Y, rect_lefts.Width, rect_lefts.Height), .26F));
+                    g.DrawLines(pen_arrow_enable, TAlignMini.Left.TriangleLines(new Rectangle(rect_lefts.X + 4, rect_lefts.Y, rect_lefts.Width, rect_lefts.Height), .26F));
+                }
+
+                if (hover_rights.Animation)
+                {
+                    using (var pen_arrow_hovers = new Pen(pen_arrow.Color.BlendColors(hover_rights.Value, pen_arrow_hover.Color), pen_arrow_hover.Width))
+                    {
+                        g.DrawLines(pen_arrow_hovers, TAlignMini.Right.TriangleLines(new Rectangle(rect_rights.X - 4, rect_rights.Y, rect_rights.Width, rect_rights.Height), .26F));
+                        g.DrawLines(pen_arrow_hovers, TAlignMini.Right.TriangleLines(new Rectangle(rect_rights.X + 4, rect_rights.Y, rect_rights.Width, rect_rights.Height), .26F));
+                    }
+                }
+                else if (hover_rights.Switch)
+                {
+                    g.DrawLines(pen_arrow_hover, TAlignMini.Right.TriangleLines(new Rectangle(rect_rights.X - 4, rect_rights.Y, rect_rights.Width, rect_rights.Height), .26F));
+                    g.DrawLines(pen_arrow_hover, TAlignMini.Right.TriangleLines(new Rectangle(rect_rights.X + 4, rect_rights.Y, rect_rights.Width, rect_rights.Height), .26F));
+                }
+                else if (hover_rights.Enable)
+                {
+                    g.DrawLines(pen_arrow, TAlignMini.Right.TriangleLines(new Rectangle(rect_rights.X - 4, rect_rights.Y, rect_rights.Width, rect_rights.Height), .26F));
+                    g.DrawLines(pen_arrow, TAlignMini.Right.TriangleLines(new Rectangle(rect_rights.X + 4, rect_rights.Y, rect_rights.Width, rect_rights.Height), .26F));
+                }
+                else
+                {
+                    g.DrawLines(pen_arrow_enable, TAlignMini.Right.TriangleLines(new Rectangle(rect_rights.X - 4, rect_rights.Y, rect_rights.Width, rect_rights.Height), .26F));
+                    g.DrawLines(pen_arrow_enable, TAlignMini.Right.TriangleLines(new Rectangle(rect_rights.X + 4, rect_rights.Y, rect_rights.Width, rect_rights.Height), .26F));
+                }
+
+                if (showType == 0)
+                {
+                    if (hover_left.Animation)
+                    {
+                        using (var pen_arrow_hovers = new Pen(pen_arrow.Color.BlendColors(hover_left.Value, pen_arrow_hover.Color), pen_arrow_hover.Width))
+                        {
+                            g.DrawLines(pen_arrow_hovers, TAlignMini.Left.TriangleLines(rect_left, .26F));
+                        }
+                    }
+                    else if (hover_left.Switch) g.DrawLines(pen_arrow_hover, TAlignMini.Left.TriangleLines(rect_left, .26F));
+                    else if (hover_left.Enable) g.DrawLines(pen_arrow, TAlignMini.Left.TriangleLines(rect_left, .26F));
+                    else g.DrawLines(pen_arrow_enable, TAlignMini.Left.TriangleLines(rect_left, .26F));
+
+                    if (hover_right.Animation)
+                    {
+                        using (var pen_arrow_hovers = new Pen(pen_arrow.Color.BlendColors(hover_right.Value, pen_arrow_hover.Color), pen_arrow_hover.Width))
+                        {
+                            g.DrawLines(pen_arrow_hovers, TAlignMini.Right.TriangleLines(rect_right, .26F));
+                        }
+                    }
+                    else if (hover_right.Switch) g.DrawLines(pen_arrow_hover, TAlignMini.Right.TriangleLines(rect_right, .26F));
+                    else if (hover_right.Enable) g.DrawLines(pen_arrow, TAlignMini.Right.TriangleLines(rect_right, .26F));
+                    else g.DrawLines(pen_arrow_enable, TAlignMini.Right.TriangleLines(rect_right, .26F));
+                }
+            }
+
+            #endregion
+
+            if (showType == 1 && calendar_month != null) PrintMonth(g, rect_read, _radius, calendar_month);
+            else if (showType == 2 && calendar_year != null) PrintYear(g, rect_read, _radius, calendar_year);
+            else if (calendar_day != null) PrintDay(g, rect_read, _radius, calendar_day);
+            base.OnDraw(e);
+        }
+
+        #region 渲染帮助
+
+        #region 年模式
+
+        Rectangle rect_year_l;
+        /// <summary>
+        /// 渲染年模式
+        /// </summary>
+        /// <param name="g">GDI</param>
+        /// <param name="rect_read">真实区域</param>
+        /// <param name="datas">数据</param>
+        void PrintYear(Canvas g, Rectangle rect_read, int radius, List<Calendari> datas)
+        {
+            var color_fore = fore ?? Colour.TextBase.Get(nameof(Calendar), ColorScheme);
+            using (var font = new Font(Font.FontFamily, Font.Size, FontStyle.Bold))
+            {
+                if (hover_year.Animation) g.String(year_str, font, color_fore.BlendColors(hover_year.Value, Colour.Primary.Get(nameof(Calendar), ColorScheme)), rect_year_l, s_f);
+                else if (hover_year.Switch) g.String(year_str, font, Colour.Primary.Get(nameof(Calendar), ColorScheme), rect_year_l, s_f);
+                else g.String(year_str, font, color_fore, rect_year_l, s_f);
+            }
+            using (var brush_fore_disable = new SolidBrush(Colour.TextQuaternary.Get(nameof(Calendar), ColorScheme)))
+            using (var brush_bg_disable = new SolidBrush(Colour.FillTertiary.Get(nameof(Calendar), ColorScheme)))
+            using (var brush_fore = new SolidBrush(color_fore))
+            {
+                var now = DateTime.Now;
+                foreach (var it in datas)
+                {
+                    using (var path = it.rect_read.RoundPath(radius))
+                    {
+                        if (_value.ToString("yyyy") == it.date_str)
+                        {
+                            g.Fill(Colour.Primary.Get(nameof(Calendar), ColorScheme), path);
+                            g.String(it.v, Font, Colour.PrimaryColor.Get(nameof(Calendar), ColorScheme), it.rect, s_f);
+                        }
+                        else if (it.enable)
+                        {
+                            if (it.hover) g.Fill(Colour.FillTertiary.Get(nameof(Calendar), ColorScheme), path);
+                            if (now.ToString("yyyy-MM-dd") == it.date_str) g.Draw(Colour.Primary.Get(nameof(Calendar), ColorScheme), Dpi, path);
+                            g.String(it.v, Font, it.t == 1 ? brush_fore : brush_fore_disable, it.rect, s_f);
+                        }
+                        else
+                        {
+                            g.Fill(brush_bg_disable, new Rectangle(it.rect.X, it.rect_read.Y, it.rect.Width, it.rect_read.Height));
+                            if (now.ToString("yyyy-MM-dd") == it.date_str) g.Draw(Colour.Primary.Get(nameof(Calendar), ColorScheme), Dpi, path);
+                            g.String(it.v, Font, brush_fore_disable, it.rect, s_f);
+                        }
+                    }
+                }
+            }
+        }
+
+        #endregion
+
+        #region 月模式
+
+        Rectangle rect_month_l;
+        /// <summary>
+        /// 渲染月模式
+        /// </summary>
+        /// <param name="g">GDI</param>
+        /// <param name="rect_read">真实区域</param>
+        /// <param name="datas">数据</param>
+        void PrintMonth(Canvas g, Rectangle rect_read, int radius, List<Calendari> datas)
+        {
+            var color_fore = fore ?? Colour.TextBase.Get(nameof(Calendar), ColorScheme);
+            using (var font = new Font(Font.FontFamily, Font.Size, FontStyle.Bold))
+            {
+                string yearStr = _Date.ToString(YearFormat, Culture);
+                if (hover_year.Animation) g.String(yearStr, font, color_fore.BlendColors(hover_year.Value, Colour.Primary.Get(nameof(Calendar), ColorScheme)), rect_month_l, s_f);
+                else if (hover_year.Switch) g.String(yearStr, font, Colour.Primary.Get(nameof(Calendar), ColorScheme), rect_month_l, s_f);
+                else g.String(yearStr, font, color_fore, rect_month_l, s_f);
+            }
+
+            using (var brush_fore_disable = new SolidBrush(Colour.TextQuaternary.Get(nameof(Calendar), ColorScheme)))
+            using (var brush_bg_disable = new SolidBrush(Colour.FillTertiary.Get(nameof(Calendar), ColorScheme)))
+            using (var brush_fore = new SolidBrush(color_fore))
+            {
+                var now = DateTime.Now;
+                foreach (var it in datas)
+                {
+                    using (var path = it.rect_read.RoundPath(radius))
+                    {
+                        if (_value.ToString("yyyy-MM") == it.date_str)
+                        {
+                            g.Fill(Colour.Primary.Get(nameof(Calendar), ColorScheme), path);
+                            g.String(it.v, Font, Colour.PrimaryColor.Get(nameof(Calendar), ColorScheme), it.rect, s_f);
+                        }
+                        else if (it.enable)
+                        {
+                            if (it.hover) g.Fill(Colour.FillTertiary.Get(nameof(Calendar), ColorScheme), path);
+                            if (now.ToString("yyyy-MM-dd") == it.date_str) g.Draw(Colour.Primary.Get(nameof(Calendar), ColorScheme), Dpi, path);
+                            g.String(it.v, Font, brush_fore, it.rect, s_f);
+                        }
+                        else
+                        {
+                            g.Fill(brush_bg_disable, new Rectangle(it.rect.X, it.rect_read.Y, it.rect.Width, it.rect_read.Height));
+                            if (now.ToString("yyyy-MM-dd") == it.date_str) g.Draw(Colour.Primary.Get(nameof(Calendar), ColorScheme), Dpi, path);
+                            g.String(it.v, Font, brush_fore_disable, it.rect, s_f);
+                        }
+                    }
+                }
+            }
+        }
+
+        #endregion
+
+        #region 天模式
+
+        RectangleF rect_day_split1, rect_day_split2;
+        Rectangle[]? rect_day_s;
+
+        /// <summary>
+        /// 渲染天模式
+        /// </summary>
+        /// <param name="g">GDI</param>
+        /// <param name="rect_read">真实区域</param>
+        /// <param name="datas">数据</param>
+        void PrintDay(Canvas g, Rectangle rect_read, int radius, List<Calendari> datas)
+        {
+            if (rect_day_s == null) return;
+            var color_fore = fore ?? Colour.TextBase.Get(nameof(Calendar), ColorScheme);
+            using (var font = new Font(Font.FontFamily, Font.Size, FontStyle.Bold))
+            {
+                string yearStr = _Date.ToString(YearFormat, Culture), monthStr = _Date.ToString(MonthFormat, Culture);
+
+                if (hover_year.Animation) g.String(yearStr, font, color_fore.BlendColors(hover_year.Value, Colour.Primary.Get(nameof(Calendar), ColorScheme)), rect_year, s_f_L);
+                else if (hover_year.Switch) g.String(yearStr, font, Colour.Primary.Get(nameof(Calendar), ColorScheme), rect_year, s_f_L);
+                else g.String(yearStr, font, color_fore, rect_year, s_f_L);
+
+                if (hover_month.Animation) g.String(monthStr, font, color_fore.BlendColors(hover_month.Value, Colour.Primary.Get(nameof(Calendar), ColorScheme)), rect_month, s_f_R);
+                else if (hover_month.Switch) g.String(monthStr, font, Colour.Primary.Get(nameof(Calendar), ColorScheme), rect_month, s_f_R);
+                else g.String(monthStr, font, color_fore, rect_month, s_f_R);
+            }
+
+            using (var brush_split = new SolidBrush(Colour.Split.Get(nameof(Calendar), ColorScheme)))
+            {
+                g.Fill(brush_split, rect_day_split1);
+                if (showButtonToDay) g.Fill(brush_split, rect_day_split2);
+            }
+
+            using (var brush = new SolidBrush(Colour.Text.Get(nameof(Calendar), ColorScheme)))
+            {
+                g.String(MondayButton, Font, brush, rect_day_s[0], s_f);
+                g.String(TuesdayButton, Font, brush, rect_day_s[1], s_f);
+                g.String(WednesdayButton, Font, brush, rect_day_s[2], s_f);
+                g.String(ThursdayButton, Font, brush, rect_day_s[3], s_f);
+                g.String(FridayButton, Font, brush, rect_day_s[4], s_f);
+                g.String(SaturdayButton, Font, brush, rect_day_s[5], s_f);
+                g.String(SundayButton, Font, brush, rect_day_s[6], s_f);
+            }
+            using (var brush_fore = new SolidBrush(color_fore))
+            using (var brush_fore_disable = new SolidBrush(Colour.TextQuaternary.Get(nameof(Calendar), ColorScheme)))
+            using (var brush_bg_disable = new SolidBrush(Colour.FillTertiary.Get(nameof(Calendar), ColorScheme)))
+            using (var brush_active = new SolidBrush(Colour.Primary.Get(nameof(Calendar), ColorScheme)))
+            using (var brush_active_fore = new SolidBrush(Colour.PrimaryColor.Get(nameof(Calendar), ColorScheme)))
+            using (var brush_error = new SolidBrush(Colour.Error.Get(nameof(Calendar), ColorScheme)))
+            {
+                PaintToDayFrame(g, datas, DateTime.Now.ToString("yyyy-MM-dd"), radius);
+                if (ItemPaintBegin == null)
+                {
+                    if (chinese)
+                    {
+                        using (var font4 = new Font(Font.FontFamily, Font.Size * .76F, Font.Style))
+                        {
+                            using (var brush_fore_c = new SolidBrush(Colour.TextSecondary.Get(nameof(Calendar), ColorScheme)))
+                            {
+                                foreach (var it in datas)
+                                {
+                                    PaintDayChinese(g, it, radius, 0, 0, font4, brush_fore, brush_fore_c, brush_fore_disable, brush_active_fore, brush_active, brush_bg_disable);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        foreach (var it in datas)
+                        {
+                            using (var path = it.rect_read.RoundPath(radius))
+                            {
+                                PaintDay(g, it, radius, 0, 0, brush_fore, brush_fore_disable, brush_active_fore, brush_active, brush_bg_disable);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if (chinese)
+                    {
+                        using (var font4 = new Font(Font.FontFamily, Font.Size * .76F, Font.Style))
+                        {
+                            using (var brush_fore_c = new SolidBrush(Colour.TextSecondary.Get(nameof(Calendar), ColorScheme)))
+                            {
+                                foreach (var it in datas)
+                                {
+                                    var state = g.Save();
+                                    var arge = new CalendarPaintBeginEventArgs(g, TDatePicker.Date, it.rect, it.rect_read, it.date, it.date_str, it.enable, radius);
+                                    ItemPaintBegin(this, arge);
+                                    if (arge.Handled)
+                                    {
+                                        g.Restore(state);
+                                        continue;
+                                    }
+                                    PaintDayChinese(g, it, radius, arge.OffsetX, arge.OffsetY, font4, brush_fore, brush_fore_c, brush_fore_disable, brush_active_fore, brush_active, brush_bg_disable);
+                                    g.Restore(state);
+                                    OnItemPaint(g, TDatePicker.Date, it.rect, it.rect_read, it.date, it.date_str, it.enable, radius);
+                                    g.Restore(state);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        foreach (var it in datas)
+                        {
+                            using (var path = it.rect_read.RoundPath(radius))
+                            {
+                                var state = g.Save();
+                                var arge = new CalendarPaintBeginEventArgs(g, TDatePicker.Date, it.rect, it.rect_read, it.date, it.date_str, it.enable, radius);
+                                ItemPaintBegin(this, arge);
+                                if (arge.Handled)
+                                {
+                                    g.Restore(state);
+                                    continue;
+                                }
+                                PaintDay(g, it, radius, arge.OffsetX, arge.OffsetY, brush_fore, brush_fore_disable, brush_active_fore, brush_active, brush_bg_disable);
+                                g.Restore(state);
+                                OnItemPaint(g, TDatePicker.Date, it.rect, it.rect_read, it.date, it.date_str, it.enable, radius);
+                                g.Restore(state);
+                            }
+                        }
+                    }
+                }
+                if (showButtonToDay)
+                {
+                    if (hover_button.Animation) g.String(button_text, Font, brush_active.Color.BlendColors(hover_button.Value, Colour.PrimaryActive.Get(nameof(Calendar), ColorScheme)), rect_button, s_f);
+                    else if (hover_button.Switch) g.String(button_text, Font, Colour.PrimaryActive.Get(nameof(Calendar), ColorScheme), rect_button, s_f);
+                    else g.String(button_text, Font, brush_active, rect_button, s_f);
+                }
+                if (badge_list.Count > 0)
+                {
+                    foreach (var it in datas)
+                    {
+                        if (badge_list.TryGetValue(it.date_str, out var find)) this.PaintBadge(find, it.rect, g);
+                    }
+                }
+            }
+        }
+
+        void PaintDayChinese(Canvas g, Calendari it, int radius, int offsetx, int offsety, Font font4, SolidBrush brush_fore, SolidBrush brush_fore_c, SolidBrush brush_fore_disable, SolidBrush brush_active_fore, SolidBrush brush_active, SolidBrush brush_bg_disable)
+        {
+            using (var path = it.rect_read.RoundPath(radius))
+            {
+                var cdate = ChineseCalendar.ChineseDate.FromDayString(it.date);
+                if (_value.ToString("yyyy-MM-dd") == it.date_str)
+                {
+                    g.Fill(brush_active, path);
+                    g.TranslateTransform(offsetx, offsety);
+                    g.String(cdate, font4, brush_active_fore, it.rect_l, s_f);
+                    g.String(it.v, Font, brush_active_fore, it.rect_f, s_f);
+                }
+                else if (it.enable)
+                {
+                    if (it.hover) g.Fill(Colour.FillTertiary.Get(nameof(Calendar), ColorScheme), path);
+                    g.TranslateTransform(offsetx, offsety);
+                    g.String(cdate, font4, brush_fore_c, it.rect_l, s_f);
+                    g.String(it.v, Font, it.t == 1 ? brush_fore : brush_fore_disable, it.rect_f, s_f);
+                }
+                else
+                {
+                    g.Fill(brush_bg_disable, new Rectangle(it.rect.X, it.rect_read.Y, it.rect.Width, it.rect_read.Height));
+                    g.TranslateTransform(offsetx, offsety);
+                    g.String(cdate, font4, brush_fore_disable, it.rect_l, s_f);
+                    g.String(it.v, Font, brush_fore_disable, it.rect_f, s_f);
+                }
+            }
+        }
+
+        void PaintDay(Canvas g, Calendari it, int radius, int offsetx, int offsety, SolidBrush brush_fore, SolidBrush brush_fore_disable, SolidBrush brush_active_fore, SolidBrush brush_active, SolidBrush brush_bg_disable)
+        {
+            using (var path = it.rect_read.RoundPath(radius))
+            {
+                if (_value.ToString("yyyy-MM-dd") == it.date_str)
+                {
+                    g.Fill(brush_active, path);
+                    g.TranslateTransform(offsetx, offsety);
+                    g.String(it.v, Font, brush_active_fore, it.rect, s_f);
+                }
+                else if (it.enable)
+                {
+                    if (it.hover) g.Fill(Colour.FillTertiary.Get(nameof(Calendar), ColorScheme), path);
+                    g.TranslateTransform(offsetx, offsety);
+                    g.String(it.v, Font, it.t == 1 ? brush_fore : brush_fore_disable, it.rect, s_f);
+                }
+                else
+                {
+                    g.Fill(brush_bg_disable, new Rectangle(it.rect.X, it.rect_read.Y, it.rect.Width, it.rect_read.Height));
+                    g.TranslateTransform(offsetx, offsety);
+                    g.String(it.v, Font, brush_fore_disable, it.rect, s_f);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 绘制今天边框
+        /// </summary>
+        internal void PaintToDayFrame(Canvas g, IList<Calendari> datas, string dateNow, int radius)
+        {
+            foreach (var it in datas)
+            {
+                if (dateNow == it.date_str)
+                {
+                    using (var path = it.rect_read.RoundPath(radius))
+                    {
+                        g.Draw(Colour.Primary.Get(nameof(Calendar), ColorScheme), Dpi, path);
+                    }
+                    return;
+                }
+            }
+        }
+
+        #endregion
+
+        public override Rectangle ReadRectangle => ClientRectangle.PaddingRect(Padding);
+
+        public override GraphicsPath RenderRegion => ReadRectangle.RoundPath(radius * Dpi);
+
+        #endregion
+
+        #endregion
+
+        #region 鼠标
+
+        ITaskOpacity hover_button, hover_lefts, hover_left, hover_rights, hover_right, hover_year, hover_month;
+        Rectangle rect_button = new Rectangle(-20, -20, 10, 10);
+        Rectangle rect_lefts = new Rectangle(-20, -20, 10, 10), rect_left = new Rectangle(-20, -20, 10, 10);
+        Rectangle rect_rights = new Rectangle(-20, -20, 10, 10), rect_right = new Rectangle(-20, -20, 10, 10);
+        Rectangle rect_year = new Rectangle(-20, -20, 10, 10), rect_year2 = new Rectangle(-20, -20, 10, 10), rect_month = new Rectangle(-20, -20, 10, 10);
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            int count = 0, hand = 0;
+            bool _hover_lefts = rect_lefts.Contains(e.X, e.Y),
+             _hover_rights = rect_rights.Contains(e.X, e.Y),
+             _hover_left = (showType == 0 && rect_left.Contains(e.X, e.Y)),
+             _hover_right = (showType == 0 && rect_right.Contains(e.X, e.Y)),
+             _hover_button = (showType == 0 && showButtonToDay && rect_button.Contains(e.X, e.Y));
+
+            bool _hover_year = false, _hover_month = false;
+            if (showType != 2)
+            {
+                _hover_year = showType == 0 ? rect_year.Contains(e.X, e.Y) : rect_year2.Contains(e.X, e.Y);
+                _hover_month = rect_month.Contains(e.X, e.Y);
+            }
+
+            if (_hover_lefts != hover_lefts.Switch) count++;
+            if (_hover_left != hover_left.Switch) count++;
+            if (_hover_rights != hover_rights.Switch) count++;
+            if (_hover_right != hover_right.Switch) count++;
+
+            if (_hover_year != hover_year.Switch) count++;
+            if (_hover_month != hover_month.Switch) count++;
+            if (_hover_button != hover_button.Switch) count++;
+
+            hover_lefts.Switch = _hover_lefts;
+            hover_left.Switch = _hover_left;
+            hover_rights.Switch = _hover_rights;
+            hover_right.Switch = _hover_right;
+            hover_year.Switch = _hover_year;
+            hover_month.Switch = _hover_month;
+            hover_button.Switch = _hover_button;
+            if (hover_lefts.Switch || hover_left.Switch || hover_rights.Switch || hover_right.Switch || hover_year.Switch || hover_month.Switch || hover_button.Switch) hand++;
+            else
+            {
+                if (showType == 1)
+                {
+                    if (calendar_month != null)
+                    {
+                        foreach (var it in calendar_month)
+                        {
+                            bool hove = it.enable && it.rect.Contains(e.X, e.Y);
+                            if (it.hover != hove) count++;
+                            it.hover = hove;
+                            if (it.hover) hand++;
+                        }
+                    }
+                }
+                else if (showType == 2)
+                {
+                    if (calendar_year != null)
+                    {
+                        foreach (var it in calendar_year)
+                        {
+                            bool hove = it.enable && it.rect.Contains(e.X, e.Y);
+                            if (it.hover != hove) count++;
+                            it.hover = hove;
+                            if (it.hover) hand++;
+                        }
+                    }
+                }
+                else
+                {
+                    if (calendar_day != null)
+                    {
+                        foreach (var it in calendar_day)
+                        {
+                            bool hove = it.enable && it.rect.Contains(e.X, e.Y);
+                            if (it.hover != hove) count++;
+                            it.hover = hove;
+                            if (it.hover) hand++;
+                        }
+                    }
+                }
+            }
+            if (count > 0) Invalidate();
+            SetCursor(hand > 0);
+            base.OnMouseMove(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            hover_lefts.Switch = false;
+            hover_left.Switch = false;
+            hover_rights.Switch = false;
+            hover_right.Switch = false;
+            hover_year.Switch = false;
+            hover_month.Switch = false;
+            hover_button.Switch = false;
+            if (calendar_year != null)
+            {
+                foreach (var it in calendar_year) it.hover = false;
+            }
+            if (calendar_month != null)
+            {
+                foreach (var it in calendar_month) it.hover = false;
+            }
+            if (calendar_day != null)
+            {
+                foreach (var it in calendar_day) it.hover = false;
+            }
+            SetCursor(false);
+            Invalidate();
+            base.OnMouseLeave(e);
+        }
+
+        int showType = 0;
+        void ChangeType(int type)
+        {
+            if (type == showType) return;
+            showType = type;
+            IOnSizeChanged();
+            Invalidate();
+        }
+
+        string? Mdown;
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            Mdown = null;
+            if (e.Button == MouseButtons.Left)
+            {
+                if (rect_lefts.Contains(e.X, e.Y))
+                {
+                    Mdown = "lefts";
+                    return;
+                }
+                else if (rect_rights.Contains(e.X, e.Y))
+                {
+                    Mdown = "rights";
+                    return;
+                }
+                else if (showType == 0 && rect_left.Contains(e.X, e.Y))
+                {
+                    Mdown = "left";
+                    return;
+                }
+                else if (showType == 0 && rect_right.Contains(e.X, e.Y))
+                {
+                    Mdown = "right";
+                    return;
+                }
+                else if ((showType == 0 && rect_year.Contains(e.X, e.Y)) || (showType != 0 && rect_year2.Contains(e.X, e.Y)))
+                {
+                    Mdown = "year";
+                    return;
+                }
+                else if (showType == 0 && showButtonToDay && rect_button.Contains(e.X, e.Y))
+                {
+                    Mdown = "button";
+                    return;
+                }
+                else if (rect_month.Contains(e.X, e.Y))
+                {
+                    Mdown = "month";
+                    return;
+                }
+                else
+                {
+                    if (showType == 1)
+                    {
+                        if (calendar_month != null)
+                        {
+                            foreach (var it in calendar_month)
+                            {
+                                if (it.enable && it.rect.Contains(e.X, e.Y))
+                                {
+                                    Mdown = it.date_str;
+                                    OnItemMouseDown(it.date, TDatePicker.Month, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    else if (showType == 2)
+                    {
+                        if (calendar_year != null)
+                        {
+                            foreach (var it in calendar_year)
+                            {
+                                if (it.enable && it.rect.Contains(e.X, e.Y))
+                                {
+                                    Mdown = it.date_str;
+                                    OnItemMouseDown(it.date, TDatePicker.Year, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (calendar_day != null)
+                        {
+                            foreach (var it in calendar_day)
+                            {
+                                if (it.enable && it.rect.Contains(e.X, e.Y))
+                                {
+                                    Mdown = it.date_str;
+                                    OnItemMouseDown(it.date, TDatePicker.Date, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            base.OnMouseDown(e);
+        }
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                try
+                {
+                    if (rect_lefts.Contains(e.X, e.Y))
+                    {
+                        if (hover_lefts.Enable && Mdown == "lefts")
+                        {
+                            if (showType == 2) Date = _Date.AddYears(-10);
+                            else Date = _Date.AddYears(-1);
+                            Invalidate();
+                        }
+                        return;
+                    }
+                    else if (rect_rights.Contains(e.X, e.Y))
+                    {
+                        if (hover_rights.Enable && Mdown == "rights")
+                        {
+                            if (showType == 2) Date = _Date.AddYears(10);
+                            else Date = _Date.AddYears(1);
+                            Invalidate();
+                        }
+                        return;
+                    }
+                    else if (showType == 0 && rect_left.Contains(e.X, e.Y))
+                    {
+                        if (hover_left.Enable && Mdown == "left")
+                        {
+                            try
+                            {
+                                Date = _Date.AddMonths(-1);
+                                Invalidate();
+                            }
+                            catch { }
+                        }
+                        return;
+                    }
+                    else if (showType == 0 && rect_right.Contains(e.X, e.Y))
+                    {
+                        if (hover_right.Enable && Mdown == "right")
+                        {
+                            try
+                            {
+                                Date = _Date.AddMonths(1);
+                                Invalidate();
+                            }
+                            catch { }
+                        }
+                        return;
+                    }
+                    else if ((showType == 0 && rect_year.Contains(e.X, e.Y)) || (showType != 0 && rect_year2.Contains(e.X, e.Y)))
+                    {
+                        if (Mdown == "year") ChangeType(2);
+                        return;
+                    }
+                    else if (showType == 0 && showButtonToDay && rect_button.Contains(e.X, e.Y))
+                    {
+                        if (Mdown == "button") Value = Date = DateTime.Now;
+                        return;
+                    }
+                    else if (rect_month.Contains(e.X, e.Y))
+                    {
+                        if (Mdown == "month") ChangeType(1);
+                        return;
+                    }
+                    else
+                    {
+                        if (showType == 1)
+                        {
+                            if (calendar_month != null)
+                            {
+                                foreach (var it in calendar_month)
+                                {
+                                    if (it.enable && it.rect.Contains(e.X, e.Y))
+                                    {
+                                        if (Mdown == it.date_str)
+                                        {
+                                            Date = it.date;
+                                            ChangeType(0);
+                                            OnItemMouseUp(it.date, TDatePicker.Month, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                            OnItemMouseClick(it.date, TDatePicker.Month, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                        }
+                                        else
+                                        {
+                                            OnItemMouseUp(it.date, TDatePicker.Month, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                        }
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        else if (showType == 2)
+                        {
+                            if (calendar_year != null)
+                            {
+                                foreach (var it in calendar_year)
+                                {
+                                    if (it.enable && it.rect.Contains(e.X, e.Y))
+                                    {
+                                        if (Mdown == it.date_str)
+                                        {
+                                            Date = it.date;
+                                            ChangeType(1);
+                                            OnItemMouseUp(it.date, TDatePicker.Year, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                            OnItemMouseClick(it.date, TDatePicker.Year, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                        }
+                                        else
+                                        {
+                                            OnItemMouseUp(it.date, TDatePicker.Year, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                        }
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (calendar_day != null)
+                            {
+                                foreach (var it in calendar_day)
+                                {
+                                    if (it.enable && it.rect.Contains(e.X, e.Y))
+                                    {
+                                        if (Mdown == it.date_str)
+                                        {
+                                            Value = it.date;
+                                            OnItemMouseUp(it.date, TDatePicker.Date, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                            OnItemMouseClick(it.date, TDatePicker.Date, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                        }
+                                        else
+                                        {
+                                            OnItemMouseUp(it.date, TDatePicker.Date, it.rect, it.rect_read, it.date_str, it.enable, e);
+                                        }
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+            base.OnMouseUp(e);
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            if (e.Delta != 0) MouseWheelDay(e);
+            base.OnMouseWheel(e);
+        }
+
+        void MouseWheelDay(MouseEventArgs e)
+        {
+            try
+            {
+                if (e.Delta > 0)
+                {
+                    if (showType == 1)
+                    {
+                        if (hover_lefts.Enable) Date = _Date.AddYears(-1);
+                        else return;
+                    }
+                    else if (showType == 2)
+                    {
+                        if (hover_lefts.Enable) Date = _Date.AddYears(-10);
+                        else return;
+                    }
+                    else
+                    {
+                        if (hover_left.Enable) Date = _Date.AddMonths(-1);
+                        else return;
+                    }
+                    Invalidate();
+                }
+                else
+                {
+                    if (showType == 1)
+                    {
+                        if (hover_rights.Enable) Date = _Date.AddYears(1);
+                        else return;
+                    }
+                    else if (showType == 2)
+                    {
+                        if (hover_rights.Enable) Date = _Date.AddYears(10);
+                        else return;
+                    }
+                    else
+                    {
+                        if (hover_right.Enable) Date = _Date.AddMonths(1);
+                        else return;
+                    }
+                    Invalidate();
+                }
+            }
+            catch { }
+        }
+
+
+        #endregion
+
+        #region 坐标
+
+        protected override void OnSizeChanged(EventArgs e)
+        {
+            LoadLayout();
+            base.OnSizeChanged(e);
+        }
+
+        void LoadLayout()
+        {
+            float dpi = Dpi;
+
+            var rect = ReadRectangle;
+
+            int t_top = 34, t_button = showButtonToDay ? 38 : 0;
+            int year_width = 60, year2_width = 88, month_width = 40;
+            this.GDI(g =>
+            {
+                var size = g.MeasureString(Config.NullText, Font);
+                t_top = (int)(size.Height * 1.76F);
+                year_width = (int)(size.Height * 3.12F);
+                year2_width = (int)(size.Height * 4.66F);
+                month_width = year_width;
+            });
+            if (dpi != 1F)
+            {
+                if (showButtonToDay) t_button = (int)(t_button * dpi);
+                year_width = (int)(year_width * dpi);
+                year2_width = (int)(year2_width * dpi);
+                month_width = (int)(month_width * dpi);
+            }
+
+            rect_lefts = new Rectangle(rect.X, rect.Y, t_top, t_top);
+            rect_left = new Rectangle(rect.X + t_top, rect.Y, t_top, t_top);
+            rect_rights = new Rectangle(rect.X + rect.Width - t_top, rect.Y, t_top, t_top);
+            rect_right = new Rectangle(rect.X + rect.Width - t_top * 2, rect.Y, t_top, t_top);
+
+            int gap = (int)(4 * Dpi), xm = rect.Width / 2;
+            rect_year2 = new Rectangle(rect.X + (rect.Width - year2_width) / 2, rect.Y, year2_width, t_top);
+            rect_button = new Rectangle(rect.X, rect.Bottom - t_button, rect.Width, t_button);
+            if (YDR)
+            {
+                rect_month = new Rectangle(rect.X + xm - year_width - gap, rect.Y, year_width, t_top);
+                rect_year = new Rectangle(rect.X + xm + gap, rect.Y, month_width, t_top);
+            }
+            else
+            {
+                rect_year = new Rectangle(rect.X + xm - year_width - gap, rect.Y, year_width, t_top);
+                rect_month = new Rectangle(rect.X + xm + gap, rect.Y, month_width, t_top);
+            }
+
+            #region 计算坐标
+
+            int gap_day = (int)(8 * dpi), gap_day2 = gap_day * 2;
+            if (showType == 1)
+            {
+                //月
+                rect_month_l = new Rectangle(rect.X, rect.Y, rect.Width, t_top);
+                int y = rect.Y + t_top;
+                int size_w = (rect.Width - gap_day2) / 3, size_h = (rect.Height - t_top - gap_day2) / 4;
+                if (calendar_month != null)
+                {
+                    foreach (var it in calendar_month) it.rect = new Rectangle(rect.X + gap_day + (size_w * it.x), y + gap_day + (size_h * it.y), size_w, size_h);
+                }
+            }
+            else if (showType == 2)
+            {
+                //年
+                rect_year_l = new Rectangle(rect.X, rect.Y, rect.Width, t_top);
+                int y = rect.Y + t_top;
+                int size_w = (rect.Width - gap_day2) / 3, size_h = (rect.Height - t_top - gap_day2) / 4;
+                if (calendar_year != null)
+                {
+                    foreach (var it in calendar_year) it.rect = new Rectangle(rect.X + gap_day + (size_w * it.x), y + gap_day + (size_h * it.y), size_w, size_h);
+                }
+            }
+            else
+            {
+                if (chinese)
+                {
+                    int y = rect.Y + t_top + 12;
+                    int size_w = (rect.Width - gap_day2) / 7, size_h = (rect.Height - t_top - t_button - gap_day2) / 7;
+
+                    rect_day_split1 = new RectangleF(rect.X, rect.Y + t_top, rect.Width, Dpi);
+                    if (showButtonToDay) rect_day_split2 = new RectangleF(rect.X, rect_button.Y - .5F, rect.Width, Dpi);
+
+                    rect_day_s = new Rectangle[]{
+                        new Rectangle(rect.X + gap_day, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 2, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 3, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 4, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 5, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 6, y, size_w, size_h)
+                    };
+                    y += size_h;
+                    if (calendar_day != null)
+                    {
+                        foreach (var it in calendar_day)
+                        {
+                            it.SetRectG(new Rectangle(rect.X + gap_day + (size_w * it.x), y + (size_h * it.y), size_w, size_h), .92F);
+                            it.rect_f = new Rectangle(it.rect_read.X, it.rect_read.Y, it.rect_read.Width, it.rect_read.Height - it.rect_read.Height / 4);
+                            it.rect_l = new Rectangle(it.rect_read.X, it.rect_read.Y + it.rect_read.Height / 2, it.rect_read.Width, it.rect_read.Height / 2);
+                        }
+                    }
+                }
+                else if (full)
+                {
+                    int y = rect.Y + t_top + 12;
+                    int size_w = (rect.Width - gap_day2) / 7, size_h = (rect.Height - t_top - t_button - gap_day2) / 7;
+
+                    rect_day_split1 = new RectangleF(rect.X, rect.Y + t_top, rect.Width, Dpi);
+                    if (showButtonToDay) rect_day_split2 = new RectangleF(rect.X, rect_button.Y - .5F, rect.Width, Dpi);
+
+                    rect_day_s = new Rectangle[]{
+                        new Rectangle(rect.X + gap_day, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 2, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 3, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 4, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 5, y, size_w, size_h),
+                        new Rectangle(rect.X + gap_day + size_w * 6, y, size_w, size_h)
+                    };
+                    y += size_h;
+                    if (calendar_day != null)
+                    {
+                        foreach (var it in calendar_day) it.SetRectG(new Rectangle(rect.X + gap_day + (size_w * it.x), y + (size_h * it.y), size_w, size_h), .92F);
+                    }
+                }
+                else
+                {
+                    int y = rect.Y + t_top + 12;
+                    int size_w = (rect.Width - gap_day2) / 7, size_h = (rect.Height - t_top - t_button - gap_day2) / 7, size = size_w;
+                    if (size_w > size_h)
+                    {
+                        size = size_h;
+                        gap_day2 = rect.Width - size * 7;
+                        gap_day = gap_day2 / 2;
+                    }
+
+                    rect_day_split1 = new RectangleF(rect.X, rect.Y + t_top, rect.Width, Dpi);
+                    if (showButtonToDay) rect_day_split2 = new RectangleF(rect.X, rect_button.Y - .5F, rect.Width, Dpi);
+
+                    rect_day_s = new Rectangle[]{
+                        new Rectangle(rect.X + gap_day, y, size, size),
+                        new Rectangle(rect.X + gap_day + size, y, size, size),
+                        new Rectangle(rect.X + gap_day + size * 2, y, size, size),
+                        new Rectangle(rect.X + gap_day + size * 3, y, size, size),
+                        new Rectangle(rect.X + gap_day + size * 4, y, size, size),
+                        new Rectangle(rect.X + gap_day + size * 5, y, size, size),
+                        new Rectangle(rect.X + gap_day + size * 6, y, size, size)
+                    };
+                    y += size;
+                    if (calendar_day != null)
+                    {
+                        int size_one = (int)(size * .666F);
+                        foreach (var it in calendar_day) it.SetRect(new Rectangle(rect.X + gap_day + (size * it.x), y + (size * it.y), size, size), size_one);
+                    }
+                }
+            }
+
+            #endregion
+        }
+
+        #endregion
+
+        #region 事件
+
+        [Description("日期 改变时发生"), Category("行为")]
+        public event DateTimeEventHandler? DateChanged;
+
+        protected virtual void OnDateChanged(DateTime e) => DateChanged?.Invoke(this, new DateTimeEventArgs(e));
+
+        /// <summary>
+        /// 绘制项时发生
+        /// </summary>
+        [Description("绘制项时发生"), Category("行为")]
+        public event CalendarPaintEventHandler? ItemPaint;
+
+        protected virtual void OnItemPaint(Canvas canvas, TDatePicker type, Rectangle rect, Rectangle rectreal, DateTime date, string text, bool enable, int radius) => ItemPaint?.Invoke(this, new CalendarPaintEventArgs(canvas, type, rect, rectreal, date, text, enable, radius));
+
+        /// <summary>
+        /// 绘制项之前发生
+        /// </summary>
+        [Description("绘制项之前发生"), Category("行为")]
+        public event CalendarPaintBeginEventHandler? ItemPaintBegin;
+
+        [Description("鼠标点击事件"), Category("行为")]
+        public event CalendarMouseEventHandler? ItemMouseClick;
+        [Description("鼠标按下事件"), Category("行为")]
+        public event CalendarMouseEventHandler? ItemMouseDown;
+        [Description("鼠标松开事件"), Category("行为")]
+        public event CalendarMouseEventHandler? ItemMouseUp;
+
+        protected virtual void OnItemMouseClick(DateTime e, TDatePicker type, Rectangle rect, Rectangle rectreal, string text, bool enable, MouseEventArgs args) => ItemMouseClick?.Invoke(this, new CalendarMouseEventArgs(e, type, rect, rectreal, text, enable, args));
+        protected virtual void OnItemMouseDown(DateTime e, TDatePicker type, Rectangle rect, Rectangle rectreal, string text, bool enable, MouseEventArgs args) => ItemMouseDown?.Invoke(this, new CalendarMouseEventArgs(e, type, rect, rectreal, text, enable, args));
+        protected virtual void OnItemMouseUp(DateTime e, TDatePicker type, Rectangle rect, Rectangle rectreal, string text, bool enable, MouseEventArgs args) => ItemMouseUp?.Invoke(this, new CalendarMouseEventArgs(e, type, rect, rectreal, text, enable, args));
+
+        #endregion
+
+        #region 语言变化
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            this.AddListener();
+        }
+
+        public void HandleEvent(EventType id, object? tag)
+        {
+            switch (id)
+            {
+                case EventType.LANG:
+                    CultureID = Localization.Get("ID", "zh-CN");
+                    Culture = new CultureInfo(CultureID);
+                    button_text = Localization.Get("ToDay", "今天");
+                    YDR = CultureID.StartsWith("en");
+                    Helper.InitLanguage(YDR, out YearFormat, out MonthFormat, out MondayButton, out TuesdayButton, out WednesdayButton, out ThursdayButton, out FridayButton, out SaturdayButton, out SundayButton, out s_f_L, out s_f_R);
+                    LoadLayout();
+                    break;
+            }
+        }
+
+        #endregion
+
+        public Calendar SetDate(DateTime value)
+        {
+            Date = value;
+            return this;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            hover_lefts?.Dispose(); hover_left?.Dispose(); hover_rights?.Dispose(); hover_right?.Dispose(); hover_year?.Dispose(); hover_month?.Dispose(); hover_button?.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+}

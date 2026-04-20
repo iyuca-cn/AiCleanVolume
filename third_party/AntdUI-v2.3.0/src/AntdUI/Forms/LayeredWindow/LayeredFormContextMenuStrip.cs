@@ -1,0 +1,843 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace AntdUI
+{
+    internal class LayeredFormContextMenuStrip : ILayeredShadowFormOpacity, SubLayeredForm
+    {
+        ContextMenuStrip.Config config;
+
+        Font? FontSub;
+        public LayeredFormContextMenuStrip(ContextMenuStrip.Config _config) : base(250)
+        {
+            config = _config;
+            var point = config.Location ?? MousePosition;
+            CloseMode = config.TopMost ? CloseMode.Leave : (CloseMode.Click | CloseMode.NoControl);
+            SetTopMost(config.Target, Handle, config.TopMost);
+            SetDpi(config.Target);
+            config.Target.SetFont(config.Font, this);
+            rectsContent = LoadLayout(config.Items);
+            ScrollBar = new ScrollBar(this, TAMode.Auto);
+            switch (config.Align)
+            {
+                case TAlign.BL:
+                case TAlign.LB:
+                    point.X -= TargetRect.Width - shadow2;
+                    break;
+                case TAlign.TL:
+                case TAlign.LT:
+                    point.X -= TargetRect.Width - shadow2;
+                    point.Y -= TargetRect.Height - shadow2;
+                    break;
+                case TAlign.Left:
+                    point.X -= TargetRect.Width - shadow2;
+                    point.Y -= TargetRect.Height / 2;
+                    break;
+                case TAlign.Right:
+                    point.Y -= TargetRect.Height / 2;
+                    break;
+                case TAlign.Top:
+                    point.X -= TargetRect.Width / 2;
+                    point.Y -= TargetRect.Height - shadow2;
+                    break;
+                case TAlign.Bottom:
+                    point.X -= TargetRect.Width / 2;
+                    break;
+                case TAlign.TR:
+                case TAlign.RT:
+                    point.Y -= TargetRect.Height - shadow2;
+                    break;
+            }
+            Init(point);
+            KeyCall = keys =>
+            {
+                if (keys == Keys.Escape)
+                {
+                    IClose();
+                    return true;
+                }
+                if (keys == Keys.Enter)
+                {
+                    if (select_index > -1)
+                    {
+                        var it = rectsContent[select_index];
+                        if (ClickItem(it)) return true;
+                    }
+                }
+                else if (keys == Keys.Up)
+                {
+                    select_index--;
+                    if (select_index < 0) select_index = rectsContent.Length - 1;
+                    while (rectsContent[select_index].Continue)
+                    {
+                        select_index--;
+                        if (select_index < 0) select_index = rectsContent.Length - 1;
+                    }
+                    foreach (var it in rectsContent) it.Hover = false;
+                    FocusItem(rectsContent[select_index]);
+                    return true;
+                }
+                else if (keys == Keys.Down)
+                {
+                    if (select_index == -1) select_index = 0;
+                    else
+                    {
+                        select_index++;
+                        if (select_index > rectsContent.Length - 1) select_index = 0;
+                    }
+                    while (rectsContent[select_index].Continue)
+                    {
+                        select_index++;
+                        if (select_index > rectsContent.Length - 1) select_index = 0;
+                    }
+                    foreach (var it in rectsContent) it.Hover = false;
+                    FocusItem(rectsContent[select_index]);
+                    return true;
+                }
+                else if (keys == Keys.Left)
+                {
+                    IClose();
+                    return true;
+                }
+                else if (keys == Keys.Right)
+                {
+                    if (select_index > -1)
+                    {
+                        var it = rectsContent[select_index];
+                        if (it.Tag is ContextMenuStripItem item && item.Sub != null && item.Sub.Length > 0)
+                        {
+                            if (subForm == null) OpenDown(item, it.Rect, item.Sub);
+                            else
+                            {
+                                subForm?.IClose();
+                                subForm = null;
+                            }
+                            return true;
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            };
+        }
+
+        ScrollBar ScrollBar;
+        object? Guid;
+        public LayeredFormContextMenuStrip(ContextMenuStrip.Config _config, LayeredFormContextMenuStrip parent, Point point, object guid, IContextMenuStripItem[] subs) : base(250)
+        {
+            config = _config;
+            Guid = guid;
+            PARENT = parent;
+            Font = parent.Font;
+            SetTopMost(config.Target, Handle, _config.TopMost);
+            SetDpi(config.Target);
+            rectsContent = LoadLayout(subs);
+            ScrollBar = new ScrollBar(this, TAMode.Auto);
+            ParentRect = parent.TargetRect;
+            IsLeftAligned = parent.IsLeftAligned;
+            Init(point);
+        }
+
+        bool IsLeftAligned = false;
+        Rectangle? ParentRect;
+
+        public override string name => nameof(AntdUI.ContextMenuStrip);
+
+        #region 布局
+
+        void Init(Point point)
+        {
+            var screen = Screen.FromPoint(point).WorkingArea;
+            if (ParentRect.HasValue)
+            {
+                if (IsLeftAligned) point.X = ParentRect.Value.X - TargetRect.Width + (3 * shadow);
+                else
+                {
+                    if (point.X > (screen.X + screen.Width) - TargetRect.Width + shadow)
+                    {
+                        point.X = ParentRect.Value.X - TargetRect.Width + (3 * shadow);
+                        IsLeftAligned = true;
+                    }
+                }
+            }
+            else
+            {
+                if (point.X < screen.X) point.X = screen.X;
+                else if (point.X > (screen.X + screen.Width) - TargetRect.Width + shadow) point.X = screen.X + screen.Width - TargetRect.Width + shadow;
+            }
+
+            if (TargetRect.Height > screen.Height)
+            {
+                int vr = TargetRect.Height - shadow2, height = screen.Height - shadow2;
+                SetSizeH(height);
+                ScrollBar.SizeChange(new Rectangle(0, 0, TargetRect.Width - ScrollBar.SIZE, height));
+                ScrollBar.SetVrSize(0, vr);
+                SetLocation(point.X - shadow, screen.Y);
+            }
+            else
+            {
+                if (point.Y < screen.Y) point.Y = screen.Y;
+                else if (point.Y > (screen.Y + screen.Height) - TargetRect.Height + shadow) point.Y = screen.Y + screen.Height - TargetRect.Height + shadow;
+                SetLocation(point.X - shadow, point.Y - shadow);
+            }
+            if (OS.Win7OrLower) Select();
+        }
+
+        InRect[] LoadLayout(IContextMenuStripItem[] Items)
+        {
+            return this.GDI(g =>
+            {
+                Radius = (int)(config.Radius * Dpi);
+
+                var list = new List<InRect>(Items.Length);
+                int text_height = g.MeasureString(Config.NullText, Font).Height;
+
+                int split = (int)Math.Round(1 * Dpi), gap = (int)(text_height * config.Gap), icon_size = (int)(text_height * config.IconRatio), icon_gap = (int)(text_height * config.IconGap);
+                int check_size = (int)(text_height * config.CheckRatio), gap_y = (int)(text_height * config.PaddRatio[1]), gap_x = (int)(text_height * config.PaddRatio[0]), gap2 = gap * 2, gap_x2 = gap_x * 2, gap_y2 = gap_y * 2;
+                int item_height = text_height + gap_y2, icon_xy = (item_height - icon_size) / 2, check_xy = (item_height - check_size) / 2;
+
+                ItemMaxWidth(Items, out bool has_checked, out bool has_icon, out bool has_subText, out bool has_subs);
+
+                #region 计算最大宽度
+
+                int maxw = 0;
+                foreach (var it in Items)
+                {
+                    if (it is ContextMenuStripItem item)
+                    {
+                        list.Add(new InRect(item));
+                        var size = g.MeasureText(item.Text + item.SubText, Font);
+                        int tmp2 = size.Width;
+                        if (has_checked) tmp2 += check_size + icon_gap;
+                        if (has_icon) tmp2 += icon_size + icon_gap;
+                        if (item.Sub != null && item.Sub.Length > 0) tmp2 += icon_size + icon_gap;
+                        if (tmp2 > maxw) maxw = tmp2;
+                    }
+                    else if (it is ContextMenuStripItemButtons buttons)
+                    {
+                        if (buttons.Items == null || buttons.Items.Length == 0) continue;
+                        int mw = (icon_size * 2) * buttons.Items.Length;
+                        if (mw > maxw) maxw = mw;
+                        list.Add(new InRect(buttons).SetContinue());
+                    }
+                    else if (it is ContextMenuStripItemDivider divider) list.Add(new InRect(divider).SetContinue());
+                }
+                if (has_subText) FontSub = new Font(Font.FontFamily, Font.Size * .8F);
+
+                #endregion
+
+                int w = maxw + gap_x2, y = 0;
+                foreach (var it in list)
+                {
+                    if (it.Tag is ContextMenuStripItem item) CLayout(g, it, item, ref y, w, maxw, has_icon, has_checked, text_height, split, gap, gap2, icon_size, icon_gap, check_size, gap_x, gap_y, gap_x2, gap_y2, item_height, icon_xy, check_xy);
+                    else if (it.Tag is ContextMenuStripItemButtons buttons) CLayout(g, it, buttons, ref y, w, maxw, text_height, split, gap, gap2, icon_size, gap_x, gap_y, gap_x2, gap_y2);
+                    else if (it.Tag is ContextMenuStripItemDivider divider) CLayout(g, it, divider, ref y, w, split, gap);
+                }
+
+                SetSize(maxw + gap2 + gap_x2, y);
+                return list.ToArray();
+            });
+        }
+
+        #region 项布局
+
+        void CLayout(Canvas g, InRect it, ContextMenuStripItem item, ref int y, int w, int maxw, bool has_icon, bool has_checked, int text_height,
+            int split, int gap, int gap2, int icon_size, int icon_gap, int check_size, int gap_x, int gap_y, int gap_x2, int gap_y2,
+            int item_height, int icon_xy, int check_xy)
+        {
+            it.Rect = new Rectangle(gap, y + gap, w, item_height);
+            int x = it.Rect.X + gap_x, usx = 0;
+            if (has_checked)
+            {
+                it.RectCheck = new Rectangle(x, it.Rect.Y + check_xy, check_size, check_size);
+                x += check_size + icon_gap;
+                usx += check_size + icon_gap;
+            }
+            if (has_icon)
+            {
+                it.RectIcon = new Rectangle(x, it.Rect.Y + icon_xy, icon_size, icon_size);
+                x += icon_size + icon_gap;
+                usx += icon_size + icon_gap;
+            }
+            if (item.Sub != null && item.Sub.Length > 0)
+            {
+                it.RectSub = new Rectangle(it.Rect.Right - icon_gap - icon_size, it.Rect.Y + icon_xy, icon_size, icon_size);
+                usx += icon_size + icon_gap;
+            }
+            it.RectText = new Rectangle(x, it.Rect.Y + gap_y, maxw - usx, text_height);
+            y += item_height + gap2;
+        }
+        void CLayout(Canvas g, InRect it, ContextMenuStripItemButtons item, ref int y, int w, int maxw, int text_height,
+            int split, int gap, int gap2, int icon_size, int gap_x, int gap_y, int gap_x2, int gap_y2)
+        {
+            int hastext = 0;
+            foreach (var item_btn in item.Items!)
+            {
+                if (item_btn.Text != null) hastext++;
+            }
+            int rw = w / item.Items.Length;
+            var rects = new List<InRect>(item.Items.Length);
+            int i = 0;
+            if (hastext == 0)
+            {
+                int h = item.Square ? rw : (gap2 + icon_size);
+                it.Rect = new Rectangle(gap, y + gap, w, h);
+                foreach (var item_btn in item.Items)
+                {
+                    var item_sub = new InRect(item_btn);
+                    item_sub.Rect = new Rectangle(it.Rect.X + (rw * i), it.Rect.Y, rw, it.Rect.Height);
+                    item_sub.RectIcon = new Rectangle(item_sub.Rect.X + (item_sub.Rect.Width - icon_size) / 2, item_sub.Rect.Y + (item_sub.Rect.Height - icon_size) / 2, icon_size, icon_size);
+                    rects.Add(item_sub);
+                    i++;
+                }
+                y += h + gap2;
+            }
+            else
+            {
+                int h = item.Square ? rw : (text_height + icon_size + gap2);
+                it.Rect = new Rectangle(gap, y + gap, w, h);
+                foreach (var item_btn in item.Items)
+                {
+                    var item_sub = new InRect(item_btn);
+                    item_sub.Rect = new Rectangle(it.Rect.X + (rw * i), it.Rect.Y, rw, it.Rect.Height);
+                    if (item_btn.HasIcon)
+                    {
+                        int y2 = (item_sub.Rect.Height - (icon_size + text_height + gap)) / 2;
+                        item_sub.RectIcon = new Rectangle(item_sub.Rect.X + (item_sub.Rect.Width - icon_size) / 2, item_sub.Rect.Y + y2, icon_size, icon_size);
+                        item_sub.RectText = new Rectangle(item_sub.Rect.X, item_sub.RectIcon.Bottom + gap, item_sub.Rect.Width, text_height);
+                    }
+                    else item_sub.RectText = item_sub.Rect;
+                    rects.Add(item_sub);
+                    i++;
+                }
+                y += h + gap2;
+            }
+            it.RectBtns = rects.ToArray();
+        }
+        void CLayout(Canvas g, InRect it, ContextMenuStripItemDivider item, ref int y, int w, int split, int gap)
+        {
+            it.Rect = new Rectangle(gap, y, w, split);
+            y += split;
+        }
+
+        #endregion
+
+        void ItemMaxWidth(IContextMenuStripItem[] items, out bool has_checked, out bool has_icon, out bool has_subText, out bool has_subs)
+        {
+            has_checked = has_icon = has_subText = has_subs = false;
+            foreach (var it in items)
+            {
+                if (it is ContextMenuStripItem item)
+                {
+                    if (!has_checked && item.Checked) has_checked = true;
+                    if (!has_icon && item.HasIcon) has_icon = true;
+                    if (!has_subText && item.SubText != null) has_subText = true;
+                    if (!has_subs && item.Sub != null && item.Sub.Length > 0) has_subs = true;
+                    if (has_checked && has_icon && has_subText && has_subs) return;
+                }
+            }
+        }
+
+        #endregion
+
+        protected override void OnDeactivate(EventArgs e)
+        {
+            base.OnDeactivate(e);
+            if (OS.Win7OrLower)
+            {
+                if (TargetRect.Contains(MousePosition)) return;
+            }
+            IClose();
+            subForm?.IClose();
+            subForm = null;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            FontSub?.Dispose();
+            subForm?.IClose();
+            subForm = null;
+            if (Guid == null) config.OnClose?.Invoke();
+            base.Dispose(disposing);
+        }
+
+        InRect[] rectsContent;
+
+        #region 渲染
+
+        readonly FormatFlags sfl = FormatFlags.Left | FormatFlags.VerticalCenter | FormatFlags.EllipsisCharacter, sfr = FormatFlags.Right | FormatFlags.VerticalCenter | FormatFlags.EllipsisCharacter;
+        public override void PrintBg(Canvas g, Rectangle rect, GraphicsPath path)
+        {
+            using (var brush = new SolidBrush(Colour.BgElevated.Get(name, config.ColorScheme)))
+            {
+                g.Fill(brush, path);
+                if (shadow == 0)
+                {
+                    int bor = (int)(Dpi), bor2 = bor * 2;
+                    using (var path2 = new Rectangle(rect.X + bor, rect.Y + bor, rect.Width - bor2, rect.Height - bor2).RoundPath(Radius))
+                    {
+                        g.Draw(Colour.BorderColor.Get(name, config.ColorScheme), bor, path2);
+                    }
+                }
+            }
+        }
+        public override void PrintContent(Canvas g, Rectangle rect, GraphicsState state)
+        {
+            using (var brush = new SolidBrush(Colour.Text.Get(name, config.ColorScheme)))
+            using (var brushSplit = new SolidBrush(Colour.Split.Get(name, "divider", config.ColorScheme)))
+            using (var brushSecondary = new SolidBrush(Colour.TextSecondary.Get(name, "subFore", config.ColorScheme)))
+            using (var brushEnabled = new SolidBrush(Colour.TextQuaternary.Get(name, "foreDisabled", config.ColorScheme)))
+            {
+                g.TranslateTransform(0, -ScrollBar.Value);
+                foreach (var it in rectsContent)
+                {
+                    if (it.Tag is ContextMenuStripItem item)
+                    {
+                        if (it.Hover)
+                        {
+                            using (var path = Helper.RoundPath(it.Rect, Radius))
+                            {
+                                g.Fill(Colour.PrimaryBg.Get(name, config.ColorScheme), path);
+                            }
+                        }
+                        if (item.Enabled)
+                        {
+                            if (FontSub != null) g.DrawText(item.SubText, FontSub, brushSecondary, it.RectText, sfr);
+                            if (item.Fore.HasValue)
+                            {
+                                using (var brush_fore = new SolidBrush(item.Fore.Value))
+                                {
+                                    g.DrawText(item.Text, Font, brush_fore, it.RectText, sfl);
+                                }
+                            }
+                            else g.DrawText(item.Text, Font, brush, it.RectText, sfl);
+
+                            if (item.Sub != null && item.Sub.Length > 0)
+                            {
+                                using (var pen = new Pen(Colour.TextSecondary.Get(name, config.ColorScheme), 2F * Dpi))
+                                {
+                                    pen.StartCap = pen.EndCap = LineCap.Round;
+                                    g.DrawLines(pen, TAlignMini.Right.TriangleLines(it.RectSub));
+                                }
+                            }
+                            if (item.Checked)
+                            {
+                                using (var pen = new Pen(Colour.Primary.Get(name, config.ColorScheme), 3F * Dpi))
+                                {
+                                    g.DrawLines(pen, PaintArrow(it.RectCheck));
+                                }
+                            }
+                            if (item.IconSvg != null)
+                            {
+                                using (var bmp = item.IconSvg.SvgToBmp(it.RectIcon.Width, it.RectIcon.Height, item.Fore ?? brush.Color))
+                                {
+                                    if (bmp != null) g.Image(bmp, it.RectIcon);
+                                }
+                            }
+                            else if (item.Icon != null) g.Image(item.Icon, it.RectIcon);
+                        }
+                        else
+                        {
+                            if (FontSub != null) g.DrawText(item.SubText, FontSub, brushEnabled, it.RectText, sfr);
+                            g.DrawText(item.Text, Font, brushEnabled, it.RectText, sfl);
+
+                            if (item.Sub != null && item.Sub.Length > 0)
+                            {
+                                using (var pen = new Pen(Colour.TextQuaternary.Get(name, config.ColorScheme), 2F * Dpi))
+                                {
+                                    pen.StartCap = pen.EndCap = LineCap.Round;
+                                    g.DrawLines(pen, TAlignMini.Right.TriangleLines(it.RectSub));
+                                }
+                            }
+                            if (item.Checked)
+                            {
+                                using (var pen = new Pen(Colour.Primary.Get(name, config.ColorScheme), 3F * Dpi))
+                                {
+                                    g.DrawLines(pen, PaintArrow(it.RectCheck));
+                                }
+                            }
+                            if (item.IconSvg != null)
+                            {
+                                using (var bmp = item.IconSvg.SvgToBmp(it.RectIcon.Width, it.RectIcon.Height, brushEnabled.Color))
+                                {
+                                    if (bmp != null) g.Image(bmp, it.RectIcon);
+                                }
+                            }
+                            else if (item.Icon != null) g.Image(item.Icon, it.RectIcon);
+                        }
+                    }
+                    else if (it.Tag is ContextMenuStripItemButtons item_buttons)
+                    {
+                        using (var font_mini = new Font(Font.FontFamily, Font.Size * item_buttons.FontRatio))
+                        {
+                            foreach (var btn in it.RectBtns!)
+                            {
+                                var btn_info = (ContextMenuStripItemButton)btn.Tag;
+                                if (btn.Hover)
+                                {
+                                    using (var path = Helper.RoundPath(btn.Rect, Radius))
+                                    {
+                                        g.Fill(Colour.PrimaryBg.Get(name, config.ColorScheme), path);
+                                    }
+                                }
+                                if (btn_info.Enabled)
+                                {
+                                    if (btn_info.IconSvg != null)
+                                    {
+                                        using (var bmp = btn_info.IconSvg.SvgToBmp(btn.RectIcon.Width, btn.RectIcon.Height, btn_info.Fore ?? brush.Color))
+                                        {
+                                            if (bmp != null) g.Image(bmp, btn.RectIcon);
+                                        }
+                                    }
+                                    else if (btn_info.Icon != null) g.Image(btn_info.Icon, btn.RectIcon);
+                                    g.DrawText(btn_info.Text, font_mini, brush, btn.RectText);
+                                }
+                            }
+                        }
+                    }
+                    else if (it.Tag is ContextMenuStripItemDivider item_divider) g.Fill(brushSplit, it.Rect);
+                }
+                g.Restore(state);
+                ScrollBar.Paint(g);
+            }
+        }
+
+        PointF[] PaintArrow(Rectangle rect)
+        {
+            float size = rect.Height * .15F, size2 = rect.Height * .2F, size3 = rect.Height * .26F;
+            return new PointF[] {
+                new PointF(rect.X+size,rect.Y+rect.Height/2),
+                new PointF(rect.X+rect.Width*0.4F,rect.Y+(rect.Height-size3)),
+                new PointF(rect.X+rect.Width-size2,rect.Y+size2),
+            };
+        }
+
+        #endregion
+
+        #region 鼠标
+
+        int select_index = -1;
+        InRect? MDown;
+        protected override void OnMouseDown(MouseButtons button, int clicks, int x, int y, int delta)
+        {
+            if (ScrollBar.MouseDown(x, y))
+            {
+                OnTouchDown(x, y);
+                select_index = -1;
+                if (button == MouseButtons.Left)
+                {
+                    int ry = ScrollBar.Show ? ScrollBar.Value : 0;
+                    for (int i = 0; i < rectsContent.Length; i++)
+                    {
+                        var it = rectsContent[i];
+                        if (it.Tag is ContextMenuStripItem item && item.Enabled && it.Rect.Contains(x, y + ry))
+                        {
+                            select_index = i;
+                            MDown = it;
+                            return;
+                        }
+                        else if (it.Tag is ContextMenuStripItemButtons item_buttons)
+                        {
+                            foreach (var btn in it.RectBtns!)
+                            {
+                                if (((ContextMenuStripItemButton)btn.Tag).Enabled && btn.Rect.Contains(x, y + ry))
+                                {
+                                    //select_index = i;
+                                    MDown = btn;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        protected override void OnMouseUp(MouseButtons button, int clicks, int x, int y, int delta)
+        {
+            if (ScrollBar.MouseUp() && OnTouchUp())
+            {
+                int ry = ScrollBar.Show ? ScrollBar.Value : 0;
+                if (MDown == null) return;
+                var it = MDown;
+                MDown = null;
+                if (it.Rect.Contains(x, y + ry)) ClickItem(it);
+            }
+        }
+
+        bool ClickItem(InRect it)
+        {
+            if (it.Tag is ContextMenuStripItem item)
+            {
+                if (item.Sub == null || item.Sub.Length == 0)
+                {
+                    if (Config.HasAnimation(name))
+                    {
+                        CloseSub();
+                        ITask.Run(() =>
+                        {
+                            if (config.CallSleep > 0) Thread.Sleep(config.CallSleep);
+                            config.Target.BeginInvoke(new Action(() => config.Call(item)));
+                        });
+                    }
+                    else
+                    {
+                        if (config.CallSleep > 0)
+                        {
+                            CloseSub();
+                            ITask.Run(() =>
+                            {
+                                Thread.Sleep(config.CallSleep);
+                                config.Target.BeginInvoke(new Action(() => config.Call(item)));
+                            });
+                        }
+                        else
+                        {
+                            CloseSub();
+                            config.Call(item);
+                        }
+                    }
+                }
+                else
+                {
+                    if (subForm == null) OpenDown(item, it.Rect, item.Sub);
+                    else
+                    {
+                        if (subForm.Guid == it.Tag) return false;
+                        subForm?.IClose();
+                        subForm = null;
+                    }
+                }
+                return true;
+            }
+            else if (it.Tag is ContextMenuStripItemButton item_button)
+            {
+                if (Config.HasAnimation(name))
+                {
+                    CloseSub();
+                    ITask.Run(() =>
+                    {
+                        if (config.CallSleep > 0) Thread.Sleep(config.CallSleep);
+                        config.Target.BeginInvoke(new Action(() => config.Call(item_button)));
+                    });
+                }
+                else
+                {
+                    if (config.CallSleep > 0)
+                    {
+                        CloseSub();
+                        ITask.Run(() =>
+                        {
+                            Thread.Sleep(config.CallSleep);
+                            config.Target.BeginInvoke(new Action(() => config.Call(item_button)));
+                        });
+                    }
+                    else
+                    {
+                        CloseSub();
+                        config.Call(item_button);
+                    }
+                }
+                return true;
+            }
+            return false;
+        }
+
+        void CloseSub()
+        {
+            IClose();
+            var item = this;
+            while (item.PARENT is LayeredFormContextMenuStrip form)
+            {
+                if (item == form) return;
+                form.IClose();
+                item = form;
+            }
+        }
+
+        void FocusItem(InRect it)
+        {
+            if (it.SetHover(true))
+            {
+                if (ScrollBar.Show) ScrollBar.Value = it.Rect.Y - it.Rect.Height;
+                Print();
+            }
+        }
+
+        int oldSub = -1;
+        protected override void OnMouseMove(MouseButtons button, int clicks, int x, int y, int delta)
+        {
+            if (ScrollBar.MouseMove(x, y) && OnTouchMove(x, y))
+            {
+                int count = 0, hand = -1;
+                int ry = ScrollBar.Show ? ScrollBar.Value : 0;
+                for (int i = 0; i < rectsContent.Length; i++)
+                {
+                    var it = rectsContent[i];
+                    if (it.Tag is ContextMenuStripItem item)
+                    {
+                        if (item.Enabled)
+                        {
+                            bool hover = it.Rect.Contains(x, y + ry);
+                            if (hover) hand = i;
+                            if (it.Hover != hover)
+                            {
+                                it.Hover = hover;
+                                count++;
+                            }
+                        }
+                        else
+                        {
+                            if (it.Hover)
+                            {
+                                it.Hover = false;
+                                count++;
+                            }
+                        }
+                    }
+                    else if (it.Tag is ContextMenuStripItemButtons item_buttons)
+                    {
+                        foreach (var btn in it.RectBtns!)
+                        {
+                            if (((ContextMenuStripItemButton)btn.Tag).Enabled)
+                            {
+                                bool hover = btn.Rect.Contains(x, y + ry);
+                                if (hover) hand = -1;
+                                if (btn.Hover != hover)
+                                {
+                                    btn.Hover = hover;
+                                    count++;
+                                }
+                            }
+                            else
+                            {
+                                if (btn.Hover)
+                                {
+                                    btn.Hover = false;
+                                    count++;
+                                }
+                            }
+                        }
+                    }
+                }
+                SetCursor(hand > 0);
+                if (count > 0) Print();
+                select_index = hand;
+                if (hand > -1)
+                {
+                    SetCursor(true);
+                    if (oldSub == hand) return;
+                    var it = rectsContent[hand];
+                    oldSub = hand;
+                    subForm?.IClose();
+                    subForm = null;
+                    if (it.Tag is ContextMenuStripItem item && item.Sub != null && item.Sub.Length > 0) OpenDown(item, it.Rect, item.Sub);
+                }
+                else
+                {
+                    oldSub = -1;
+                    subForm?.IClose();
+                    subForm = null;
+                    SetCursor(false);
+                }
+            }
+        }
+        void OpenDown(ContextMenuStripItem item, Rectangle rect, IContextMenuStripItem[] sub)
+        {
+            foreach (var it in sub) it.ParentItem = item;
+            var trect = TargetRect;
+            subForm = new LayeredFormContextMenuStrip(config, this, new Point(trect.X + trect.Width - rect.X - shadow2, trect.Y + rect.Y + shadow / 2 - ScrollBar.Value), item, sub);
+            subForm.Show(this);
+        }
+
+        protected override void OnMouseWheel(MouseButtons button, int clicks, int x, int y, int delta) => ScrollBar.MouseWheel(delta);
+        protected override bool OnTouchScrollY(int value) => ScrollBar.MouseWheelYCore(value);
+
+        LayeredFormContextMenuStrip? subForm;
+        ILayeredForm? SubLayeredForm.SubForm() => subForm;
+
+        #region 安全三角区
+
+        public override bool EnableSafetyTriangleZone => true;
+        public override Rectangle? OnSafetyTriangleZone(int x, int y) => subForm?.TargetRect;
+
+        Point[]? SafetyTriangleZone;
+        DateTime SafetyTriangleFlag;
+        public override bool IMOUSEMOVEAfter(int x, int y, Rectangle rect)
+        {
+            bool ret = false;
+            if (SafetyTriangleZone != null && Helper.IsPointInTriangle(x, y, SafetyTriangleZone)) ret = true;
+            var now = DateTime.Now;
+            if ((now - SafetyTriangleFlag).TotalMilliseconds > 500)
+            {
+                SafetyTriangleFlag = now;
+                SafetyTriangleZone = Helper.SafetyTriangleZone(x, y, rect);
+                if (SafetyTriangleZone != null && Helper.IsPointInTriangle(x, y, SafetyTriangleZone)) ret = true;
+            }
+            return ret;
+        }
+
+        #endregion
+
+        #endregion
+
+        class InRect
+        {
+            public InRect(IContextMenuStripItem tag)
+            {
+                Tag = tag;
+            }
+
+            public bool Continue;
+            public IContextMenuStripItem Tag { get; set; }
+
+            public InRect SetContinue(bool value = true)
+            {
+                Continue = value;
+                return this;
+            }
+
+            public bool Hover { get; set; }
+
+            #region 区域
+
+            public Rectangle Rect { get; set; }
+            public Rectangle RectCheck { get; set; }
+            public Rectangle RectIcon { get; set; }
+            /// <summary>
+            /// 文本区域
+            /// </summary>
+            public Rectangle RectText { get; set; }
+            public Rectangle RectSub { get; set; }
+            public InRect[]? RectBtns { get; set; }
+
+            #endregion
+
+            internal bool SetHover(bool val)
+            {
+                bool change = false;
+                if (val)
+                {
+                    if (!Hover) change = true;
+                    Hover = true;
+                }
+                else
+                {
+                    if (Hover) change = true;
+                    Hover = false;
+                }
+                return change;
+            }
+        }
+    }
+}

@@ -1,0 +1,124 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace AntdUI
+{
+    public class Target
+    {
+        #region 构造函数
+
+        public Target(Form form)
+        {
+            Value = form;
+            IsForm = true;
+        }
+        public Target(IWin32Window form)
+        {
+            Value = form;
+            IsForm = true;
+        }
+        public Target(Control control)
+        {
+            Value = control;
+            IsControl = true;
+        }
+        internal Target()
+        {
+        }
+
+        #endregion
+
+        public static Target Null => new Target();
+
+        public object? Value { get; set; }
+
+        public bool IsForm { get; private set; }
+        public bool IsControl { get; private set; }
+
+        public Form? GetForm
+        {
+            get
+            {
+                if (Value is Form t) return t;
+                return null;
+            }
+        }
+        public Control? GetControl
+        {
+            get
+            {
+                if (Value is Control t) return t;
+                return null;
+            }
+        }
+
+        public bool IsCreated(out bool invoke, out Control? obj)
+        {
+            obj = null;
+            invoke = false;
+            if (Value == null) return true;
+            if (Value is Control t && t.IsHandleCreated)
+            {
+                obj = t;
+                invoke = t.InvokeRequired;
+                return true;
+            }
+            else if (Value is IWin32Window) return true;
+            return false;
+        }
+        public void SetFont(Font? font, Form form)
+        {
+            if (Value is Control t) form.Font = font ?? t.Font;
+            else if (font != null) form.Font = font;
+        }
+        public void SetFontConfig(Font? font, Form form)
+        {
+            if (Value is Control t) form.Font = font ?? t.Font;
+            else if (font != null) form.Font = font;
+        }
+        public void SetFontConfig(Font? font, Form form, object user)
+        {
+            if (user is Control control) form.Font = control.Font;
+            else if (Value is Control t) form.Font = font ?? t.Font;
+            else if (font != null) form.Font = font;
+        }
+        public void SetIcon(Form form)
+        {
+            if (Value is Form t) form.Icon = t.Icon;
+        }
+
+        public void Show(Form form)
+        {
+            if (Value is Control t) form.Show(t);
+            else if (Value is IWin32Window win32Window) form.Show(win32Window);
+            else form.Show();
+        }
+
+        public DialogResult ShowDialog(Form form)
+        {
+            if (Value is Control t) return form.ShowDialog(t);
+            else if (Value is IWin32Window win32Window) return form.ShowDialog(win32Window);
+            else return form.ShowDialog();
+        }
+
+        public void BeginInvoke(Action action)
+        {
+            if (Value is Control t) t.BeginInvoke(action);
+            else action();
+        }
+
+        public Form? Parent()
+        {
+            if (Value is Form form) return form;
+            if (Value is Control control) return control.FindPARENT();
+            return null;
+        }
+    }
+}

@@ -1,0 +1,1011 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace AntdUI
+{
+    [ToolboxItem(false)]
+    [Localizable(true)]
+    public class IControl : Control, BadgeConfig
+    {
+        public IControl(ControlType ctype = ControlType.Default)
+        {
+            switch (ctype)
+            {
+                case ControlType.Default:
+                    SetStyle(ControlStyles.ContainerControl |
+                       ControlStyles.AllPaintingInWmPaint |
+                       ControlStyles.OptimizedDoubleBuffer |
+                       ControlStyles.ResizeRedraw |
+                       ControlStyles.SupportsTransparentBackColor |
+                       ControlStyles.UserPaint, true);
+                    SetStyle(ControlStyles.Selectable, false);
+                    break;
+                case ControlType.Select:
+                    SetStyle(ControlStyles.ContainerControl | ControlStyles.Selectable |
+                       ControlStyles.AllPaintingInWmPaint |
+                       ControlStyles.OptimizedDoubleBuffer |
+                       ControlStyles.ResizeRedraw |
+                       ControlStyles.SupportsTransparentBackColor |
+                       ControlStyles.UserPaint, true);
+                    break;
+                case ControlType.Button:
+                    SetStyle(ControlStyles.ContainerControl | ControlStyles.Selectable |
+                       ControlStyles.AllPaintingInWmPaint |
+                       ControlStyles.OptimizedDoubleBuffer |
+                       ControlStyles.ResizeRedraw |
+                       ControlStyles.SupportsTransparentBackColor |
+                       ControlStyles.UserPaint, true);
+                    SetStyle(ControlStyles.StandardClick | ControlStyles.StandardDoubleClick, false);
+                    break;
+            }
+            UpdateStyles();
+        }
+
+        #region 属性
+
+        /// <summary>
+        /// 确定该控件是可见的还是隐藏的
+        /// </summary>
+        [Description("确定该控件是可见的还是隐藏的"), Category("行为"), DefaultValue(true)]
+        public new bool Visible
+        {
+            get => base.Visible;
+            set
+            {
+                if (InvokeRequired) Invoke(() => base.Visible = value);
+                else base.Visible = value;
+            }
+        }
+
+        /// <summary>
+        /// 指示是否已启用该控件
+        /// </summary>
+        [Description("指示是否已启用该控件"), Category("行为"), DefaultValue(true)]
+        public new bool Enabled
+        {
+            get => base.Enabled;
+            set
+            {
+                if (InvokeRequired) Invoke(() => base.Enabled = value);
+                else base.Enabled = value;
+            }
+        }
+
+        #region 主题
+
+        TAMode colorScheme = TAMode.Auto;
+        /// <summary>
+        /// 色彩模式
+        /// </summary>
+        [Description("色彩模式"), Category("外观"), DefaultValue(TAMode.Auto)]
+        public TAMode ColorScheme
+        {
+            get => colorScheme;
+            set
+            {
+                if (colorScheme == value) return;
+                colorScheme = value;
+                OnColorSchemeChanged(EventArgs.Empty);
+                if (IsHandleCreated) Invalidate();
+                OnPropertyChanged(nameof(ColorScheme));
+            }
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Advanced)]
+        protected virtual void OnColorSchemeChanged(EventArgs e) { }
+
+        #endregion
+
+        #region 徽标
+
+        string? badge;
+        /// <summary>
+        /// 徽标内容
+        /// </summary>
+        [Description("徽标内容"), Category("徽标"), DefaultValue(null), Localizable(true)]
+        public string? Badge
+        {
+            get => badge;
+            set
+            {
+                if (badge == value) return;
+                badge = value;
+                Invalidate();
+            }
+        }
+
+        string? badgeSvg;
+        /// <summary>
+        /// 徽标SVG
+        /// </summary>
+        [Description("徽标SVG"), Category("徽标"), DefaultValue(null)]
+        public string? BadgeSvg
+        {
+            get => badgeSvg;
+            set
+            {
+                if (badgeSvg == value) return;
+                badgeSvg = value;
+                Invalidate();
+            }
+        }
+
+        TAlign badgeAlign = TAlign.TR;
+        /// <summary>
+        /// 徽标方向
+        /// </summary>
+        [Description("徽标方向"), Category("徽标"), DefaultValue(TAlign.TR)]
+        public TAlign BadgeAlign
+        {
+            get => badgeAlign;
+            set
+            {
+                if (badgeAlign == value) return;
+                badgeAlign = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        float badgeSize = .6F;
+        /// <summary>
+        /// 徽标比例
+        /// </summary>
+        [Description("徽标比例"), Category("徽标"), DefaultValue(.6F)]
+        public float BadgeSize
+        {
+            get => badgeSize;
+            set
+            {
+                if (badgeSize == value) return;
+                badgeSize = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        bool badgeMode = false;
+        /// <summary>
+        /// 徽标模式（镂空）
+        /// </summary>
+        [Description("徽标模式（镂空）"), Category("徽标"), DefaultValue(false)]
+        public bool BadgeMode
+        {
+            get => badgeMode;
+            set
+            {
+                if (badgeMode == value) return;
+                badgeMode = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgefore;
+        /// <summary>
+        /// 徽标前景颜色
+        /// </summary>
+        [Description("徽标前景颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeFore
+        {
+            get => badgefore;
+            set
+            {
+                if (badgefore == value) return;
+                badgefore = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgeback;
+        /// <summary>
+        /// 徽标背景颜色
+        /// </summary>
+        [Description("徽标背景颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeBack
+        {
+            get => badgeback;
+            set
+            {
+                if (badgeback == value) return;
+                badgeback = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgeBorderColor;
+        /// <summary>
+        /// 徽标边框颜色
+        /// </summary>
+        [Description("徽标边框颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeBorderColor
+        {
+            get => badgeBorderColor;
+            set
+            {
+                if (badgeBorderColor == value) return;
+                badgeBorderColor = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        float? badgeBorderWidth;
+        /// <summary>
+        /// 徽标边框宽度
+        /// </summary>
+        [Description("徽标边框宽度"), Category("徽标"), DefaultValue(null)]
+        public float? BadgeBorderWidth
+        {
+            get => badgeBorderWidth;
+            set
+            {
+                if (badgeBorderWidth == value) return;
+                badgeBorderWidth = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        int badgeOffsetX = 1, badgeOffsetY = 1;
+        /// <summary>
+        /// 徽标偏移X
+        /// </summary>
+        [Description("徽标偏移X"), Category("徽标"), DefaultValue(1)]
+        public int BadgeOffsetX
+        {
+            get => badgeOffsetX;
+            set
+            {
+                if (badgeOffsetX == value) return;
+                badgeOffsetX = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        /// <summary>
+        /// 徽标偏移Y
+        /// </summary>
+        [Description("徽标偏移Y"), Category("徽标"), DefaultValue(1)]
+        public int BadgeOffsetY
+        {
+            get => badgeOffsetY;
+            set
+            {
+                if (badgeOffsetY == value) return;
+                badgeOffsetY = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        #endregion
+
+        #region DPI
+
+        float? dpi;
+        public float Dpi
+        {
+            get
+            {
+                if (Config._dpi_custom.HasValue) return Config._dpi_custom.Value;
+                if (dpi.HasValue) return dpi.Value;
+                var form = this.FindPARENT();
+                if (form is BaseForm baseForm)
+                {
+                    var _dpi = baseForm.Dpi;
+                    dpi = _dpi;
+                    return _dpi;
+                }
+                else if (form is ILayeredForm layeredForm)
+                {
+                    var _dpi = layeredForm.Dpi;
+                    dpi = _dpi;
+                    return _dpi;
+                }
+                else
+                {
+                    var _dpi = Helper.GetScreenDpi(this);
+                    dpi = _dpi;
+                    return _dpi;
+                }
+            }
+        }
+
+#if !NET40 && !NET46
+        protected override void OnDpiChangedBeforeParent(EventArgs e)
+        {
+            base.OnDpiChangedBeforeParent(e);
+            dpi = null;
+        }
+#endif
+
+        #endregion
+
+        #endregion
+
+        #region Spin 加载
+
+        #region 同步
+
+        /// <summary>
+        /// Spin 加载中
+        /// </summary>
+        /// <param name="action">需要等待的委托</param>
+        /// <param name="end">运行结束后的回调</param>
+        public Task Spin(Action<Spin.Config> action, Action? end = null) => Spin(new Spin.Config(), action, end);
+
+        /// <summary>
+        /// Spin 加载中
+        /// </summary>
+        /// <param name="text">加载文本</param>
+        /// <param name="action">需要等待的委托</param>
+        /// <param name="end">运行结束后的回调</param>
+        public Task Spin(string text, Action<Spin.Config> action, Action? end = null) => Spin(new Spin.Config { Text = text }, action, end);
+
+        /// <summary>
+        /// Spin 加载中
+        /// </summary>
+        /// <param name="config">自定义配置</param>
+        /// <param name="action">需要等待的委托</param>
+        /// <param name="end">运行结束后的回调</param>
+        public Task Spin(Spin.Config config, Action<Spin.Config> action, Action? end = null) => AntdUI.Spin.open(this, config, action, end);
+
+        #endregion
+
+        #region 异步
+
+        /// <summary>
+        /// Spin 加载中
+        /// </summary>
+        /// <param name="action">需要等待的委托</param>
+        /// <param name="end">运行结束后的回调</param>
+        public Task Spin(Func<Spin.Config, Task> action, Action? end = null) => Spin(new Spin.Config(), action, end);
+
+        /// <summary>
+        /// Spin 加载中
+        /// </summary>
+        /// <param name="text">加载文本</param>
+        /// <param name="action">需要等待的委托</param>
+        /// <param name="end">运行结束后的回调</param>
+        public Task Spin(string text, Func<Spin.Config, Task> action, Action? end = null) => Spin(new Spin.Config { Text = text }, action, end);
+
+        /// <summary>
+        /// Spin 加载中
+        /// </summary>
+        /// <param name="config">自定义配置</param>
+        /// <param name="action">需要等待的委托</param>
+        /// <param name="end">运行结束后的回调</param>
+        public Task Spin(Spin.Config config, Func<Spin.Config, Task> action, Action? end = null) => AntdUI.Spin.open(this, config, action, end);
+
+        #endregion
+
+        #endregion
+
+        #region 帮助类
+
+        [Browsable(false)]
+        public virtual GraphicsPath RenderRegion
+        {
+            get
+            {
+                var path = new GraphicsPath();
+                path.AddRectangle(ClientRectangle);
+                return path;
+            }
+        }
+
+        /// <summary>
+        /// 真实区域
+        /// </summary>
+        [Browsable(false)]
+        public virtual Rectangle ReadRectangle => ClientRectangle.PaddingRect(Padding);
+
+        internal void IOnSizeChanged()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(IOnSizeChanged);
+                return;
+            }
+            OnSizeChanged(EventArgs.Empty);
+        }
+
+        static bool disableDataBinding = false;
+#if NET40
+        public void OnPropertyChanged(string propertyName)
+#else
+        public void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+#endif
+        {
+            if (disableDataBinding) return;
+            try
+            {
+                foreach (Binding it in DataBindings)
+                {
+                    if (it.PropertyName == propertyName)
+                    {
+                        it.WriteValue();
+                        return;
+                    }
+                }
+            }
+            catch (NotSupportedException) { disableDataBinding = true; }
+        }
+
+        #region 鼠标
+
+        CursorType oldcursor = CursorType.Default;
+        public void SetCursor(bool val) => SetCursor(val ? CursorType.Hand : CursorType.Default);
+        public void SetCursor(CursorType cursor = CursorType.Default)
+        {
+            if (oldcursor == cursor) return;
+            oldcursor = cursor;
+            bool flag = true;
+            switch (cursor)
+            {
+                case CursorType.Hand:
+                    SetCursor(HandCursor);
+                    break;
+                case CursorType.IBeam:
+                    SetCursor(Cursors.IBeam);
+                    break;
+                case CursorType.No:
+                    SetCursor(Cursors.No);
+                    break;
+                case CursorType.SizeAll:
+                    flag = false;
+                    SetCursor(Cursors.SizeAll);
+                    break;
+                case CursorType.VSplit:
+                    flag = false;
+                    SetCursor(Cursors.VSplit);
+                    break;
+                case CursorType.HSplit:
+                    flag = false;
+                    SetCursor(Cursors.HSplit);
+                    break;
+                case CursorType.Default:
+                default:
+                    SetCursor(DefaultCursor);
+                    break;
+            }
+            Window.CanHandMessage = flag;
+        }
+        void SetCursor(Cursor cursor)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(() => SetCursor(cursor));
+                return;
+            }
+            Cursor = cursor;
+        }
+
+        [Description("悬停光标"), Category("光标"), DefaultValue(typeof(Cursor), "Hand")]
+        public virtual Cursor HandCursor { get; set; } = Cursors.Hand;
+
+        #endregion
+
+        #region 委托
+
+#if NET40 || NET46 || NET48
+
+        [EditorBrowsable(EditorBrowsableState.Advanced)]
+        public IAsyncResult BeginInvoke(Action method) => BeginInvoke(method, null);
+
+        public void Invoke(Action method) => _ = Invoke(method, null);
+        public T Invoke<T>(Func<T> method) => (T)Invoke(method, null);
+
+#endif
+
+        #endregion
+
+        internal bool CanProcessMnemonicBefore(char charCode, string? text)
+        {
+            if (Enabled && Visible && IsMnemonic(charCode, text)) return true;
+            return false;
+        }
+        internal bool CanProcessMnemonicAfter()
+        {
+            var form = FindForm();
+            if (form == null) return true;
+            return CanProcessMnemonicActiveControl(form.ActiveControl);
+        }
+        internal bool CanProcessMnemonicActiveControl(Control? control)
+        {
+            if (control is Input input) return input.hasAlt;
+            else if (control is UserControl userControl) return CanProcessMnemonicActiveControl(userControl.ActiveControl);
+            return true;
+        }
+
+        #endregion
+
+        #region 触屏
+
+        bool mdown = false;
+        int mdownd = 0, oldX, oldY;
+        protected virtual void OnTouchDown(int x, int y)
+        {
+            oldMY = 0;
+            oldX = x;
+            oldY = y;
+            if (Config.TouchEnabled)
+            {
+                taskTouch?.Dispose();
+                taskTouch = null;
+                mdownd = 0;
+                mdown = true;
+            }
+        }
+
+        int oldMY = 0;
+        protected virtual bool OnTouchMove(int x, int y)
+        {
+            if (mdown)
+            {
+                int moveX = oldX - x, moveY = oldY - y, moveXa = Math.Abs(moveX), moveYa = Math.Abs(moveY), threshold = (int)(Config.TouchThreshold * Dpi);
+                if (mdownd > 0 || (moveXa > threshold || moveYa > threshold))
+                {
+                    oldMY = moveY;
+                    if (mdownd > 0)
+                    {
+                        if (mdownd == 1) OnTouchScrollY(-moveY);
+                        else OnTouchScrollX(-moveX);
+                        oldX = x;
+                        oldY = y;
+                        return false;
+                    }
+                    else
+                    {
+                        if (moveYa > moveXa) mdownd = 1;
+                        else mdownd = 2;
+                        oldX = x;
+                        oldY = y;
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        AnimationTask? taskTouch;
+        protected virtual bool OnTouchUp()
+        {
+            taskTouch?.Dispose();
+            taskTouch = null;
+            mdown = false;
+            if (mdownd > 0)
+            {
+                if (mdownd == 1)
+                {
+                    int moveY = oldMY, moveYa = Math.Abs(moveY);
+                    if (moveYa > 10)
+                    {
+                        // 缓冲动画
+                        int duration = (int)Math.Ceiling(moveYa * .1F), incremental = moveYa / 2, sleep = 20;
+                        if (moveY > 0)
+                        {
+                            taskTouch = new AnimationTask(new AnimationLoopConfig(this, () =>
+                            {
+                                if (moveYa > 0 && OnTouchScrollY(-incremental))
+                                {
+                                    moveYa -= duration;
+                                    return true;
+                                }
+                                return false;
+                            }, sleep).SetPriority());
+                        }
+                        else
+                        {
+                            taskTouch = new AnimationTask(new AnimationLoopConfig(this, () =>
+                            {
+                                if (moveYa > 0 && OnTouchScrollY(incremental))
+                                {
+                                    moveYa -= duration;
+                                    return true;
+                                }
+                                return false;
+                            }, sleep).SetPriority());
+                        }
+                    }
+                }
+                return false;
+            }
+            return true;
+        }
+        protected void OnTouchCancel()
+        {
+            taskTouch?.Dispose();
+            taskTouch = null;
+            mdown = false;
+        }
+        protected virtual bool OnTouchScrollX(int value) => false;
+        protected virtual bool OnTouchScrollY(int value) => false;
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            taskTouch?.Dispose();
+            taskTouch = null;
+            base.OnMouseWheel(e);
+        }
+
+        const int WM_POINTERDOWN = 0x0246, WM_POINTERUP = 0x0247;
+        const int WM_LBUTTONDOWN = 0x0201, WM_LBUTTONUP = 0x0202;
+
+        protected override void WndProc(ref System.Windows.Forms.Message m)
+        {
+            if (OS.Win7OrLower && m.Msg == WM_LBUTTONDOWN)
+            {
+                Select();
+                base.WndProc(ref m);
+            }
+            else if (Config.TouchClickEnabled)
+            {
+                switch (m.Msg)
+                {
+                    case WM_POINTERDOWN:
+                        Vanara.PInvoke.User32.PostMessage(m.HWnd, WM_LBUTTONDOWN, m.WParam, m.LParam);
+                        break;
+                    case WM_POINTERUP:
+                        Vanara.PInvoke.User32.PostMessage(m.HWnd, WM_LBUTTONUP, m.WParam, m.LParam);
+                        break;
+                    default:
+                        base.WndProc(ref m);
+                        return;
+                }
+            }
+            else base.WndProc(ref m);
+        }
+
+        #endregion
+
+        #region 鼠标悬停
+
+        AnimationTask? taskHover;
+        TimeSpan timeHover;
+        Stopwatch hoverStopwatch = new Stopwatch();
+        int oldx = -1, oldy = -1;
+        protected virtual bool CanMouseMove { get; set; }
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            if (CanMouseMove)
+            {
+                if (oldx == e.X && oldy == e.Y) return;
+                oldx = e.X;
+                oldy = e.Y;
+                hoverStopwatch.Reset();
+                hoverStopwatch.Start();
+                timeHover = hoverStopwatch.Elapsed + TimeSpan.FromMilliseconds(Config.MouseHoverDelay);
+                if (taskHover == null)
+                {
+                    taskHover = new AnimationTask(new AnimationLoopConfig(this, () =>
+                    {
+                        if (hoverStopwatch.Elapsed < timeHover) return true;
+                        BeginInvoke(() => OnMouseHover(oldx, oldy));
+                        return false;
+                    }, Config.MouseHoverDelay).SetEnd(() => taskHover = null).SetSleep(Config.MouseHoverDelay).SetPriority());
+                }
+            }
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            taskHover?.Dispose();
+            taskHover = null;
+            hoverStopwatch.Reset();
+            oldx = -1;
+            oldy = -1;
+        }
+
+        protected virtual void OnMouseHover(int x, int y)
+        {
+        }
+
+        #endregion
+
+        #region 拖拽
+
+        /// <summary>
+        /// 拖拽文件夹处理
+        /// </summary>
+        [Description("拖拽文件夹处理"), Category("行为"), DefaultValue(true)]
+        public bool HandDragFolder { get; set; } = true;
+
+        protected virtual void OnDragEnter()
+        { }
+        protected virtual void OnDragLeave()
+        { }
+
+        FileDropHandler? fileDrop;
+        /// <summary>
+        /// 使用管理员权限拖拽上传
+        /// </summary>
+        public void UseAdmin()
+        {
+            fileDrop ??= new FileDropHandler(this);
+        }
+
+        protected override void OnDragEnter(DragEventArgs e)
+        {
+            base.OnDragEnter(e);
+            if (DragChanged == null) return;
+            if (AllowDrop)
+            {
+                OnDragEnter();
+                if (DragState(e.Data)) e.Effect = DragDropEffects.All;
+                else e.Effect = DragDropEffects.None;
+            }
+        }
+
+        protected override void OnDragLeave(EventArgs e)
+        {
+            base.OnDragLeave(e);
+            OnDragLeave();
+        }
+
+        internal Func<string[], string[]?>? ONDRAG;
+        protected override void OnDragDrop(DragEventArgs e)
+        {
+            base.OnDragDrop(e);
+            if (DragChanged == null) return;
+            if (DragData(e.Data, out var files))
+            {
+                if (ONDRAG == null) DragChanged(this, new StringsEventArgs(files));
+                else
+                {
+                    var r = ONDRAG(files);
+                    if (r != null) DragChanged(this, new StringsEventArgs(r));
+                }
+            }
+            OnDragLeave();
+        }
+
+        bool DragState(IDataObject? Data)
+        {
+            if (DragData(Data, out var files))
+            {
+                if (ONDRAG == null) return true;
+                else
+                {
+                    var r = ONDRAG(files);
+                    if (r == null) return false;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool DragData(IDataObject? Data, out string[] files)
+        {
+            if (Data == null)
+            {
+                files = new string[0];
+                return false;
+            }
+            foreach (string format in Data.GetFormats())
+            {
+                if (Data.GetData(format) is string[] tmp && tmp.Length > 0)
+                {
+                    if (HandDragFolder)
+                    {
+                        var list = new System.Collections.Generic.List<string>(tmp.Length);
+                        foreach (var it in tmp)
+                        {
+                            if (System.IO.File.Exists(it)) list.Add(it);
+                            else list.AddRange(DragDataDirTree(it));
+                        }
+                        files = list.ToArray();
+                    }
+                    else files = tmp;
+                    return true;
+                }
+            }
+            files = new string[0];
+            return false;
+        }
+
+        System.Collections.Generic.List<string> DragDataDirTree(string dir)
+        {
+            var dirinfo = new System.IO.DirectoryInfo(dir);
+            var files = dirinfo.GetFiles();
+            var dirs = dirinfo.GetDirectories();
+            var list = new System.Collections.Generic.List<string>(files.Length + dirs.Length);
+            foreach (var it in files) list.Add(it.FullName);
+            foreach (var it in dirs) list.AddRange(DragDataDirTree(it.FullName));
+            return list;
+        }
+
+        #region 事件
+
+        /// <summary>
+        /// Bool 类型事件
+        /// </summary>
+        public delegate void DragEventHandler(object sender, StringsEventArgs e);
+
+        /// <summary>
+        /// 文件拖拽后时发生
+        /// </summary>
+        [Description("文件拖拽后时发生"), Category("行为")]
+        public event DragEventHandler? DragChanged;
+
+        protected virtual void OnDragChanged(string[] files) => DragChanged?.Invoke(this, new StringsEventArgs(files));
+
+        #endregion
+
+        protected override void Dispose(bool disposing)
+        {
+            Window.CanHandMessage = true;
+            fileDrop?.Dispose();
+            base.Dispose(disposing);
+        }
+
+        #endregion
+
+        #region 渲染
+
+        /// <summary>
+        /// 渲染 时发生
+        /// </summary>
+        [Description("渲染 时发生"), Category("行为")]
+        public event DrawEventHandler? Draw;
+
+        /// <summary>
+        /// 渲染背景 时发生
+        /// </summary>
+        [Description("渲染背景 时发生"), Category("行为")]
+        public event DrawEventHandler? DrawBg;
+
+        protected virtual void OnDrawBg(DrawEventArgs e) => DrawBg?.Invoke(this, e);
+
+        protected virtual void OnDraw(DrawEventArgs e) => Draw?.Invoke(this, e);
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var rect = ClientRectangle;
+            if (rect.Width == 0 || rect.Height == 0) return;
+            base.OnPaint(e);
+            var g = e.Graphics.High(Dpi);
+            try
+            {
+                var args = new DrawEventArgs(g, rect);
+                OnDrawBg(args);
+                OnDraw(args);
+            }
+            catch { }
+            this.PaintBadge(g);
+        }
+
+        public Bitmap? DrawBitmap()
+        {
+            var rect = ClientRectangle;
+            if (rect.Width == 0 || rect.Height == 0) return null;
+            var bmp = new Bitmap(rect.Width, rect.Height);
+            using (var g = Graphics.FromImage(bmp).High(Dpi))
+            {
+                try
+                {
+                    var args = new DrawEventArgs(g, rect);
+                    OnDrawBg(args);
+                    OnDraw(args);
+                }
+                catch { }
+                this.PaintBadge(g);
+            }
+            return bmp;
+        }
+
+        #endregion
+    }
+
+    public enum ControlType
+    {
+        Default,
+        Select,
+        Button
+    }
+
+    public enum CursorType
+    {
+        Default,
+        Hand,
+        IBeam,
+        No,
+        SizeAll,
+        VSplit,
+        HSplit
+    }
+
+    public interface BadgeConfig
+    {
+        /// <summary>
+        /// 徽标内容
+        /// </summary>
+        string? Badge { get; set; }
+
+        /// <summary>
+        /// 徽标SVG
+        /// </summary>
+        string? BadgeSvg { get; set; }
+
+        /// <summary>
+        /// 徽标方向
+        /// </summary>
+        TAlign BadgeAlign { get; set; }
+
+        /// <summary>
+        /// 徽标大小
+        /// </summary>
+        float BadgeSize { get; set; }
+
+        /// <summary>
+        /// 徽标模式（镂空）
+        /// </summary>
+        bool BadgeMode { get; set; }
+
+        /// <summary>
+        /// 徽标前景颜色
+        /// </summary>
+        Color? BadgeFore { get; set; }
+
+        /// <summary>
+        /// 徽标背景颜色
+        /// </summary>
+        Color? BadgeBack { get; set; }
+
+        /// <summary>
+        /// 徽标边框颜色
+        /// </summary>
+        Color? BadgeBorderColor { get; set; }
+
+        /// <summary>
+        /// 徽标边框宽度
+        /// </summary>
+        float? BadgeBorderWidth { get; set; }
+
+        /// <summary>
+        /// 徽标偏移X
+        /// </summary>
+        int BadgeOffsetX { get; set; }
+
+        /// <summary>
+        /// 徽标偏移Y
+        /// </summary>
+        int BadgeOffsetY { get; set; }
+    }
+
+    public interface ShadowConfig
+    {
+        /// <summary>
+        /// 阴影大小
+        /// </summary>
+        int Shadow { get; set; }
+
+        /// <summary>
+        /// 阴影颜色
+        /// </summary>
+        Color? ShadowColor { get; set; }
+
+        /// <summary>
+        /// 阴影透明度
+        /// </summary>
+        float ShadowOpacity { get; set; }
+
+        /// <summary>
+        /// 阴影偏移X
+        /// </summary>
+        int ShadowOffsetX { get; set; }
+
+        /// <summary>
+        /// 阴影偏移Y
+        /// </summary>
+        int ShadowOffsetY { get; set; }
+    }
+}

@@ -1,0 +1,39 @@
+name: 使用疑问
+description: 当你不明白某个功能如何使用时，可以提交该Issue。
+title:
+labels: ["问题"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        注意看看 [Wiki文档](https://gitee.com/antdui/AntdUI/wikis) 或者有没有重复 [问题](https://gitee.com/antdui/AntdUI/issues)
+  - type: input
+    attributes:
+      label: 版本号
+      description: 请输入您使用的版本号。
+      placeholder: 例如：1.0.5，请不要填写“最新”等干扰描述，源码可填写提交id
+    validations:
+      required: true
+  - type: textarea
+    id: net_sdk
+    attributes:
+      label: .NET version
+      description: .NET SDK的版本。NET，cmd 执行 `dotnet --info`。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 操作系统
+      description: 例如：Windows 11，操作系统类型和版本
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 你的需求是什么？
+      description: 清晰并简洁地描述你希望发生的事情。
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        🙏 我承诺将本着相互尊重、理解和友善的态度进行交流，共同维护好良好的社区氛围。

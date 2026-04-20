@@ -1,0 +1,77 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System.Drawing;
+
+namespace AntdUI
+{
+    partial class CellBadge
+    {
+        public override void PaintBack(Canvas g) { }
+
+        public override void Paint(Canvas g, Font font, bool enable, SolidBrush fore)
+        {
+            Color color;
+            if (Fill.HasValue) color = Fill.Value;
+            else
+            {
+                switch (State)
+                {
+                    case TState.Success:
+                        color = Colour.Success.Get(nameof(Badge), PARENT.PARENT.ColorScheme); break;
+                    case TState.Error:
+                        color = Colour.Error.Get(nameof(Badge), PARENT.PARENT.ColorScheme); break;
+                    case TState.Primary:
+                    case TState.Processing:
+                        color = Colour.Primary.Get(nameof(Badge), PARENT.PARENT.ColorScheme); break;
+                    case TState.Warn:
+                        color = Colour.Warning.Get(nameof(Badge), PARENT.PARENT.ColorScheme); break;
+                    default:
+                        color = Colour.TextQuaternary.Get(nameof(Badge), PARENT.PARENT.ColorScheme); break;
+                }
+            }
+            using (var brush = new SolidBrush(color))
+            {
+                if (State == TState.Processing && PARENT.PARENT != null)
+                {
+                    float max = TxtHeight * PARENT.PARENT.AnimationStateValue, alpha = 255 * (1F - PARENT.PARENT.AnimationStateValue);
+                    g.DrawEllipse(Helper.ToColor(alpha, brush.Color), 4F * g.Dpi, new RectangleF(RectDot.X + (RectDot.Width - max) / 2F, RectDot.Y + (RectDot.Height - max) / 2F, max, max));
+                }
+                g.FillEllipse(brush, RectDot);
+            }
+            if (Fore.HasValue) g.DrawText(Text, font, Fore.Value, Rect, Table.StringFormat(PARENT.COLUMN));
+            else g.DrawText(Text, font, fore, Rect, Table.StringFormat(PARENT.COLUMN));
+        }
+
+        public override Size GetSize(Canvas g, Font font, TableGaps gap)
+        {
+            if (string.IsNullOrEmpty(Text))
+            {
+                var size = g.MeasureString(Config.NullText, font);
+                return new Size(size.Height, size.Height);
+            }
+            else
+            {
+                var size = g.MeasureText(Text, font);
+                return new Size(size.Width + size.Height, size.Height);
+            }
+        }
+
+        int TxtHeight = 0;
+        Rectangle RectDot;
+        public override void SetRect(Canvas g, Font font, Rectangle rect, Size size, int maxwidth, TableGaps gap)
+        {
+            TxtHeight = size.Height;
+            int dot_size = (int)(size.Height * dotratio);
+            if (string.IsNullOrEmpty(Text)) RectDot = new Rectangle(rect.X + (rect.Width - dot_size) / 2, rect.Y + (rect.Height - dot_size) / 2, dot_size, dot_size);
+            else
+            {
+                Rect = new Rectangle(rect.X + size.Height, rect.Y, rect.Width - size.Height, rect.Height);
+                RectDot = new Rectangle(rect.X + (size.Height - dot_size) / 2, rect.Y + (rect.Height - dot_size) / 2, dot_size, dot_size);
+            }
+        }
+    }
+}

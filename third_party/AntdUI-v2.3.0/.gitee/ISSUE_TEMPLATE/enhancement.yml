@@ -1,0 +1,27 @@
+name: 功能建议
+description: 对本项目提出一个功能建议
+title:
+labels: ["增强"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢提出功能建议，我将仔细考虑！
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景和动机
+      description: 请在此说明新API的用途和价值。
+      placeholder: 目的
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 要求
+      description: 你希望发生什么。
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        🙏 我承诺将本着相互尊重、理解和友善的态度进行交流，共同维护好良好的社区氛围。

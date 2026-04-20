@@ -1,0 +1,322 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System.Collections.Generic;
+using System.Drawing;
+
+namespace AntdUI
+{
+    /// <summary>
+    /// 全局配置
+    /// </summary>
+    public class Config
+    {
+        #region 色彩模式
+
+        static TMode mode = TMode.Light;
+        /// <summary>
+        /// 色彩模式
+        /// </summary>
+        public static TMode Mode
+        {
+            get => mode;
+            set
+            {
+                mode = value;
+                EventHub.Dispatch(EventType.THEME, value);
+                if (Style.tmp_primary.HasValue) Style.SetPrimaryCore(Style.tmp_primary.Value);
+                if (Style.tmp_success.HasValue) Style.SetSuccessCore(Style.tmp_success.Value);
+                if (Style.tmp_warning.HasValue) Style.SetWarningCore(Style.tmp_warning.Value);
+                if (Style.tmp_error.HasValue) Style.SetErrorCore(Style.tmp_error.Value);
+                if (Style.tmp_info.HasValue) Style.SetInfoCore(Style.tmp_info.Value);
+            }
+        }
+
+        public static bool IsLight
+        {
+            get => mode == TMode.Light;
+            set => Mode = value ? TMode.Light : TMode.Dark;
+        }
+        public static bool IsDark
+        {
+            get => mode == TMode.Dark;
+            set => Mode = value ? TMode.Dark : TMode.Light;
+        }
+
+        #endregion
+
+        #region 动画使能
+
+        /// <summary>
+        /// 动画使能
+        /// </summary>
+        public static bool Animation { get; set; } = true;
+
+        /// <summary>
+        /// 全局默认表格单元格焦点样式
+        /// </summary>
+        public static TableCellFocusedStyle DefaultCellFocusedStyle { get; set; } = TableCellFocusedStyle.None;
+
+        internal static List<string>? AnimationData;
+
+        /// <summary>
+        /// 启用动画
+        /// </summary>
+        public static void EnableAnimation(params string[] controls)
+        {
+            if (AnimationData == null) return;
+            foreach (var it in controls) AnimationData.Remove(it);
+        }
+
+        /// <summary>
+        /// 禁用动画
+        /// </summary>
+        public static void DisableAnimation(params string[] controls)
+        {
+            if (AnimationData == null) AnimationData = new List<string>(controls);
+            else
+            {
+                foreach (var it in controls)
+                {
+                    if (AnimationData.Contains(it)) continue;
+                    AnimationData.Add(it);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 清除动画数据
+        /// </summary>
+        public static void ClearAnimationData() => AnimationData = null;
+
+        public static bool HasAnimation(string control)
+        {
+            if (Animation)
+            {
+                if (AnimationData == null) return true;
+                if (AnimationData.Contains(control)) return false;
+                return true;
+            }
+            return false;
+        }
+        public static bool HasAnimation(string control, string name)
+        {
+            if (Animation)
+            {
+                if (AnimationData == null) return true;
+                if (AnimationData.Contains(control) || AnimationData.Contains(name)) return false;
+                return true;
+            }
+            return false;
+        }
+
+        #endregion
+
+        #region 主题配置
+
+        /// <summary>
+        /// 全局主题配置
+        /// </summary>
+        public static IThemeConfig? ThemeConfig { get; set; }
+
+        public static IThemeConfig Theme() => ThemeConfig ??= new IThemeConfig();
+
+        public static void ThemeClear() => ThemeConfig = null;
+
+        #endregion
+
+        /// <summary>
+        /// 触屏使能
+        /// </summary>
+        public static bool TouchEnabled { get; set; } = true;
+
+        /// <summary>
+        /// 触屏阈值
+        /// </summary>
+        public static int TouchThreshold { get; set; } = 20;
+
+        /// <summary>
+        /// 触屏点击使能
+        /// </summary>
+        public static bool TouchClickEnabled { get; set; }
+
+        /// <summary>
+        /// 鼠标悬停时长（毫秒）
+        /// </summary>
+        public static int MouseHoverDelay { get; set; } = 100;
+
+        /// <summary>
+        /// 阴影使能
+        /// </summary>
+        public static bool ShadowEnabled { get; set; } = true;
+
+        /// <summary>
+        /// 阴影大小 (默认10像素)
+        /// </summary>
+        public static int ShadowSize { get; set; } = 10;
+
+        /// <summary>
+        /// 阴影透明度 (默认0.2f)
+        /// </summary>
+        public static float ShadowOpacity { get; set; } = 0.2F;
+
+        /// <summary>
+        /// 焦点边框使能
+        /// </summary>
+        public static bool FocusBorderEnabled { get; set; } = true;
+
+        /// <summary>
+        /// 下拉边距更远
+        /// </summary>
+        public static bool DropDownMarginFurther { get; set; }
+
+        #region 弹出在窗口
+
+        /// <summary>
+        /// 弹出是否在窗口里而不是在系统里（Message/Notification）
+        /// </summary>
+        public static bool ShowInWindow { get; set; }
+
+        /// <summary>
+        /// 弹出是否在窗口里而不是在系统里（Message）
+        /// </summary>
+        public static bool ShowInWindowByMessage { get; set; }
+
+        /// <summary>
+        /// 弹出是否在窗口里而不是在系统里（Notification）
+        /// </summary>
+        public static bool ShowInWindowByNotification { get; set; }
+
+        #endregion
+
+        /// <summary>
+        /// 通知消息边界偏移量XY（Message/Notification）
+        /// </summary>
+        public static int NoticeWindowOffsetXY { get; set; }
+
+        /// <summary>
+        /// 通知满溢关闭
+        /// </summary>
+        public static bool NoticeOverflowClose { get; set; }
+
+        /// <summary>
+        /// 文本呈现的质量
+        /// </summary>
+        public static System.Drawing.Text.TextRenderingHint? TextRenderingHint { get; set; }
+
+        /// <summary>
+        /// 文本高质量呈现
+        /// </summary>
+        public static bool TextRenderingHighQuality { get; set; }
+
+        /// <summary>
+        /// Emoji使能
+        /// </summary>
+        public static bool EmojiEnabled { get; set; } = true;
+
+        /// <summary>
+        /// Emoji字体
+        /// </summary>
+        public static string EmojiFont { get; set; } = "Segoe UI Emoji";
+
+        /// <summary>
+        /// 是否使用钩子
+        /// </summary>
+#if DEBUG
+        public static bool UseHook { get; set; }
+#else
+        public static bool UseHook { get; set; } = true;
+#endif
+
+        /// <summary>
+        /// 默认字体
+        /// </summary>
+        [System.Obsolete]
+        public static Font? Font { get; set; }
+
+        #region 滚动条
+
+        /// <summary>
+        /// 滚动条隐藏样式
+        /// </summary>
+        public static bool ScrollBarHide { get; set; }
+
+        /// <summary>
+        /// 滚动条最小大小Y
+        /// </summary>
+        public static int ScrollMinSizeY { get; set; } = 30;
+
+        #endregion
+
+        #region DPI
+
+        /// <summary>
+        /// DPI模式
+        /// </summary>
+        public static DpiMode DpiMode { get; set; } = DpiMode.Default;
+
+        static float? dpi;
+        internal static float? _dpi_custom;
+        public static float Dpi
+        {
+            get
+            {
+                if (_dpi_custom.HasValue) return _dpi_custom.Value;
+                else if (dpi.HasValue) return dpi.Value;
+                else
+                {
+                    var _dpi = Helper.GDI(g => Helper.GetDpi(g.DpiX, g.DpiY));
+                    dpi = _dpi;
+                    EventHub.Dispatch(EventType.DPI, _dpi);
+                    return _dpi;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 自定义DPI
+        /// </summary>
+        /// <param name="dpi">值</param>
+        public static void SetDpi(float? dpi)
+        {
+            if (_dpi_custom == dpi) return;
+            _dpi_custom = dpi;
+            if (dpi.HasValue) EventHub.Dispatch(EventType.DPI, dpi.Value);
+            else EventHub.Dispatch(EventType.DPI, Config.dpi);
+        }
+
+        #endregion
+
+        public const string NullText = "龍Qq";
+
+        /// <summary>
+        /// 设置修正文本渲染
+        /// </summary>
+        /// <param name="families">需要修正的字体列表</param>
+        public static void SetCorrectionTextRendering(params string[] families)
+        {
+            foreach (var it in families) CorrectionTextRendering.Set(it);
+        }
+
+        #region 空白图
+
+        public static Image? EmptyImage { get; set; }
+
+        public static float EmptyImageRatio = 2.98F;
+
+        internal static string[]? EmptyImageSvg;
+
+        /// <summary>
+        /// 设置空白图片
+        /// </summary>
+        /// <param name="light">浅色</param>
+        /// <param name="dark">深色</param>
+        public static void SetEmptyImageSvg(string light, string dark) => EmptyImageSvg = new string[] { light, dark };
+        public static void ClearEmptyImageSvg() => EmptyImageSvg = null;
+
+        #endregion
+    }
+}

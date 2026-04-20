@@ -1,0 +1,3545 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Design;
+using System.Windows.Forms;
+
+namespace AntdUI
+{
+    /// <summary>
+    /// Menu 导航菜单
+    /// </summary>
+    /// <remarks>为页面和功能提供导航的菜单列表。</remarks>
+    [Description("Menu 导航菜单")]
+    [ToolboxItem(true)]
+    [DefaultProperty("Items")]
+    [DefaultEvent("SelectChanged")]
+    public class Menu : IControl, SubLayeredForm, IEventListener
+    {
+        #region 属性
+
+        /// <summary>
+        /// 悬停背景颜色
+        /// </summary>
+        [Description("悬停背景颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? BackHover { get; set; }
+
+        /// <summary>
+        /// 激活背景颜色
+        /// </summary>
+        [Description("激活背景颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? BackActive { get; set; }
+
+        Color? fore;
+        /// <summary>
+        /// 文字颜色
+        /// </summary>
+        [Description("文字颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public new Color? ForeColor
+        {
+            get => fore;
+            set
+            {
+                if (fore == value) return;
+                fore = value;
+                Invalidate();
+                OnPropertyChanged(nameof(ForeColor));
+            }
+        }
+
+        /// <summary>
+        /// 激活字体颜色
+        /// </summary>
+        [Description("激活字体颜色"), Category("外观"), DefaultValue(null)]
+        [Editor(typeof(Design.ColorEditor), typeof(UITypeEditor))]
+        public Color? ForeActive { get; set; }
+
+        int radius = 6;
+        /// <summary>
+        /// 圆角
+        /// </summary>
+        [Description("圆角"), Category("外观"), DefaultValue(6)]
+        public int Radius
+        {
+            get => radius;
+            set
+            {
+                if (radius == value) return;
+                radius = value;
+                Invalidate();
+                OnPropertyChanged(nameof(Radius));
+            }
+        }
+
+        bool round = false;
+        /// <summary>
+        /// 圆角样式
+        /// </summary>
+        [Description("圆角样式"), Category("外观"), DefaultValue(false)]
+        public bool Round
+        {
+            get => round;
+            set
+            {
+                if (round == value) return;
+                round = value;
+                Invalidate();
+                OnPropertyChanged(nameof(Round));
+            }
+        }
+
+        /// <summary>
+        /// 焦点模式
+        /// </summary>
+        [Description("焦点模式"), Category("外观"), DefaultValue(TFocusMode.None)]
+        public TFocusMode FocusMode { get; set; } = TFocusMode.None;
+
+        /// <summary>
+        /// 色彩模式
+        /// </summary>
+        [Obsolete("use ColorScheme"), Description("色彩模式"), Category("外观"), DefaultValue(TAMode.Auto)]
+        public TAMode Theme
+        {
+            get => ColorScheme;
+            set => ColorScheme = value;
+        }
+
+        int? _gap;
+        /// <summary>
+        /// 间距
+        /// </summary>
+        [Description("间距"), Category("外观"), DefaultValue(null)]
+        public int? Gap
+        {
+            get => _gap;
+            set
+            {
+                if (_gap == value) return;
+                _gap = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(Gap));
+            }
+        }
+
+        int? icongap;
+        /// <summary>
+        /// 图标与文字间距比例
+        /// </summary>
+        [Description("图标与文字间距比例"), Category("外观"), DefaultValue(null)]
+        public int? IconGap
+        {
+            get => icongap;
+            set
+            {
+                if (icongap == value) return;
+                icongap = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(IconGap));
+            }
+        }
+
+        int? _itemMargin;
+        /// <summary>
+        /// 菜单项外间距
+        /// </summary>
+        [Description("菜单项外间距"), Category("外观"), DefaultValue(null)]
+        public int? itemMargin
+        {
+            get => _itemMargin;
+            set
+            {
+                if (_itemMargin == value) return;
+                _itemMargin = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(itemMargin));
+            }
+        }
+
+        int? _inlineIndent;
+        /// <summary>
+        /// 缩进宽度
+        /// </summary>
+        [Description("缩进宽度"), Category("外观"), DefaultValue(null)]
+        public int? InlineIndent
+        {
+            get => _inlineIndent;
+            set
+            {
+                if (_inlineIndent == value) return;
+                _inlineIndent = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(InlineIndent));
+            }
+        }
+
+        float iconratio = 1.2F;
+        /// <summary>
+        /// 图标比例
+        /// </summary>
+        [Description("图标比例"), Category("外观"), DefaultValue(1.2F)]
+        public float IconRatio
+        {
+            get => iconratio;
+            set
+            {
+                if (iconratio == value) return;
+                iconratio = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(IconRatio));
+            }
+        }
+
+        float? arrowRatio;
+        /// <summary>
+        /// 箭头比例
+        /// </summary>
+        [Description("箭头比例"), Category("外观"), DefaultValue(null)]
+        public float? ArrowRatio
+        {
+            get => arrowRatio;
+            set
+            {
+                if (arrowRatio == value) return;
+                arrowRatio = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(ArrowRatio));
+            }
+        }
+
+        TMenuMode mode = TMenuMode.Inline;
+        /// <summary>
+        /// 菜单类型
+        /// </summary>
+        [Description("菜单类型"), Category("外观"), DefaultValue(TMenuMode.Inline)]
+        public TMenuMode Mode
+        {
+            get => mode;
+            set
+            {
+                if (mode == value) return;
+                mode = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(Mode));
+            }
+        }
+
+        /// <summary>
+        /// 菜单类型是否需要弹出下拉
+        /// </summary>
+        public bool IsModeNeedDropDown => IsModeHorizontal || mode == TMenuMode.Vertical;
+        /// <summary>
+        /// 菜单类型是否横向
+        /// </summary>
+        public bool IsModeHorizontal => mode == TMenuMode.Horizontal || mode == TMenuMode.Horizontal_Arrow;
+
+        /// <summary>
+        /// 触发下拉的行为
+        /// </summary>
+        [Description("触发下拉的行为"), Category("行为"), DefaultValue(Trigger.Hover)]
+        public Trigger Trigger { get; set; } = Trigger.Hover;
+
+        bool indent = false;
+        /// <summary>
+        /// 常规缩进
+        /// </summary>
+        [Description("常规缩进"), Category("外观"), DefaultValue(false)]
+        public bool Indent
+        {
+            get { return indent; }
+            set
+            {
+                if (indent == value) return;
+                indent = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(Indent));
+            }
+        }
+
+        bool unique = false;
+        /// <summary>
+        /// 只保持一个子菜单的展开
+        /// </summary>
+        [Description("只保持一个子菜单的展开"), Category("外观"), DefaultValue(false)]
+        public bool Unique
+        {
+            get => unique;
+            set
+            {
+                if (unique == value) return;
+                unique = value;
+                if (unique) UniqueHand(items);
+            }
+        }
+
+        void UniqueHand(MenuItemCollection? items)
+        {
+            if (items == null) return;
+            foreach (var item in items)
+            {
+                if (item.Expand)
+                {
+                    UniqueHand(item.Sub);
+                    foreach (var it in items)
+                    {
+                        if (item == it) continue;
+                        it.Expand = false;
+                    }
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 显示子菜单背景
+        /// </summary>
+        [Description("显示子菜单背景"), Category("外观"), DefaultValue(false)]
+        public bool ShowSubBack { get; set; }
+
+        /// <summary>
+        /// 自动折叠
+        /// </summary>
+        [Description("自动折叠"), Category("外观"), DefaultValue(false)]
+        public bool AutoCollapse { get; set; }
+
+        bool collapsed = false;
+        /// <summary>
+        /// 是否折叠
+        /// </summary>
+        [Description("是否折叠"), Category("外观"), DefaultValue(false)]
+        public bool Collapsed
+        {
+            get => collapsed;
+            set
+            {
+                if (collapsed == value) return;
+                collapsed = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(Collapsed));
+            }
+        }
+
+        /// <summary>
+        /// 超出文字提示配置
+        /// </summary>
+        [Browsable(false)]
+        [Description("超出文字提示配置"), Category("行为"), DefaultValue(null)]
+        public TooltipConfig? TooltipConfig { get; set; }
+
+        /// <summary>
+        /// 鼠标右键控制
+        /// </summary>
+        [Description("鼠标右键控制"), Category("交互"), DefaultValue(true)]
+        public bool MouseRightCtrl { get; set; } = true;
+
+        bool scrollBarBlock = false;
+        /// <summary>
+        /// 滚动条遮挡
+        /// </summary>
+        [Description("滚动条遮挡"), Category("外观"), DefaultValue(false)]
+        public bool ScrollBarBlock
+        {
+            get => scrollBarBlock;
+            set
+            {
+                if (scrollBarBlock == value) return;
+                scrollBarBlock = value;
+                ChangeList(true);
+                OnPropertyChanged(nameof(ScrollBarBlock));
+            }
+        }
+
+        #region 下拉
+
+        /// <summary>
+        /// 下拉边距
+        /// </summary>
+        [Description("下拉边距"), Category("外观"), DefaultValue(typeof(Size), "16, 10")]
+        public Size DropDownPadding { get; set; } = new Size(16, 10);
+
+        /// <summary>
+        /// 下拉图标比例
+        /// </summary>
+        [Description("下拉图标比例"), Category("外观"), DefaultValue(0.7F)]
+        public float DropIconRatio { get; set; } = 0.7F;
+
+        /// <summary>
+        /// 下拉图标边距比例
+        /// </summary>
+        [Description("下拉图标边距比例"), Category("外观"), DefaultValue(0.25F)]
+        public float DropIconGap { get; set; } = 0.25F;
+
+        /// <summary>
+        /// 下拉菜单偏移量（水平模式下子菜单相对主菜单的偏移）
+        /// </summary>
+        [Description("下拉菜单偏移量"), Category("外观"), DefaultValue(typeof(Size), "0, 0")]
+        public Size DropDownOffset { get; set; } = new Size(0, 0);
+
+        #endregion
+
+        #region 集合操作
+
+        MenuItem? selectItem, focusItem;
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public MenuItem? SelectItem
+        {
+            get => selectItem;
+            private set
+            {
+                focusItem = null;
+                if (selectItem == value) return;
+                selectItem = value;
+                if (value == null) return;
+                SelectChanged?.Invoke(this, new MenuSelectEventArgs(value));
+            }
+        }
+
+        public void SelectIndex(int i1, bool focus = true)
+        {
+            if (items == null || items.Count == 0) return;
+            IUSelect(items);
+            if (items.ListExceed(i1))
+            {
+                Invalidate();
+                return;
+            }
+            var it1 = items[i1];
+            it1.Select = true;
+            SelectItem = it1;
+            ItemClick?.Invoke(this, new MenuItemEventArgs(it1, new MouseEventArgs(MouseButtons.None, 0, 0, 0, 0)));
+            if (focus) Focus(it1);
+            Invalidate();
+        }
+
+        public void SelectIndex(int i1, int i2, bool focus = true)
+        {
+            if (items == null || items.Count == 0) return;
+            IUSelect(items);
+            if (items.ListExceed(i1))
+            {
+                Invalidate();
+                return;
+            }
+            var it1 = items[i1];
+            if (it1.items.ListExceed(i2))
+            {
+                Invalidate();
+                return;
+            }
+            var it2 = it1.Sub[i2];
+            it1.Select = it2.Select = true;
+            SelectItem = it2;
+            ItemClick?.Invoke(this, new MenuItemEventArgs(it2, new MouseEventArgs(MouseButtons.None, 0, 0, 0, 0)));
+            if (focus) Focus(it2);
+            Invalidate();
+        }
+
+        public void SelectIndex(int i1, int i2, int i3, bool focus = true)
+        {
+            if (items == null || items.Count == 0) return;
+            IUSelect(items);
+            if (items.ListExceed(i1))
+            {
+                Invalidate();
+                return;
+            }
+            var it1 = items[i1];
+            if (it1.items.ListExceed(i2))
+            {
+                Invalidate(); return;
+            }
+            var it2 = it1.Sub[i2];
+            if (it2.items.ListExceed(i3))
+            {
+                Invalidate();
+                return;
+            }
+            var it3 = it2.Sub[i3];
+            it1.Select = it2.Select = it3.Select = true;
+            SelectItem = it3;
+            ItemClick?.Invoke(this, new MenuItemEventArgs(it3, new MouseEventArgs(MouseButtons.None, 0, 0, 0, 0)));
+            if (focus) Focus(it3);
+            Invalidate();
+        }
+
+        #endregion
+
+        MenuItemCollection? items;
+        /// <summary>
+        /// 菜单集合
+        /// </summary>
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)]
+        [Description("菜单集合"), Category("数据")]
+        public MenuItemCollection Items
+        {
+            get
+            {
+                items ??= new MenuItemCollection(this);
+                return items;
+            }
+            set => items = value.BindData(this);
+        }
+
+        bool pauseLayout = false;
+        [Browsable(false), Description("暂停布局"), Category("行为"), DefaultValue(false)]
+        public bool PauseLayout
+        {
+            get => pauseLayout;
+            set
+            {
+                if (pauseLayout == value) return;
+                pauseLayout = value;
+                if (!value) ChangeList(true);
+                OnPropertyChanged(nameof(PauseLayout));
+            }
+        }
+
+        /// <summary>
+        /// 滚动条
+        /// </summary>
+        [Browsable(false)]
+        public ScrollBar ScrollBar;
+
+        #endregion
+
+        #region 布局
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ChangeList();
+            this.AddListener();
+            var item = GetSelectItem(out var sub);
+            if (item != null)
+            {
+                selectItem = item;
+                foreach (var it in sub) it.Select = true;
+            }
+        }
+
+        #region 获取选中项目
+
+        public MenuItem? GetSelectItem()
+        {
+            var list = new List<MenuItem>(0);
+            return GetSelectItem(ref list, items);
+        }
+
+        public MenuItem? GetSelectItem(out List<MenuItem> list)
+        {
+            list = new List<MenuItem>(0);
+            return GetSelectItem(ref list, items);
+        }
+
+        MenuItem? GetSelectItem(ref List<MenuItem> list, MenuItemCollection? items)
+        {
+            if (items == null || items.Count == 0) return null;
+            foreach (var it in items)
+            {
+                var list_ = new List<MenuItem>(list.Count + 1);
+                list_.AddRange(list);
+                list_.Add(it);
+                var select = GetSelectItem(ref list_, it.Sub);
+                if (select == null)
+                {
+                    if (it.Select)
+                    {
+                        list = list_;
+                        return it;
+                    }
+                }
+                else
+                {
+                    list = list_;
+                    return select;
+                }
+            }
+            return null;
+        }
+
+        #endregion
+
+        protected override void OnFontChanged(EventArgs e)
+        {
+            ChangeList();
+            base.OnFontChanged(e);
+        }
+
+        protected override void OnSizeChanged(EventArgs e)
+        {
+            ChangeList();
+            base.OnSizeChanged(e);
+        }
+
+        public void HandleEvent(EventType id, object? tag)
+        {
+            switch (id)
+            {
+                case EventType.LANG:
+                    ChangeList();
+                    break;
+            }
+        }
+
+        int collapseWidth = 0, collapsedWidth = 0;
+        /// <summary>
+        /// 展开之前宽度
+        /// </summary>
+        public int CollapseWidth => collapseWidth;
+
+        /// <summary>
+        /// 展开后宽度
+        /// </summary>
+        public int CollapsedWidth => collapsedWidth;
+
+        bool scroll_show = false, hover_r = false;
+        Rectangle rect_r, rect_r_ico;
+        bool CanLayout()
+        {
+            if (IsHandleCreated)
+            {
+                var rect = ClientRectangle;
+                if (pauseLayout || items == null || items.Count == 0 || rect.Width == 0 || rect.Height == 0) return false;
+                return true;
+            }
+            return false;
+        }
+
+        internal void ChangeList(bool print = false)
+        {
+            if (CanLayout())
+            {
+                var _rect = ClientRectangle;
+                var rect = _rect.PaddingRect(Padding);
+                int x = 0, y = 0, icon_count = 0;
+                this.GDI(g =>
+                {
+                    var size = g.MeasureString(Config.NullText, Font);
+                    int icon_size = (int)(size.Height * iconratio);
+                    int gap = (_gap.HasValue ? (int)(_gap.Value * Dpi) : (int)(size.Height * .8F)), gap2 = gap * 2, divider = (int)Dpi, sp = (_itemMargin.HasValue ? (int)(_itemMargin.Value * Dpi) : (int)(size.Height * .2F)), sp2 = sp * 2, height = size.Height + gap2;
+                    int inlineIndent = (_inlineIndent.HasValue ? (int)(_inlineIndent.Value * Dpi) : (int)(size.Height * 1.2F)), iconsp = (icongap.HasValue ? (int)(icongap.Value * Dpi) : size.Height / 2);
+                    if (mode == TMenuMode.Horizontal)
+                    {
+                        ChangeListHorizontal(rect, g, items!, ref x, icon_size, gap, gap2, divider, sp, sp2, iconsp);
+                        scroll_show = x > rect.Width;
+                        if (scroll_show)
+                        {
+                            rect_r = new Rectangle(rect.Right - rect.Height, rect.Y, rect.Height, rect.Height);
+                            int ico_size = (int)(rect_r.Height * .6F), ico_xy = (rect_r.Height - ico_size) / 2;
+                            rect_r_ico = new Rectangle(rect_r.X + ico_xy, rect_r.Y + ico_xy, ico_size, ico_size);
+                        }
+                    }
+                    else if (mode == TMenuMode.Horizontal_Arrow)
+                    {
+                        int arrow_size = arrowRatio.HasValue ? (int)(size.Height * arrowRatio.Value) : icon_size;
+                        ChangeListHorizontalArrow(rect, g, items!, ref x, icon_size, arrow_size, gap, gap2, divider, sp, sp2, iconsp);
+                        scroll_show = x > rect.Width;
+                        if (scroll_show)
+                        {
+                            rect_r = new Rectangle(rect.Right - rect.Height, rect.Y, rect.Height, rect.Height);
+                            int ico_size = (int)(rect_r.Height * .6F), ico_xy = (rect_r.Height - ico_size) / 2;
+                            rect_r_ico = new Rectangle(rect_r.X + ico_xy, rect_r.Y + ico_xy, ico_size, ico_size);
+                        }
+                    }
+                    else
+                    {
+                        scroll_show = false;
+                        collapseWidth = icon_size + gap2 + Padding.Horizontal;
+                        if (mode == TMenuMode.InlineNoText)
+                        {
+                            int arrow_size = arrowRatio.HasValue ? (int)(size.Height * arrowRatio.Value) : (int)(icon_size * 0.85F);
+                            collapsedWidth = ChangeListInlineNoText(rect, g, null, items!, ref y, height, icon_size, arrow_size, gap, gap2, divider, sp, sp2, iconsp) + Padding.Horizontal;
+                        }
+                        else
+                        {
+                            scrollBarBlock = true;
+                            int arrow_size = arrowRatio.HasValue ? (int)(size.Height * arrowRatio.Value) : icon_size, scx;
+                            if (ScrollBar.Show && scrollBarBlock)
+                            {
+                                rect.Width -= ScrollBar.SIZE;
+                                int yr = ChangeListY(rect, items!, ref icon_count, height, sp) + Padding.Vertical;
+                                scx = 0;
+                            }
+                            else
+                            {
+                                int yr = ChangeListY(rect, items!, ref icon_count, height, sp) + Padding.Vertical;
+                                scx = yr > _rect.Height ? ScrollBar.SIZE : 0;
+                            }
+                            collapsedWidth = ChangeList(rect, g, null, items!, ref y, height, icon_size, arrow_size, gap, gap2, divider, sp, sp2, inlineIndent, iconsp, scx, 0) + Padding.Horizontal;
+                        }
+                        if (AutoCollapse)
+                        {
+                            if (icon_count > 0) collapsed = collapsedWidth >= _rect.Width;
+                            else collapsed = false;
+                        }
+                        if (collapsed) ChangeUTitle(items!);
+                    }
+                });
+                ScrollBar.SetVrSize(y + Padding.Vertical);
+                ScrollBar.SizeChange(_rect);
+            }
+            if (print) Invalidate();
+        }
+
+        int ChangeListY(Rectangle rect, MenuItemCollection items, ref int icon_count, int height, int sp)
+        {
+            int y = 0;
+            foreach (var it in items)
+            {
+                if (it is MenuDividerItem) continue;
+                if (it.HasIcon) icon_count++;
+                if (it.Visible)
+                {
+                    y += height + sp;
+                    if ((mode == TMenuMode.Inline || mode == TMenuMode.InlineNoText) && it.Expand) y += ChangeListY(rect, it.Sub, ref icon_count, height, sp);
+                }
+            }
+            return y;
+        }
+
+        int ChangeList(Rectangle rect, Canvas g, MenuItem? Parent, MenuItemCollection items, ref int y, int height, int icon_size, int arrow_size, int gap, int gap2, int divider, int sp, int sp2, int inlineIndent, int iconsp, int scx, int depth)
+        {
+            int collapsedWidth = 0, i = 0;
+            foreach (var it in items)
+            {
+                it.Index = i;
+                i++;
+                it.PARENT = this;
+                it.ParentItem = Parent;
+                if (it is MenuDividerItem)
+                {
+                    it.SetRectDivider(new Rectangle(rect.X, rect.Y + y, rect.Width, divider));
+                    y += divider + sp;
+                }
+                else
+                {
+                    int uw = it.SetRect(this, depth, Indent, new Rectangle(rect.X, rect.Y + y, rect.Width, height), icon_size, arrow_size, gap, gap2, sp, sp2, inlineIndent, iconsp, scx, out int exr);
+                    if (it.Visible)
+                    {
+                        int size = g.MeasureText(it.Text, it.Font ?? Font).Width + uw + gap2 + scx + exr;
+                        if (size > collapsedWidth) collapsedWidth = size;
+                        y += height + sp;
+                        if (mode == TMenuMode.Inline && it.CanExpand)
+                        {
+                            if (collapsed)
+                            {
+                                int oldy = y;
+                                int size2 = ChangeList(rect, g, it, it.Sub, ref y, height, icon_size, arrow_size, gap, gap2, divider, sp, sp2, inlineIndent, iconsp, scx, depth + 1);
+                                if (size2 > collapsedWidth) collapsedWidth = size2;
+                                y = oldy;
+                            }
+                            else
+                            {
+                                int y_item = y;
+                                int size2 = ChangeList(rect, g, it, it.Sub, ref y, height, icon_size, arrow_size, gap, gap2, divider, sp, sp2, inlineIndent, iconsp, scx, depth + 1);
+                                if (size2 > collapsedWidth) collapsedWidth = size2;
+
+                                it.SubY = rect.Y + y_item - sp / 2;
+                                it.SubHeight = y - y_item;
+
+                                if ((it.Expand || it.ExpandThread) && it.ExpandProg > 0)
+                                {
+                                    it.ExpandHeight = y - y_item;
+                                    it.ExpandRHeight = (int)(it.ExpandHeight * it.ExpandProg);
+                                    y = y_item + it.ExpandRHeight;
+                                }
+                                else if (!it.Expand) y = y_item;
+                            }
+                        }
+                    }
+                }
+            }
+            return collapsedWidth;
+        }
+        int ChangeListInlineNoText(Rectangle rect, Canvas g, MenuItem? Parent, MenuItemCollection items, ref int y, int height, int icon_size, int arrow_size, int gap, int gap2, int divider, int sp, int sp2, int iconsp)
+        {
+            int collapsedWidth = 0, i = 0;
+            foreach (var it in items)
+            {
+                it.Index = i;
+                i++;
+                it.PARENT = this;
+                it.ParentItem = Parent;
+                if (it is MenuDividerItem)
+                {
+                    it.SetRectDivider(new Rectangle(rect.X, rect.Y + y, rect.Width, divider));
+                    y += divider + sp;
+                }
+                else
+                {
+                    int uw = it.SetRectInlineNoText(new Rectangle(rect.X, rect.Y + y, rect.Width, height), icon_size, arrow_size, gap, gap2, sp, sp2, iconsp);
+                    if (it.Visible)
+                    {
+                        int size = g.MeasureText(it.Text, it.Font ?? Font).Width + uw + gap2;
+                        if (size > collapsedWidth) collapsedWidth = size;
+                        y += height + sp;
+                        if (it.CanExpand)
+                        {
+                            if (collapsed)
+                            {
+                                int oldy = y;
+                                int size2 = ChangeListInlineNoText(rect, g, it, it.Sub, ref y, height, icon_size, arrow_size, gap, gap2, divider, sp, sp2, iconsp);
+                                if (size2 > collapsedWidth) collapsedWidth = size2;
+                                y = oldy;
+                            }
+                            else
+                            {
+                                int y_item = y;
+
+                                int size2 = ChangeListInlineNoText(rect, g, it, it.Sub, ref y, height, icon_size, arrow_size, gap, gap2, divider, sp, sp2, iconsp);
+                                if (size2 > collapsedWidth) collapsedWidth = size2;
+
+                                it.SubY = rect.Y + y_item - sp / 2;
+                                it.SubHeight = y - y_item;
+
+                                if ((it.Expand || it.ExpandThread) && it.ExpandProg > 0)
+                                {
+                                    it.ExpandHeight = y - y_item;
+                                    it.ExpandRHeight = (int)(it.ExpandHeight * it.ExpandProg);
+                                    y = y_item + it.ExpandRHeight;
+                                }
+                                else if (!it.Expand) y = y_item;
+                            }
+                        }
+                    }
+                }
+            }
+            return collapsedWidth;
+        }
+        void ChangeListHorizontal(Rectangle rect, Canvas g, MenuItemCollection items, ref int x, int icon_size, int gap, int gap2, int divider, int sp, int sp2, int iconsp)
+        {
+            int i = 0;
+            foreach (var it in items)
+            {
+                it.Index = i;
+                i++;
+                it.PARENT = this;
+                if (it is MenuDividerItem)
+                {
+                    it.SetRectDivider(new Rectangle(rect.X + x, rect.Y, divider, rect.Height));
+                    x += divider + sp;
+                }
+                else
+                {
+                    int width = g.MeasureText(it.Text, it.Font ?? Font).Width;
+                    if (it.HasIcon)
+                    {
+                        int tmp = icon_size + iconsp;
+                        int usew = gap2 + tmp, y = (rect.Height - icon_size) / 2;
+                        int size = width + gap2 + tmp;
+                        var _rect = new Rectangle(rect.X + x, rect.Y, size, rect.Height);
+                        it.ico_rect = new Rectangle(_rect.X + gap, _rect.Y + y, icon_size, icon_size);
+                        it.SetRectNoArr(_rect, new Rectangle(_rect.X + gap + tmp, _rect.Y, _rect.Width - usew, _rect.Height));
+                        if (it.Visible) x += size + sp;
+                    }
+                    else
+                    {
+                        int size = width + gap2;
+                        var _rect = new Rectangle(rect.X + x, rect.Y, size, rect.Height);
+                        it.SetRectNoArr(_rect, new Rectangle(_rect.X + gap, _rect.Y, _rect.Width - gap2, _rect.Height));
+                        if (it.Visible) x += size + sp;
+                    }
+                }
+                if (it.items?.Count > 0) it.SubY = rect.Height; // 子菜单从主菜单底部开始
+            }
+        }
+        void ChangeListHorizontalArrow(Rectangle rect, Canvas g, MenuItemCollection items, ref int x, int icon_size, int arrow_size, int gap, int gap2, int divider, int sp, int sp2, int iconsp)
+        {
+            int i = 0;
+            foreach (var it in items)
+            {
+                it.Index = i;
+                i++;
+                it.PARENT = this;
+                if (it is MenuDividerItem)
+                {
+                    it.SetRectDivider(new Rectangle(rect.X + x, rect.Y, divider, rect.Height));
+                    x += divider + sp;
+                }
+                else
+                {
+                    int width = g.MeasureText(it.Text, it.Font ?? Font).Width;
+                    if (it.HasIcon)
+                    {
+                        int tmp = icon_size + iconsp;
+                        int usew = gap2 + tmp, y = (rect.Height - icon_size) / 2;
+                        if (it.CanExpand)
+                        {
+                            int size = width + gap2 + tmp + sp + arrow_size / 2;
+                            var _rect = new Rectangle(rect.X + x, rect.Y, size, rect.Height);
+                            it.ico_rect = new Rectangle(_rect.X + gap, _rect.Y + y, icon_size, icon_size);
+                            it.SetRect(_rect, new Rectangle(_rect.X + gap + tmp, _rect.Y, _rect.Width - usew, _rect.Height), arrow_size, sp);
+                            if (it.Visible) x += size + sp;
+                        }
+                        else
+                        {
+                            int size = width + gap2 + tmp;
+                            var _rect = new Rectangle(rect.X + x, rect.Y, size, rect.Height);
+                            it.ico_rect = new Rectangle(_rect.X + gap, _rect.Y + y, icon_size, icon_size);
+                            it.SetRectNoArr(_rect, new Rectangle(_rect.X + gap + tmp, _rect.Y, _rect.Width - usew, _rect.Height));
+                            if (it.Visible) x += size + sp;
+                        }
+                    }
+                    else
+                    {
+                        if (it.CanExpand)
+                        {
+                            int size = width + gap2 + sp + arrow_size / 2;
+                            var _rect = new Rectangle(rect.X + x, rect.Y, size, rect.Height);
+                            it.SetRect(_rect, new Rectangle(_rect.X + gap, _rect.Y, _rect.Width - gap2, _rect.Height), arrow_size, sp);
+                            if (it.Visible) x += size + sp;
+                        }
+                        else
+                        {
+                            int size = width + gap2;
+                            var _rect = new Rectangle(rect.X + x, rect.Y, size, rect.Height);
+                            it.SetRectNoArr(_rect, new Rectangle(_rect.X + gap, _rect.Y, _rect.Width - gap2, _rect.Height));
+                            if (it.Visible) x += size + sp;
+                        }
+                    }
+                }
+                if (it.items?.Count > 0) it.SubY = rect.Height; // 子菜单从主菜单底部开始
+            }
+        }
+
+        void ChangeUTitle(MenuItemCollection items)
+        {
+            foreach (var it in items)
+            {
+                if (it is MenuDividerItem) continue;
+                it.ico_rect = new Rectangle(it.rect.X + (it.rect.Width - it.ico_rect.Width) / 2, it.ico_rect.Y, it.ico_rect.Width, it.ico_rect.Height);
+                if (it.Visible && it.CanExpand) ChangeUTitle(it.Sub);
+            }
+        }
+
+        #endregion
+
+        #region 渲染
+
+        public Menu() { ScrollBar = new ScrollBar(this); }
+        protected override void OnDraw(DrawEventArgs e)
+        {
+            if (items == null || items.Count == 0)
+            {
+                base.OnDraw(e);
+                return;
+            }
+            var g = e.Canvas;
+            if (scroll_show) g.SetClip(new Rectangle(e.Rect.X, e.Rect.Y, rect_r.Right - rect_r.Height, e.Rect.Height));
+            int sy = ScrollBar.Value;
+            g.TranslateTransform(0, -sy);
+            Color color_fore, color_fore_active, fore_enabled = Colour.TextQuaternary.Get(nameof(Menu), "foreDisabled", ColorScheme), back_hover, back_active;
+            if (Config.IsDark || ColorScheme == TAMode.Dark)
+            {
+                color_fore = fore ?? Colour.Text.Get(nameof(Menu), ColorScheme);
+                back_hover = color_fore_active = ForeActive ?? Colour.TextBase.Get(nameof(Menu), ColorScheme);
+                back_active = BackActive ?? Colour.Primary.Get(nameof(Menu), ColorScheme);
+            }
+            else
+            {
+                color_fore = fore ?? Colour.TextBase.Get(nameof(Menu), ColorScheme);
+                color_fore_active = ForeActive ?? Colour.Primary.Get(nameof(Menu), ColorScheme);
+                back_hover = BackHover ?? Colour.FillSecondary.Get(nameof(Menu), ColorScheme);
+                back_active = BackActive ?? Colour.PrimaryBg.Get(nameof(Menu), ColorScheme);
+            }
+            float _radius = radius * Dpi;
+            using (var sub_bg = new SolidBrush(Colour.FillQuaternary.Get(nameof(Menu), ColorScheme)))
+            using (var brush_split = new SolidBrush(Colour.Split.Get(nameof(Menu), ColorScheme)))
+            {
+                PaintItems(g, e.Rect, sy, items, color_fore, color_fore_active, fore_enabled, back_hover, back_active, _radius, sub_bg, brush_split);
+            }
+            g.ResetTransform();
+            if (scroll_show)
+            {
+                g.ResetClip();
+                if (hover_r)
+                {
+                    using (var path = Helper.RoundPath(rect_r, _radius))
+                    {
+                        g.Fill(back_hover, path);
+                    }
+                }
+                SvgExtend.GetImgExtend(g, "EllipsisOutlined", rect_r_ico, color_fore);
+            }
+            ScrollBar.Paint(g);
+            base.OnDraw(e);
+        }
+
+        void PaintItems(Canvas g, Rectangle rect, int sy, MenuItemCollection items, Color fore, Color fore_active, Color fore_enabled, Color back_hover, Color back_active, float radius, SolidBrush sub_bg, SolidBrush brush_split)
+        {
+            foreach (var it in items)
+            {
+                it.show = it.Show && it.Visible && rect.IsItemVisibleExpand(sy, it.rect, it.Expand, it.SubHeight);
+                if (it.show)
+                {
+                    if (it.Depth == -1) g.Fill(brush_split, it.rect);
+                    else
+                    {
+                        PaintIt(g, it, fore, fore_active, fore_enabled, back_hover, back_active, radius);
+                        if (!collapsed && (it.Expand || it.ExpandThread) && it.items != null && it.items.Count > 0)
+                        {
+                            if (ShowSubBack) g.Fill(sub_bg, new RectangleF(rect.X, it.SubY, rect.Width, it.SubHeight));
+                            var state = g.Save();
+                            if (it.ExpandThread) g.SetClip(new RectangleF(rect.X, it.rect.Bottom, rect.Width, it.ExpandHeight * it.ExpandProg));
+                            PaintItemExpand(g, rect, sy, it.items, fore, fore_active, fore_enabled, back_hover, back_active, radius, brush_split);
+                            g.Restore(state);
+                        }
+                    }
+                }
+            }
+        }
+        void PaintItemExpand(Canvas g, Rectangle rect, int sy, MenuItemCollection items, Color fore, Color fore_active, Color fore_enabled, Color back_hover, Color back_active, float radius, SolidBrush brush_split)
+        {
+            foreach (var it in items)
+            {
+                it.show = it.Show && it.Visible && rect.IsItemVisibleExpand(sy, it.rect, it.Expand, it.SubHeight);
+                if (it.show)
+                {
+                    if (it.Depth == -1) g.Fill(brush_split, it.rect);
+                    else
+                    {
+                        PaintIt(g, it, fore, fore_active, fore_enabled, back_hover, back_active, radius);
+                        if ((it.Expand || it.ExpandThread) && it.items != null && it.items.Count > 0)
+                        {
+                            if (it.ExpandThread)
+                            {
+                                if (it.ExpandTemp == null)
+                                {
+                                    it.ExpandTemp = new Bitmap(rect.Width, it.ExpandHeight);
+                                    using (var g2 = Graphics.FromImage(it.ExpandTemp).HighLay(Dpi, true))
+                                    {
+                                        g2.TranslateTransform(0, -it.rect.Bottom);
+                                        PaintItemExpand(g2, rect, sy, it.items, fore, fore_active, fore_enabled, back_hover, back_active, radius, brush_split);
+                                    }
+                                }
+                                g.Image(it.ExpandTemp, new Rectangle(rect.X, it.rect.Bottom, it.ExpandTemp.Width, it.ExpandRHeight), new Rectangle(0, 0, it.ExpandTemp.Width, it.ExpandRHeight), it.ExpandProg);
+                            }
+                            else PaintItemExpand(g, rect, sy, it.items, fore, fore_active, fore_enabled, back_hover, back_active, radius, brush_split);
+                        }
+                    }
+                }
+            }
+        }
+
+        void PaintIt(Canvas g, MenuItem it, Color fore, Color fore_active, Color fore_enabled, Color back_hover, Color back_active, float radius)
+        {
+            if (collapsed) PaintItemMini(g, it, fore, fore_active, fore_enabled, back_hover, back_active, radius);
+            else PaintItem(g, it, fore, fore_active, fore_enabled, back_hover, back_active, radius);
+            it.PaintBadge(Font, it.rect, g, ColorScheme);
+        }
+
+        void PaintItemMini(Canvas g, MenuItem it, Color fore, Color fore_active, Color fore_enabled, Color back_hover, Color back_active, float radius)
+        {
+            if (it.Enabled)
+            {
+                if (Config.IsDark || ColorScheme == TAMode.Dark)
+                {
+                    if (it.Select)
+                    {
+                        PaintBack(g, back_active, it.rect, radius);
+                        PaintIcon(g, it, fore_active);
+                    }
+                    else
+                    {
+                        if (it.AnimationHover)
+                        {
+                            PaintIcon(g, it, fore);
+                            PaintIcon(g, it, Helper.ToColorN(it.AnimationHoverValue, back_hover));
+                        }
+                        else if (it.Hover) PaintIcon(g, it, back_hover);
+                        else PaintIcon(g, it, fore);
+                    }
+                }
+                else
+                {
+                    if (it.Select)
+                    {
+                        PaintBack(g, back_active, it.rect, radius);
+                        PaintIcon(g, it, fore_active);
+                    }
+                    else
+                    {
+                        if (it.AnimationHover) PaintBack(g, Helper.ToColorN(it.AnimationHoverValue, back_hover), it.rect, radius);
+                        else if (it.Hover) PaintBack(g, back_hover, it.rect, radius);
+                        PaintIcon(g, it, fore);
+                    }
+                }
+            }
+            else
+            {
+                if (it.Select) PaintBack(g, back_active, it.rect, radius);
+                PaintIcon(g, it, fore_enabled);
+            }
+        }
+
+        void PaintItem(Canvas g, MenuItem it, Color fore, Color fore_active, Color fore_enabled, Color back_hover, Color back_active, float radius)
+        {
+            if (it.Enabled)
+            {
+                if (Config.IsDark || ColorScheme == TAMode.Dark)
+                {
+                    if (it.Select)
+                    {
+                        if (it.CanExpand)
+                        {
+                            if (IsModeNeedDropDown) PaintBack(g, back_active, it.rect, radius);
+                            PaintTextIconExpand(g, it, fore_active);
+                        }
+                        else
+                        {
+                            PaintBack(g, back_active, it.rect, radius);
+                            PaintTextIcon(g, it, fore_active, radius);
+                        }
+                    }
+                    else
+                    {
+                        if (it.AnimationHover)
+                        {
+                            PaintTextIconExpand(g, it, fore);
+                            PaintTextIconExpand(g, it, Helper.ToColorN(it.AnimationHoverValue, back_hover));
+                        }
+                        else if (it.Hover) PaintTextIconExpand(g, it, back_hover);
+                        else PaintTextIconExpand(g, it, fore);
+                    }
+                }
+                else
+                {
+                    if (it.Select)
+                    {
+                        if (it.CanExpand)
+                        {
+                            if (IsModeNeedDropDown) PaintBack(g, back_active, it.rect, radius);
+                            PaintTextIconExpand(g, it, fore_active);
+                        }
+                        else
+                        {
+                            PaintBack(g, back_active, it.rect, radius);
+                            PaintTextIcon(g, it, fore_active, radius);
+                        }
+                    }
+                    else
+                    {
+                        if (it.AnimationHover) PaintBack(g, Helper.ToColorN(it.AnimationHoverValue, back_hover), it.rect, radius);
+                        else if (it.Hover) PaintBack(g, back_hover, it.rect, radius);
+                        PaintTextIconExpand(g, it, fore);
+                    }
+                }
+                PaintCustomButton(g, it, fore, fore_active);
+                if (focusItem == it) PaintFocus(g, it, fore, radius);
+            }
+            else
+            {
+                if (it.Select)
+                {
+                    if (it.CanExpand)
+                    {
+                        if (IsModeNeedDropDown) PaintBack(g, back_active, it.rect, radius);
+                        using (var pen = new Pen(fore_active, Dpi * 2))
+                        {
+                            pen.StartCap = pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                            g.DrawLines(pen, it.arrow_rect.TriangleLinesVertical(it.GetArrowProg(), .4F));
+                        }
+                    }
+                    else PaintBack(g, back_active, it.rect, radius);
+                }
+                else if (it.CanExpand)
+                {
+                    using (var pen = new Pen(fore_enabled, Dpi * 2))
+                    {
+                        pen.StartCap = pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        g.DrawLines(pen, it.arrow_rect.TriangleLinesVertical(it.GetArrowProg(), .4F));
+                    }
+                }
+                PaintTextIcon(g, it, fore_enabled, radius);
+            }
+        }
+
+        readonly FormatFlags SL = FormatFlags.Left | FormatFlags.VerticalCenter | FormatFlags.NoWrapEllipsis;
+        void PaintTextIcon(Canvas g, MenuItem it, Color fore, float radius)
+        {
+            using (var brush = new SolidBrush(fore))
+            {
+                if (mode != TMenuMode.InlineNoText) g.DrawText(it.Text, it.Font ?? Font, brush, it.txt_rect, SL);
+                if (focusItem == null) PaintFocus(g, it, fore, radius);
+            }
+            PaintIcon(g, it, fore);
+        }
+        void PaintFocus(Canvas g, MenuItem it, Color fore, float radius)
+        {
+            switch (FocusMode)
+            {
+                case TFocusMode.Line:
+                    int fh = (int)(it.rect.Height * 0.6F), fw = (int)(fh * 0.12F);
+                    g.Fill(fore, new Rectangle(it.rect.X, it.rect.Y + (it.rect.Height - fh) / 2, fw, fh));
+                    break;
+                case TFocusMode.Border:
+                    float wave = 2 * Dpi, wave2 = wave * 2, r = radius + wave;
+                    var rect_focus = new RectangleF(it.rect.X - wave, it.rect.Y - wave, it.rect.Width + wave2, it.rect.Height + wave2);
+                    using (var path_focus = rect_focus.RoundPath(r))
+                    {
+                        g.Draw(Colour.PrimaryBorder.Get(nameof(Menu), ColorScheme), wave, path_focus);
+                    }
+                    break;
+            }
+        }
+        void PaintTextIconExpand(Canvas g, MenuItem it, Color fore)
+        {
+            if (it.CanExpand)
+            {
+                if (mode == TMenuMode.Inline || mode == TMenuMode.InlineNoText)
+                {
+                    using (var pen = new Pen(fore, Dpi * 2))
+                    {
+                        pen.StartCap = pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        g.DrawLines(pen, it.arrow_rect.TriangleLinesVertical(it.GetArrowProg(), .4F));
+                    }
+                }
+                else if (mode == TMenuMode.Vertical)
+                {
+                    using (var pen = new Pen(fore, Dpi * 2))
+                    {
+                        pen.StartCap = pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        g.DrawLines(pen, TAlignMini.Right.TriangleLines(it.arrow_rect, .4F));
+                    }
+                }
+                else if (mode == TMenuMode.Horizontal_Arrow)
+                {
+                    using (var pen = new Pen(fore, Dpi * 2))
+                    {
+                        pen.StartCap = pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        g.DrawLines(pen, it.arrow_rect.TriangleLinesVertical(-1, .4F));
+                    }
+                }
+            }
+            if (mode == TMenuMode.InlineNoText) PaintIcon(g, it, fore);
+            else
+            {
+                g.DrawText(it.Text, it.Font ?? Font, fore, it.txt_rect, SL);
+                PaintIcon(g, it, fore);
+            }
+        }
+        void PaintIcon(Canvas g, MenuItem it, Color fore)
+        {
+            if (it.Select)
+            {
+                int count = 0;
+                if (it.IconActive != null)
+                {
+                    g.Image(it.IconActive, it.ico_rect); count++;
+                }
+                if (it.IconActiveSvg != null)
+                {
+                    if (g.GetImgExtend(it.IconActiveSvg, it.ico_rect, fore)) count++;
+                }
+                if (count > 0) return;
+            }
+
+
+            if (it.Icon != null) g.Image(it.Icon, it.ico_rect);
+            if (it.IconSvg != null) g.GetImgExtend(it.IconSvg, it.ico_rect, fore);
+        }
+        void PaintCustomButton(Canvas g, MenuItem it, Color fore, Color fore_active)
+        {
+            if (it.Button == null) return;
+            foreach (var item in it.Button)
+            {
+                if (item.AnimationHover)
+                {
+                    PaintCustomButtonIcon(g, item, fore);
+                    PaintCustomButtonIcon(g, item, Helper.ToColorN(it.AnimationHoverValue, fore_active));
+                }
+                else if (item.Hover) PaintCustomButtonIcon(g, item, fore_active);
+                else PaintCustomButtonIcon(g, item, fore);
+                item.PaintBadge(Font, item.rect, g, ColorScheme);
+            }
+        }
+        void PaintCustomButtonIcon(Canvas g, MenuButton it, Color fore)
+        {
+            if (it.Icon != null) g.Image(it.Icon, it.rect);
+            if (it.IconSvg != null) g.GetImgExtend(it.IconSvg, it.rect, fore);
+        }
+        void PaintBack(Canvas g, Color color, Rectangle rect, float radius)
+        {
+            if (Round || radius > 0)
+            {
+                using (var path = rect.RoundPath(radius, Round))
+                {
+                    g.Fill(color, path);
+                }
+            }
+            else g.Fill(color, rect);
+        }
+
+        #endregion
+
+        #region 鼠标
+
+        MenuItem? MDown;
+        int mClicks = 0;
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            base.OnMouseDown(e);
+            mClicks = e.Clicks;
+            if (FocusMode != TFocusMode.None) Focus();
+            CloseTip();
+            CloseDropDown();
+            if (e.Button == MouseButtons.Right && !MouseRightCtrl) return;
+            if (ScrollBar.MouseDown(e.X, e.Y))
+            {
+                if (items == null || items.Count == 0) return;
+                if (scroll_show)
+                {
+                    if (rect_r.Contains(e.X, e.Y)) return;
+                }
+                OnTouchDown(e.X, e.Y);
+                foreach (var it in items)
+                {
+                    if (IMouseDown(items, it, e.X, e.Y)) return;
+                }
+            }
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (e.Button == MouseButtons.Right && !MouseRightCtrl) return;
+            if (ScrollBar.MouseUp() && OnTouchUp())
+            {
+                if (items == null || items.Count == 0 || MDown == null) return;
+                foreach (var it in items)
+                {
+                    var list = new List<MenuItem> { it };
+                    if (IMouseUp(items, it, list, e.X, e.Y, MDown, e)) return;
+                }
+            }
+        }
+
+        bool IMouseDown(MenuItemCollection items, MenuItem item, int x, int y)
+        {
+            if (item.Visible)
+            {
+                if (item is MenuDividerItem) return false;
+                bool can = item.CanExpand;
+                if (item.Enabled && item.Contains(x, y, 0, ScrollBar.Value, out _))
+                {
+                    MDown = item;
+                    return true;
+                }
+                if (can && item.Expand && !collapsed)
+                {
+                    foreach (var sub in item.Sub)
+                    {
+                        if (IMouseDown(items, sub, x, y)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        bool IMouseUp(MenuItemCollection items, MenuItem item, List<MenuItem> list, int x, int y, MenuItem MDown, MouseEventArgs e)
+        {
+            if (item.Visible)
+            {
+                bool can = item.CanExpand;
+                if (MDown == item)
+                {
+                    if (item.Enabled && item.Contains(x, y, 0, ScrollBar.Value, out var btn))
+                    {
+                        if (btn == null)
+                        {
+                            if (IsCanChang(item))
+                            {
+                                if (can)
+                                {
+                                    if (IsModeNeedDropDown && Trigger == Trigger.Click && item.items != null && item.items.Count > 0)
+                                    {
+                                        if (subForm == null) OpenDropDown(item);
+                                        else CloseDropDown();
+                                    }
+                                    else item.Expand = !item.Expand;
+                                }
+                                else
+                                {
+                                    IUSelect(items);
+                                    if (list.Count > 1)
+                                    {
+                                        foreach (var it in list) it.Select = true;
+                                    }
+                                    item.Select = true;
+                                    SelectItem = item;
+                                    ItemClick?.Invoke(this, new MenuItemEventArgs(item, e, mClicks));
+                                    Invalidate();
+                                }
+                            }
+                        }
+                        else CustomButtonClick?.Invoke(this, new MenuCustomButtonEventArgs(btn, item));
+                    }
+                    return true;
+                }
+                if (item is MenuDividerItem) return false;
+                if (can && item.Expand && !collapsed)
+                {
+                    foreach (var sub in item.Sub)
+                    {
+                        var list_ = new List<MenuItem>(list.Count + 1);
+                        list_.AddRange(list);
+                        list_.Add(sub);
+                        if (IMouseUp(items, sub, list_, x, y, MDown, e)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            if (ScrollBar.MouseMove(e.X, e.Y) && OnTouchMove(e.X, e.Y))
+            {
+                if (items == null || items.Count == 0) return;
+                int count = 0, hand = 0;
+                if (scroll_show)
+                {
+                    if (rect_r.Contains(e.X, e.Y))
+                    {
+                        if (!hover_r)
+                        {
+                            hover_r = true;
+                            Invalidate();
+                        }
+                        foreach (var it in items) it.Hover = false;
+                        SetCursor(true);
+                        return;
+                    }
+                    else
+                    {
+                        if (hover_r) count++;
+                        hover_r = false;
+                    }
+                }
+                if (collapsed)
+                {
+                    foreach (var it in items)
+                    {
+                        if (it.show) it.Contains(e.X, e.Y, 0, ScrollBar.Value, ref hand, ref count);
+                    }
+                }
+                else if (mode == TMenuMode.Inline)
+                {
+                    foreach (var it in items) IMouseMove(it, e.X, e.Y, ref count, ref hand);
+                }
+                else if (mode == TMenuMode.InlineNoText)
+                {
+                    foreach (var it in items)
+                    {
+                        if (it.show)
+                        {
+                            it.Contains(e.X, e.Y, 0, ScrollBar.Value, ref hand, ref count);
+                            if (it.items != null && it.items.Count > 0) foreach (var sub in it.items) IMouseMove(sub, e.X, e.Y, ref count, ref hand);
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var it in items)
+                    {
+                        if (it.show) it.Contains(e.X, e.Y, 0, ScrollBar.Value, ref hand, ref count);
+                    }
+                }
+                SetCursor(hand > 0);
+                if (count > 0) Invalidate();
+            }
+            else ILeave();
+        }
+
+        void IMouseMove(MenuItem it, int x, int y, ref int count, ref int hand)
+        {
+            if (it.show)
+            {
+                if (it.Contains(x, y, 0, ScrollBar.Value, ref hand, ref count)) return;
+                if (it.items != null && it.items.Count > 0) foreach (var sub in it.items) IMouseMove(sub, x, y, ref count, ref hand);
+            }
+        }
+
+        #region 鼠标悬浮
+
+        protected override bool CanMouseMove { get; set; } = true;
+
+        MenuItem? tmpItem;
+        protected override void OnMouseHover(int x, int y)
+        {
+            if (items == null || items.Count == 0)
+            {
+                CloseTip();
+                CloseDropDown();
+                return;
+            }
+            if (scroll_show && rect_r.Contains(x, y))
+            {
+                tmpItem = null;
+                CloseTip();
+                if (subForm == null)
+                {
+                    var list = new List<MenuItem>(items.Count);
+                    foreach (var item in items)
+                    {
+                        if (item.rect.X > (rect_r.X - item.rect.Width)) list.Add(item);
+                    }
+                    subForm = new LayeredFormMenuDown(this, radius, rect_r, list);
+                    subForm.Show(this);
+                }
+                return;
+            }
+            int sy = ScrollBar.Value;
+            var it = GetItemMouseHover(items, x, y, sy, out int drop);
+            if (it == null)
+            {
+                tmpItem = null;
+                CloseTip();
+                CloseDropDown();
+            }
+            else
+            {
+                if (tmpItem == it) return;
+                CloseTip();
+                CloseDropDown();
+                tmpItem = it;
+                switch (drop)
+                {
+                    case 0:
+                        if (OpenDropDown(it)) OpenTip(it, it.Rect(0, ScrollBar.ValueY));
+                        break;
+                    case 1:
+                        OpenDropDown(it);
+                        break;
+                    case 2:
+                        OpenTip(it, new Rectangle(it.rect.X, it.rect.Y + (it.rect.Height / 2) - sy, it.rect.Width, rect_r.Height));
+                        break;
+                }
+            }
+        }
+
+        MenuItem? GetItemMouseHover(MenuItemCollection items, int x, int y, int sy, out int drop)
+        {
+            drop = 0;
+            if (collapsed)
+            {
+                foreach (var it in items)
+                {
+                    if (it.show && it.rect.Contains(x, y + sy)) return it;
+                }
+            }
+            else if (mode == TMenuMode.Inline) return null;
+            else if (mode == TMenuMode.InlineNoText)
+            {
+                drop = 2;
+                return GetItemMouseHover(items, x, y, sy);
+            }
+            else
+            {
+                if (Trigger == Trigger.Hover)
+                {
+                    drop = 1;
+                    foreach (var it in items)
+                    {
+                        if (it.show && it.rect.Contains(x, y + sy)) return it;
+                    }
+                }
+            }
+            return null;
+        }
+        MenuItem? GetItemMouseHover(MenuItemCollection items, int x, int y, int sy)
+        {
+            foreach (var it in items)
+            {
+                if (it.show && it.rect.Contains(x, y + sy)) return it;
+                if (it.items != null && it.items.Count > 0)
+                {
+                    var item = GetItemMouseHover(it.items, x, y, sy);
+                    if (item != null) return item;
+                }
+            }
+            return null;
+        }
+
+        void IMouseHover(MenuItem it, int x, int y, int sy)
+        {
+            if (it.show && it.rect.Contains(x, y + sy))
+            {
+                var rect = new Rectangle(it.rect.X, it.rect.Y + (it.rect.Height / 2) - ScrollBar.Value, it.rect.Width, rect_r.Height);
+                OpenTip(it, rect);
+                return;
+            }
+            if (it.items != null && it.items.Count > 0) foreach (var sub in it.items) IMouseHover(sub, x, y, sy);
+        }
+
+        #region Tip
+
+        TooltipForm? toolTip;
+        public void CloseTip()
+        {
+            toolTip?.IClose();
+            toolTip = null;
+        }
+
+        bool OpenTip(MenuItem it, Rectangle rect)
+        {
+            if (it.Text == null) return true;
+            if (toolTip == null)
+            {
+                toolTip = new TooltipForm(this, rect, it.Text, TooltipConfig ?? new TooltipConfig
+                {
+                    Font = it.Font ?? Font,
+                    ArrowAlign = TAlign.Right,
+                });
+                toolTip.Show(this);
+            }
+            else if (toolTip.SetText(rect, it.Text))
+            {
+                CloseTip();
+                OpenTip(it, rect);
+            }
+            return false;
+        }
+
+        #endregion
+
+        #endregion
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            tmpItem = null;
+            if (RectangleToScreen(ClientRectangle).Contains(MousePosition)) return;
+            CloseTip();
+            ScrollBar.Leave();
+            ILeave();
+        }
+
+        protected override void OnLeave(EventArgs e)
+        {
+            base.OnLeave(e);
+            ScrollBar.Leave();
+            ILeave();
+        }
+
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            ScrollBar.MouseWheel(e);
+            base.OnMouseWheel(e);
+        }
+        protected override bool OnTouchScrollX(int value) => ScrollBar.MouseWheelXCore(value);
+        protected override bool OnTouchScrollY(int value) => ScrollBar.MouseWheelYCore(value);
+
+        void ILeave()
+        {
+            SetCursor(false);
+            if (items == null || items.Count == 0) return;
+            int count = 0;
+            foreach (var it in items) ILeave(it, ref count);
+            if (count > 0) Invalidate();
+        }
+        void ILeave(MenuItem it, ref int count)
+        {
+            if (it.Hover) count++;
+            it.Hover = false;
+            if (it.items != null && it.items.Count > 0) foreach (var sub in it.items) ILeave(sub, ref count);
+        }
+
+        /// <summary>
+        /// 取消全部选择
+        /// </summary>
+        public void USelect()
+        {
+            if (items == null || items.Count == 0) return;
+            IUSelect(items);
+            Invalidate();
+        }
+
+        void IUSelect(MenuItemCollection items)
+        {
+            foreach (var it in items) IUSelect(it);
+            SelectItem = null;
+        }
+        void IUSelect(MenuItem it)
+        {
+            it.Select = false;
+            if (it.items != null && it.items.Count > 0) foreach (var sub in it.items) IUSelect(sub);
+        }
+
+        public MenuItem? HitTest(int x, int y)
+        {
+            if (items == null || items.Count == 0) return null;
+
+            foreach (var it in items)
+            {
+                if (IHitTest(x, y, it, out var md)) return md;
+            }
+            return null;
+        }
+        bool IHitTest(int x, int y, MenuItem item, out MenuItem? mdown)
+        {
+            if (item.Visible)
+            {
+                bool can = item.CanExpand;
+                if (item.Enabled && item.Contains(x, y, 0, ScrollBar.Value, out _))
+                {
+                    mdown = item;
+                    return true;
+                }
+                if (can && item.Expand && !collapsed)
+                {
+                    foreach (var sub in item.Sub)
+                    {
+                        if (IHitTest(x, y, sub, out mdown)) return true;
+                    }
+                }
+            }
+            mdown = null;
+            return false;
+        }
+
+        #endregion
+
+        #region 键盘
+
+        protected override bool ProcessCmdKey(ref System.Windows.Forms.Message msg, Keys keyData)
+        {
+            var r = base.ProcessCmdKey(ref msg, keyData);
+            switch (keyData)
+            {
+                case Keys.Up:
+                    if (selectItem == null)
+                    {
+                        if (items != null)
+                        {
+                            Select(items[0]);
+                            return true;
+                        }
+                    }
+                    else if (FindUp(focusItem ?? selectItem)) return true;
+                    break;
+                case Keys.Down:
+                    if (selectItem == null)
+                    {
+                        if (items != null)
+                        {
+                            Select(items[items.Count - 1]);
+                            return true;
+                        }
+                    }
+                    else if (FindDown(focusItem ?? selectItem)) return true;
+                    break;
+                case Keys.Left:
+                    if (selectItem != null && FindLeft(focusItem ?? selectItem)) return true;
+                    break;
+                case Keys.Right:
+                    if (selectItem != null && FindRight(focusItem ?? selectItem)) return true;
+                    break;
+                case Keys.Enter:
+                    if (selectItem != null)
+                    {
+                        var item = focusItem ?? selectItem;
+                        if (item.CanExpand) item.Expand = !item.Expand;
+                        else Select(item);
+                    }
+                    break;
+            }
+            return r;
+        }
+
+        bool FindUp(MenuItem item)
+        {
+            var p1 = item.ParentItem;
+            if (p1 == null)
+            {
+                int index = items!.IndexOf(item) - 1;
+                if (index >= 0)
+                {
+                    SetFocusItem(items[index]);
+                    return true;
+                }
+            }
+            else
+            {
+                int index = p1.items!.IndexOf(item) - 1;
+                if (index >= 0) SetFocusItem(FindUpExpand(p1.items[index]));
+                else SetFocusItem(p1);
+                return true;
+            }
+            return false;
+        }
+        MenuItem FindUpExpand(MenuItem it)
+        {
+            if (it.CanExpand && it.Expand) return FindUpExpand(it.items![it.items.Count - 1]);
+            return it;
+        }
+        bool FindDown(MenuItem item, bool canex = true)
+        {
+            if (canex && item.CanExpand && item.Expand)
+            {
+                SetFocusItem(item.items![0]);
+                return true;
+            }
+            var p1 = item.ParentItem;
+            if (p1 == null)
+            {
+                int index = items!.IndexOf(item) + 1;
+                if (index < items.Count)
+                {
+                    SetFocusItem(items[index]);
+                    return true;
+                }
+            }
+            else
+            {
+                int index = p1.items!.IndexOf(item) + 1;
+                if (index < p1.items.Count)
+                {
+                    SetFocusItem(p1.items[index]);
+                    return true;
+                }
+                else
+                {
+                    if (p1.ParentItem == null)
+                    {
+                        var sub = items!;
+                        int index2 = sub.Count + 1;
+                        if (index2 < sub.Count)
+                        {
+                            var r = FindDown(sub[sub.Count + 1]);
+                            if (r) return true;
+                        }
+                        else
+                        {
+                            var r = FindDown(p1, false);
+                            if (r) return true;
+                        }
+                    }
+                    else
+                    {
+                        var sub = p1.ParentItem.items!;
+                        int index2 = sub.Count + 1;
+                        if (index2 < sub.Count)
+                        {
+                            var r = FindDown(sub[index2]);
+                            if (r) return true;
+                        }
+                        else
+                        {
+                            var r = FindDown(p1, false);
+                            if (r) return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        bool FindLeft(MenuItem item)
+        {
+            if (item.CanExpand && item.Expand) item.Expand = false;
+            return true;
+        }
+        bool FindRight(MenuItem item)
+        {
+            if (item.CanExpand && !item.Expand) item.Expand = true;
+            return true;
+        }
+        void SetFocusItem(MenuItem item)
+        {
+            switch (FocusMode)
+            {
+                case TFocusMode.Line:
+                case TFocusMode.Border:
+                    focusItem = item;
+                    Invalidate();
+                    Focus(item);
+                    break;
+                default:
+                    Select(item);
+                    break;
+            }
+        }
+
+        #endregion
+
+        #region 方法
+
+        /// <summary>
+        /// 获取选中项索引
+        /// </summary>
+        public int GetSelectIndex(MenuItem item)
+        {
+            if (items != null) return items.IndexOf(item);
+            else return -1;
+        }
+
+        /// <summary>
+        /// 选中菜单
+        /// </summary>
+        /// <param name="item">项</param>
+        /// <param name="focus">设置焦点</param>
+        public void Select(MenuItem item, bool focus = true)
+        {
+            if (items == null || items.Count == 0) return;
+            IUSelect(items);
+            Select(item, focus, items);
+        }
+        void Select(MenuItem item, bool focus, MenuItemCollection items)
+        {
+            foreach (var it in items)
+            {
+                if (it == item)
+                {
+                    it.Select = true;
+                    tmpAM = true;
+                    ItemClick?.Invoke(this, new MenuItemEventArgs(it, new MouseEventArgs(MouseButtons.None, 0, 0, 0, 0)));
+                    SelectItem = it;
+                    if (SelectEx(it.ParentItem) > 0) ChangeList(true);
+                    tmpAM = false;
+                    Invalidate();
+                    if (focus) Focus(it);
+                    return;
+                }
+                else if (it.items != null && it.items.Count > 0) Select(item, focus, it.items);
+            }
+        }
+
+        public void Focus(MenuItem menuItem, bool force = false)
+        {
+            if (ScrollBar.ShowY)
+            {
+                int sy = ScrollBar.ValueY;
+                if (force || (menuItem.rect.Y < sy || menuItem.rect.Bottom > sy + Height)) ScrollBar.ValueY = menuItem.rect.Y - Padding.Top;
+            }
+        }
+
+        internal bool tmpAM = false;
+        int SelectEx(MenuItem? it)
+        {
+            int count = 0;
+            if (it == null) return count;
+            if (it.Expand) it.Select = true;
+            else
+            {
+                count++;
+                it.Expand = it.Select = true;
+            }
+            count += SelectEx(it.ParentItem);
+            return count;
+        }
+
+        /// <summary>
+        /// 移除菜单
+        /// </summary>
+        /// <param name="item">项</param>
+        public void Remove(MenuItem item) => Remove(item, items);
+        void Remove(MenuItem item, MenuItemCollection? items)
+        {
+            if (items == null) return;
+            foreach (var it in items)
+            {
+                if (it == item)
+                {
+                    items.Remove(it);
+                    return;
+                }
+                Remove(item, it.items);
+            }
+        }
+
+        #endregion
+
+        #region 查找
+
+        /// <summary>
+        /// 根据节点id查询节点
+        /// </summary>
+        public MenuItem? FindID(string id) => FindID(items, id);
+
+        MenuItem? FindID(MenuItemCollection? items, string id)
+        {
+            if (items == null) return null;
+            foreach (var sub in items)
+            {
+                if (sub.ID == id) return sub;
+                var preItem = FindID(sub.items, id);
+                if (preItem != null) return preItem;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 根据节点name查询节点
+        /// </summary>
+        public MenuItem? FindName(string id) => FindName(items, id);
+
+        MenuItem? FindName(MenuItemCollection? items, string id)
+        {
+            if (items == null) return null;
+            foreach (var sub in items)
+            {
+                if (sub.Name == id) return sub;
+                var preItem = FindName(sub.items, id);
+                if (preItem != null) return preItem;
+            }
+            return null;
+        }
+
+        #endregion
+
+        #region 事件
+
+        /// <summary>
+        /// Select 属性值更改时发生
+        /// </summary>
+        [Description("Select 属性值更改时发生"), Category("行为")]
+        public event SelectEventHandler? SelectChanged;
+
+        /// <summary>
+        /// 点击项时发生
+        /// </summary>
+        [Description("点击项时发生"), Category("行为")]
+        public event MenuItemEventHandler? ItemClick;
+
+        /// <summary>
+        /// Select 属性值更改前发生
+        /// </summary>
+        [Description("Select 属性值更改前发生"), Category("行为")]
+        public event SelectBoolEventHandler? SelectChanging;
+
+        /// <summary>
+        /// 自定义按钮点击时发生
+        /// </summary>
+        [Description("自定义按钮点击时发生"), Category("行为")]
+        public event MenuCustomButtonEventHandler? CustomButtonClick;
+
+        bool IsCanChang(MenuItem it)
+        {
+            bool pass = false;
+            if (SelectChanging == null) pass = true;
+            else if (SelectChanging(this, new MenuSelectEventArgs(it))) pass = true;
+            return pass;
+        }
+
+        #endregion
+
+        #region 子窗口
+
+        ILayeredForm? subForm;
+        public ILayeredForm? SubForm() => subForm;
+        internal int select_x = 0;
+
+        internal void DropDownChange(MenuItem value)
+        {
+            select_x = 0;
+            subForm = null;
+            if (items == null || items.Count == 0) return;
+            IUSelect(items);
+            foreach (var it in items)
+            {
+                var list = new List<MenuItem> { it };
+                if (IDropDownChange(items, it, list, value)) return;
+            }
+            Invalidate();
+        }
+        bool IDropDownChange(MenuItemCollection items, MenuItem item, List<MenuItem> list, MenuItem value)
+        {
+            bool can = item.CanExpand;
+            if (item.Enabled && item == value)
+            {
+                if (IsCanChang(item))
+                {
+                    if (can) item.Expand = !item.Expand;
+                    else
+                    {
+                        IUSelect(items);
+                        if (list.Count > 1)
+                        {
+                            foreach (var it in list) it.Select = true;
+                        }
+                        item.Select = true;
+                        SelectItem = item;
+                        ItemClick?.Invoke(this, new MenuItemEventArgs(item, new MouseEventArgs(MouseButtons.None, 0, 0, 0, 0)));
+                        Invalidate();
+                    }
+                }
+                return true;
+            }
+            if (can)
+            {
+                foreach (var sub in item.Sub)
+                {
+                    var list_ = new List<MenuItem>(list.Count + 1);
+                    list_.AddRange(list);
+                    list_.Add(sub);
+                    if (IDropDownChange(items, sub, list_, value)) return true;
+                }
+            }
+            return false;
+        }
+
+        bool OpenDropDown(MenuItem it)
+        {
+            if (it.items == null || it.items.Count == 0) return true;
+            select_x = 0;
+            subForm = new LayeredFormMenuDown(this, radius, it.Rect(0, ScrollBar.ValueY), it.items);
+            subForm.Show(this);
+            return false;
+        }
+        void CloseDropDown()
+        {
+            subForm?.Close();
+            subForm = null;
+        }
+
+        #endregion
+
+        protected override void Dispose(bool disposing)
+        {
+            ScrollBar.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    public class MenuItemCollection : iCollection<MenuItem>
+    {
+        public MenuItemCollection(Menu it)
+        {
+            BindData(it);
+        }
+        public MenuItemCollection(MenuItem it)
+        {
+            BindData(it);
+        }
+
+        internal MenuItemCollection BindData(Menu it)
+        {
+            action = render =>
+            {
+                if (render) it.ChangeList(true);
+                else it.Invalidate();
+            };
+            return this;
+        }
+        internal MenuItemCollection BindData(MenuItem it)
+        {
+            action = render =>
+            {
+                if (it.PARENT == null) return;
+                if (render) it.PARENT.ChangeList(true);
+                else it.PARENT.Invalidate();
+            };
+            return this;
+        }
+    }
+
+    public class MenuItem : BadgeConfig
+    {
+        public MenuItem() { }
+        public MenuItem(string text)
+        {
+            Text = text;
+        }
+        public MenuItem(string text, Image? icon)
+        {
+            Text = text;
+            Icon = icon;
+        }
+        public MenuItem(string text, string? icon_svg)
+        {
+            Text = text;
+            IconSvg = icon_svg;
+        }
+
+        /// <summary>
+        /// 序号
+        /// </summary>
+        public int Index { get; internal set; }
+
+        /// <summary>
+        /// ID
+        /// </summary>
+        [Description("ID"), Category("数据"), DefaultValue(null)]
+        public string? ID { get; set; }
+
+        /// <summary>
+        /// 名称
+        /// </summary>
+        [Description("名称"), Category("数据"), DefaultValue(null)]
+        public string? Name { get; set; }
+
+        #region 图标
+
+        Image? icon;
+        /// <summary>
+        /// 图标
+        /// </summary>
+        [Description("图标"), Category("外观"), DefaultValue(null)]
+        public Image? Icon
+        {
+            get => icon;
+            set
+            {
+                if (icon == value) return;
+                icon = value;
+                Invalidates();
+            }
+        }
+
+        string? iconSvg;
+        /// <summary>
+        /// 图标
+        /// </summary>
+        [Description("图标SVG"), Category("外观"), DefaultValue(null)]
+        public string? IconSvg
+        {
+            get => iconSvg;
+            set
+            {
+                if (iconSvg == value) return;
+                iconSvg = value;
+                Invalidates();
+            }
+        }
+
+        /// <summary>
+        /// 是否包含图片
+        /// </summary>
+        internal bool HasIcon => !string.IsNullOrWhiteSpace(iconSvg) || icon != null;
+
+        /// <summary>
+        /// 图标激活
+        /// </summary>
+        [Description("图标激活"), Category("外观"), DefaultValue(null)]
+        public Image? IconActive { get; set; }
+
+        /// <summary>
+        /// 图标激活SVG
+        /// </summary>
+        [Description("图标激活SVG"), Category("外观"), DefaultValue(null)]
+        public string? IconActiveSvg { get; set; }
+
+        #endregion
+
+        string? text;
+        /// <summary>
+        /// 文本
+        /// </summary>
+        [Description("文本"), Category("外观"), DefaultValue(null), Localizable(true)]
+        public string? Text
+        {
+            get => Localization.GetLangI(LocalizationText, text, new string?[] { "{id}", ID });
+            set
+            {
+                if (text == value) return;
+                text = value;
+                Invalidates();
+            }
+        }
+
+        [Description("文本"), Category("国际化"), DefaultValue(null)]
+        public string? LocalizationText { get; set; }
+
+        /// <summary>
+        /// 自定义字体
+        /// </summary>
+        [Description("自定义字体"), Category("外观"), DefaultValue(null)]
+        public Font? Font { get; set; }
+
+        bool visible = true;
+        /// <summary>
+        /// 是否显示
+        /// </summary>
+        [Description("是否显示"), Category("外观"), DefaultValue(true)]
+        public bool Visible
+        {
+            get => visible;
+            set
+            {
+                if (visible == value) return;
+                visible = value;
+                Invalidates();
+            }
+        }
+
+        /// <summary>
+        /// 用户定义数据
+        /// </summary>
+        [Description("用户定义数据"), Category("数据"), DefaultValue(null)]
+        public object? Tag { get; set; }
+
+        internal MenuItemCollection? items;
+        /// <summary>
+        /// 获取列表中所有列表项的集合
+        /// </summary>
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Content)]
+        [Description("子集合"), Category("外观")]
+        public MenuItemCollection Sub
+        {
+            get
+            {
+                items ??= new MenuItemCollection(this);
+                return items;
+            }
+            set => items = value.BindData(this);
+        }
+
+        #region 禁用
+
+        bool enabled = true;
+        /// <summary>
+        /// 禁用状态
+        /// </summary>
+        [Description("禁用状态"), Category("行为"), DefaultValue(true)]
+        public bool Enabled
+        {
+            get => enabled;
+            set
+            {
+                if (enabled == value) return;
+                enabled = value;
+                Invalidate();
+            }
+        }
+
+        #endregion
+
+        #region 展开
+
+        AnimationTask? ThreadExpand;
+        bool expand = true;
+        /// <summary>
+        /// 展开
+        /// </summary>
+        [Description("展开"), Category("行为"), DefaultValue(true)]
+        public bool Expand
+        {
+            get => expand;
+            set
+            {
+                if (expand == value) return;
+                expand = value;
+                if (items != null && items.Count > 0)
+                {
+                    if (PARENT == null) return;
+                    if (value && PARENT.Unique)
+                    {
+                        if (ParentItem == null)
+                        {
+                            foreach (var it in PARENT.Items)
+                            {
+                                if (it != this) it.Expand = false;
+                            }
+                        }
+                        else
+                        {
+                            foreach (var it in ParentItem.Sub)
+                            {
+                                if (it != this) it.Expand = false;
+                            }
+                        }
+                    }
+                    if (((PARENT.Mode == TMenuMode.Inline && !PARENT.Collapsed) || PARENT.Mode == TMenuMode.InlineNoText) && Config.HasAnimation(nameof(Menu)))
+                    {
+                        if (PARENT.tmpAM)
+                        {
+                            ExpandProg = 1F;
+                            ArrowProg = value ? 1F : -1F;
+                            return;
+                        }
+                        ThreadExpand?.Dispose();
+                        ExpandTemp?.Dispose();
+                        ExpandTemp = null;
+                        var oldval = ThreadExpand?.Tag;
+                        ExpandThread = true;
+                        int t = Animation.TotalFrames(10, 200);
+                        ThreadExpand = new AnimationTask(new AnimationFixed2Config((i, val, arrow) =>
+                        {
+                            ExpandProg = val;
+                            ArrowProg = arrow;
+                            Invalidates();
+                        }, 10, t, oldval, value).SetEnd(() =>
+                        {
+                            ExpandProg = 1F;
+                            ArrowProg = value ? 1F : -1F;
+                            ExpandThread = false;
+                            ExpandTemp?.Dispose();
+                            ExpandTemp = null;
+                            Invalidates();
+                        }));
+                    }
+                    else
+                    {
+                        ExpandProg = 1F;
+                        ArrowProg = value ? 1F : -1F;
+                        Invalidates();
+                    }
+                }
+                else
+                {
+                    expand = false;
+                    ExpandProg = 1F;
+                    ArrowProg = -1F;
+                    Invalidates();
+                }
+            }
+        }
+
+        [Description("是否可以展开"), Category("行为"), DefaultValue(false)]
+        public bool CanExpand => visible && items != null && items.Count > 0;
+
+        #endregion
+
+        #region 徽标
+
+        string? badge;
+        /// <summary>
+        /// 徽标内容
+        /// </summary>
+        [Description("徽标内容"), Category("徽标"), DefaultValue(null), Localizable(true)]
+        public string? Badge
+        {
+            get => badge;
+            set
+            {
+                if (badge == value) return;
+                badge = value;
+                Invalidate();
+            }
+        }
+
+        string? badgeSvg;
+        /// <summary>
+        /// 徽标SVG
+        /// </summary>
+        [Description("徽标SVG"), Category("徽标"), DefaultValue(null)]
+        public string? BadgeSvg
+        {
+            get => badgeSvg;
+            set
+            {
+                if (badgeSvg == value) return;
+                badgeSvg = value;
+                Invalidate();
+            }
+        }
+
+        TAlign badgeAlign = TAlign.Right;
+        /// <summary>
+        /// 徽标方向
+        /// </summary>
+        [Description("徽标方向"), Category("徽标"), DefaultValue(TAlign.Right)]
+        public TAlign BadgeAlign
+        {
+            get => badgeAlign;
+            set
+            {
+                if (badgeAlign == value) return;
+                badgeAlign = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        float badgeSize = .6F;
+        /// <summary>
+        /// 徽标比例
+        /// </summary>
+        [Description("徽标比例"), Category("徽标"), DefaultValue(.6F)]
+        public float BadgeSize
+        {
+            get => badgeSize;
+            set
+            {
+                if (badgeSize == value) return;
+                badgeSize = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        bool badgeMode = false;
+        /// <summary>
+        /// 徽标模式（镂空）
+        /// </summary>
+        [Description("徽标模式（镂空）"), Category("徽标"), DefaultValue(false)]
+        public bool BadgeMode
+        {
+            get => badgeMode;
+            set
+            {
+                if (badgeMode == value) return;
+                badgeMode = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgefore;
+        /// <summary>
+        /// 徽标前景颜色
+        /// </summary>
+        [Description("徽标前景颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeFore
+        {
+            get => badgefore;
+            set
+            {
+                if (badgefore == value) return;
+                badgefore = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgeback;
+        /// <summary>
+        /// 徽标背景颜色
+        /// </summary>
+        [Description("徽标背景颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeBack
+        {
+            get => badgeback;
+            set
+            {
+                if (badgeback == value) return;
+                badgeback = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgeBorderColor;
+        /// <summary>
+        /// 徽标边框颜色
+        /// </summary>
+        [Description("徽标边框颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeBorderColor
+        {
+            get => badgeBorderColor;
+            set
+            {
+                if (badgeBorderColor == value) return;
+                badgeBorderColor = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        float? badgeBorderWidth;
+        /// <summary>
+        /// 徽标边框宽度
+        /// </summary>
+        [Description("徽标边框宽度"), Category("徽标"), DefaultValue(null)]
+        public float? BadgeBorderWidth
+        {
+            get => badgeBorderWidth;
+            set
+            {
+                if (badgeBorderWidth == value) return;
+                badgeBorderWidth = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        int badgeOffsetX = 1, badgeOffsetY = 1;
+        /// <summary>
+        /// 徽标偏移X
+        /// </summary>
+        [Description("徽标偏移X"), Category("徽标"), DefaultValue(1)]
+        public int BadgeOffsetX
+        {
+            get => badgeOffsetX;
+            set
+            {
+                if (badgeOffsetX == value) return;
+                badgeOffsetX = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        /// <summary>
+        /// 徽标偏移Y
+        /// </summary>
+        [Description("徽标偏移Y"), Category("徽标"), DefaultValue(1)]
+        public int BadgeOffsetY
+        {
+            get => badgeOffsetY;
+            set
+            {
+                if (badgeOffsetY == value) return;
+                badgeOffsetY = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        #endregion
+
+        #region 方法
+
+        public void Remove()
+        {
+            if (ParentItem == null) PARENT?.Items.Remove(this);
+            else ParentItem.items?.Remove(this);
+        }
+
+        public void UpdateText(string newText)
+        {
+            Text = newText;
+            Invalidate();
+        }
+
+        #endregion
+
+        #region 悬浮态
+
+        bool hover = false;
+        /// <summary>
+        /// 是否悬浮
+        /// </summary>
+        internal bool Hover
+        {
+            get => hover;
+            set
+            {
+                if (hover == value) return;
+                hover = value;
+                if (Config.HasAnimation(nameof(Menu)))
+                {
+                    ThreadHover?.Dispose();
+                    AnimationHover = true;
+                    ThreadHover = new AnimationTask(new AnimationFixedConfig(i =>
+                    {
+                        AnimationHoverValue = i;
+                        Invalidate();
+                    }, 20, Animation.TotalFrames(20, 200), value, AnimationType.Ball).SetEnd(() => AnimationHover = false));
+                }
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// 是否选中
+        /// </summary>
+        [Description("是否选中"), Category("外观"), DefaultValue(false)]
+        public bool Select { get; set; }
+
+        #region 自定义按钮
+
+        /// <summary>
+        /// 自定义按钮的集合
+        /// </summary>
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        [Description("自定义按钮的集合"), Category("外观")]
+        public List<MenuButton>? Button { get; set; }
+
+        #endregion
+
+        public MenuItem? ParentItem { get; internal set; }
+
+        #region 内部
+        internal int Depth { get; set; }
+        internal float? ArrowProg { get; set; }
+
+        public float GetArrowProg()
+        {
+            if (ArrowProg.HasValue) return ArrowProg.Value;
+            else return expand ? 1F : -1F;
+        }
+
+        internal Menu? PARENT { get; set; }
+
+        #region 布局
+
+        public Rectangle Rect() => Rect("");
+        public Rectangle Rect(int x, int y) => Rect("", x, y);
+        public Rectangle Rect(string type, int x = 0, int y = 0)
+        {
+            if (x > 0 || y > 0)
+            {
+                switch (type)
+                {
+                    case "Text":
+                        return new Rectangle(txt_rect.X - x, txt_rect.Y - y, txt_rect.Width, txt_rect.Height);
+                    case "Sub":
+                        return new Rectangle(rect.X - x, rect.Y - y, rect.Width, rect.Height + (Expand ? SubHeight : 0));
+                    case "Icon":
+                        return new Rectangle(ico_rect.X - x, ico_rect.Y - y, ico_rect.Width, ico_rect.Height);
+                    case "Arrow":
+                        return new Rectangle(arrow_rect.X - x, arrow_rect.Y - y, arrow_rect.Width, arrow_rect.Height);
+                    default:
+                        return new Rectangle(rect.X - x, rect.Y - y, rect.Width, rect.Height);
+                }
+            }
+            switch (type)
+            {
+                case "Text":
+                    return txt_rect;
+                case "Sub":
+                    return new Rectangle(rect.X, rect.Y, rect.Width, rect.Height + (Expand ? SubHeight : 0));
+                case "Icon":
+                    return ico_rect;
+                case "Arrow":
+                    return arrow_rect;
+                default:
+                    return rect;
+            }
+        }
+
+        internal int SetRect(Menu obj, int depth, bool indent, Rectangle _rect, int icon_size, int arrow_size, int gap, int gap2, int sp, int sp2, int inlineIndent, int iconsp, int scx, out int exr)
+        {
+            Depth = depth;
+            rect = _rect;
+            int x = gap, usew = gap2, y = (_rect.Height - icon_size) / 2;
+            if (indent && depth > 0)
+            {
+                int tmp = inlineIndent * depth;
+                x += tmp;
+                usew += tmp;
+            }
+            else if (depth > 1)
+            {
+                int tmp = inlineIndent * (depth - 1);
+                x += tmp;
+                usew += tmp;
+            }
+            if (HasIcon)
+            {
+                int tmp = icon_size + iconsp;
+                ico_rect = new Rectangle(_rect.X + x, _rect.Y + y, icon_size, icon_size);
+
+                x += tmp;
+                usew += tmp;
+
+                txt_rect = new Rectangle(_rect.X + x, _rect.Y, _rect.Width - usew, _rect.Height);
+            }
+            else txt_rect = new Rectangle(_rect.X + x, _rect.Y, _rect.Width - usew, _rect.Height);
+
+            int ur = _rect.Right - arrow_size - gap - scx;
+            arrow_rect = new Rectangle(ur, _rect.Y + (_rect.Height - arrow_size) / 2, arrow_size, arrow_size);
+
+            exr = 0;
+            if (Button != null)
+            {
+                int sone = icon_size + iconsp;
+                foreach (var btn in Button)
+                {
+                    btn.PARENT = obj;
+                    ur -= sone;
+                    exr += sone;
+                    btn.rect = new Rectangle(ur, _rect.Y + y, icon_size, icon_size);
+                }
+            }
+
+            Show = true;
+            return usew;
+        }
+        internal int SetRectInlineNoText(Rectangle _rect, int icon_size, int arrow_size, int gap, int gap2, int sp, int sp2, int iconsp)
+        {
+            Depth = 0;
+            rect = _rect;
+            int x = gap, usew = gap2;
+            if (HasIcon)
+            {
+                int tmp = icon_size + iconsp, y = (_rect.Height - icon_size) / 2;
+                ico_rect = new Rectangle(_rect.X + x, _rect.Y + y, icon_size, icon_size);
+
+                x += tmp;
+                usew += tmp;
+
+                txt_rect = new Rectangle(_rect.X + x, _rect.Y, _rect.Width - usew, _rect.Height);
+            }
+            else txt_rect = new Rectangle(_rect.X + x, _rect.Y, _rect.Width - usew, _rect.Height);
+            arrow_rect = new Rectangle(_rect.Right - (arrow_size - sp), _rect.Y + (_rect.Height - arrow_size) / 2, arrow_size, arrow_size);
+            Show = true;
+            return usew;
+        }
+        internal void SetRect(Rectangle _rect, Rectangle rect_text, int arrow_size, int sp)
+        {
+            Depth = 0;
+            rect = _rect;
+            txt_rect = rect_text;
+
+            arrow_rect = new Rectangle(_rect.Right - (arrow_size + sp), _rect.Y + (_rect.Height - arrow_size) / 2, arrow_size, arrow_size);
+
+            Show = true;
+        }
+        internal void SetRectNoArr(Rectangle _rect, Rectangle rect_text)
+        {
+            Depth = 0;
+            rect = _rect;
+            txt_rect = rect_text;
+            Show = true;
+        }
+
+        internal void SetRectDivider(Rectangle _rect)
+        {
+            Depth = -1;
+            rect = _rect;
+            Show = true;
+        }
+
+        internal Rectangle rect { get; set; }
+        internal Rectangle arrow_rect { get; set; }
+
+        internal bool Contains(int x, int y, int sx, int sy, out MenuButton? btn)
+        {
+            btn = null;
+            if (rect.Contains(x + sx, y + sy))
+            {
+                SetHover(true);
+                if (Button != null)
+                {
+                    foreach (var item in Button)
+                    {
+                        if (item.Contains(x, y, sx, sy))
+                        {
+                            btn = item;
+                            return true;
+                        }
+                    }
+                }
+                return true;
+            }
+            else
+            {
+                SetHover(false);
+                return false;
+            }
+        }
+        internal bool Contains(int x, int y, int sx, int sy, ref int hand, ref int change)
+        {
+            if (rect.Contains(x + sx, y + sy))
+            {
+                if (SetHover(true)) change++;
+                if (Button != null)
+                {
+                    foreach (var item in Button)
+                    {
+                        if (item.Contains(x, y, sx, sy, ref change)) hand++;
+                    }
+                }
+                hand++;
+                return true;
+            }
+            else if (SetHover(false)) change++;
+            return false;
+        }
+
+        internal bool SetHover(bool val)
+        {
+            bool change = false;
+            if (val)
+            {
+                if (!hover) change = true;
+                Hover = true;
+            }
+            else
+            {
+                if (hover) change = true;
+                Hover = false;
+            }
+            return change;
+        }
+
+        internal float AnimationHoverValue = 0;
+        internal bool AnimationHover = false;
+        AnimationTask? ThreadHover;
+
+        internal Rectangle txt_rect { get; set; }
+        internal Rectangle ico_rect { get; set; }
+
+        #endregion
+
+        internal int SubY { get; set; }
+        internal int SubHeight { get; set; }
+
+        internal int ExpandHeight { get; set; }
+        internal int ExpandRHeight { get; set; }
+        internal float ExpandProg { get; set; }
+        internal bool ExpandThread { get; set; }
+        internal Bitmap? ExpandTemp { get; set; }
+        internal bool show { get; set; }
+        internal bool Show { get; set; }
+        void Invalidate() => PARENT?.Invalidate();
+        void Invalidates() => PARENT?.ChangeList(true);
+
+        #endregion
+
+        #region 设置
+
+        public MenuItem SetFont(Font? value)
+        {
+            Font = value;
+            return this;
+        }
+
+        #region 图标
+
+        public MenuItem SetIcon(Image? img)
+        {
+            icon = img;
+            return this;
+        }
+
+        public MenuItem SetIcon(string? svg)
+        {
+            iconSvg = svg;
+            return this;
+        }
+
+        public MenuItem SetIcon(Image? img, Image? hover)
+        {
+            icon = img;
+            IconActive = hover;
+            return this;
+        }
+
+        public MenuItem SetIcon(string? svg, string? hover)
+        {
+            iconSvg = svg;
+            IconActiveSvg = hover;
+            return this;
+        }
+
+        #endregion
+
+        public MenuItem SetID(string? value)
+        {
+            ID = value;
+            return this;
+        }
+
+        public MenuItem SetName(string? value)
+        {
+            Name = value;
+            return this;
+        }
+
+        public MenuItem SetText(string? value, string? localization = null)
+        {
+            text = value;
+            LocalizationText = localization;
+            return this;
+        }
+
+        public MenuItem SetVisible(bool value = false)
+        {
+            visible = value;
+            return this;
+        }
+
+        public MenuItem SetEnabled(bool value = false)
+        {
+            enabled = value;
+            return this;
+        }
+
+        public MenuItem SetExpand(bool value = true)
+        {
+            expand = value;
+            return this;
+        }
+
+        public MenuItem SetSub(MenuItem value)
+        {
+            Sub.Add(value);
+            return this;
+        }
+
+        public MenuItem SetSub(params MenuItem[] value)
+        {
+            Sub.AddRange(value);
+            return this;
+        }
+
+        public MenuItem SetSub(IList<MenuItem> value)
+        {
+            Sub.AddRange(value);
+            return this;
+        }
+
+        #region 徽标
+
+        public MenuItem SetBadge(string? value = " ", TAlign align = TAlign.TR)
+        {
+            badge = value;
+            badgeAlign = align;
+            return this;
+        }
+        public MenuItem SetBadgeSvg(string? value, TAlign align = TAlign.TR)
+        {
+            badgeSvg = value;
+            badgeAlign = align;
+            return this;
+        }
+        public MenuItem SetBadgeOffset(int x, int y)
+        {
+            BadgeOffsetX = x;
+            BadgeOffsetY = y;
+            return this;
+        }
+        public MenuItem SetBadgeSize(float value)
+        {
+            BadgeSize = value;
+            return this;
+        }
+        public MenuItem SetBadgeFore(Color? value)
+        {
+            BadgeFore = value;
+            return this;
+        }
+        public MenuItem SetBadgeBack(Color? value)
+        {
+            BadgeBack = value;
+            return this;
+        }
+        public MenuItem SetBadgeBorderColor(Color? value)
+        {
+            BadgeBorderColor = value;
+            return this;
+        }
+        public MenuItem SetBadgeBorderWidth(float? value)
+        {
+            BadgeBorderWidth = value;
+            return this;
+        }
+        public MenuItem SetBadgeBorder(float value, Color color)
+        {
+            BadgeBorderWidth = value;
+            BadgeBorderColor = color;
+            return this;
+        }
+
+        #endregion
+
+        public MenuItem SetTag(object? value)
+        {
+            Tag = value;
+            return this;
+        }
+
+        #endregion
+
+        public override string? ToString() => Text;
+    }
+
+    public class MenuButton : BadgeConfig
+    {
+        public MenuButton() { }
+        public MenuButton(Image? icon)
+        {
+            Icon = icon;
+        }
+        public MenuButton(string? icon_svg)
+        {
+            IconSvg = icon_svg;
+        }
+
+        /// <summary>
+        /// ID
+        /// </summary>
+        [Description("ID"), Category("数据"), DefaultValue(null)]
+        public string? ID { get; set; }
+
+        /// <summary>
+        /// 名称
+        /// </summary>
+        [Description("名称"), Category("数据"), DefaultValue(null)]
+        public string? Name { get; set; }
+
+        #region 图标
+
+        Image? icon;
+        /// <summary>
+        /// 图标
+        /// </summary>
+        [Description("图标"), Category("外观"), DefaultValue(null)]
+        public Image? Icon
+        {
+            get => icon;
+            set
+            {
+                if (icon == value) return;
+                icon = value;
+                Invalidates();
+            }
+        }
+
+        string? iconSvg;
+        /// <summary>
+        /// 图标
+        /// </summary>
+        [Description("图标SVG"), Category("外观"), DefaultValue(null)]
+        public string? IconSvg
+        {
+            get => iconSvg;
+            set
+            {
+                if (iconSvg == value) return;
+                iconSvg = value;
+                Invalidates();
+            }
+        }
+
+        /// <summary>
+        /// 是否包含图片
+        /// </summary>
+        internal bool HasIcon => !string.IsNullOrWhiteSpace(iconSvg) || icon != null;
+
+        /// <summary>
+        /// 图标激活
+        /// </summary>
+        [Description("图标激活"), Category("外观"), DefaultValue(null)]
+        public Image? IconActive { get; set; }
+
+        /// <summary>
+        /// 图标激活SVG
+        /// </summary>
+        [Description("图标激活SVG"), Category("外观"), DefaultValue(null)]
+        public string? IconActiveSvg { get; set; }
+
+        #endregion
+
+        bool visible = true;
+        /// <summary>
+        /// 是否显示
+        /// </summary>
+        [Description("是否显示"), Category("外观"), DefaultValue(true)]
+        public bool Visible
+        {
+            get => visible;
+            set
+            {
+                if (visible == value) return;
+                visible = value;
+                Invalidates();
+            }
+        }
+
+        /// <summary>
+        /// 用户定义数据
+        /// </summary>
+        [Description("用户定义数据"), Category("数据"), DefaultValue(null)]
+        public object? Tag { get; set; }
+
+        #region 禁用
+
+        bool enabled = true;
+        /// <summary>
+        /// 禁用状态
+        /// </summary>
+        [Description("禁用状态"), Category("行为"), DefaultValue(true)]
+        public bool Enabled
+        {
+            get => enabled;
+            set
+            {
+                if (enabled == value) return;
+                enabled = value;
+                Invalidate();
+            }
+        }
+
+        #endregion
+
+        #region 徽标
+
+        string? badge;
+        /// <summary>
+        /// 徽标内容
+        /// </summary>
+        [Description("徽标内容"), Category("徽标"), DefaultValue(null), Localizable(true)]
+        public string? Badge
+        {
+            get => badge;
+            set
+            {
+                if (badge == value) return;
+                badge = value;
+                Invalidate();
+            }
+        }
+
+        string? badgeSvg;
+        /// <summary>
+        /// 徽标SVG
+        /// </summary>
+        [Description("徽标SVG"), Category("徽标"), DefaultValue(null)]
+        public string? BadgeSvg
+        {
+            get => badgeSvg;
+            set
+            {
+                if (badgeSvg == value) return;
+                badgeSvg = value;
+                Invalidate();
+            }
+        }
+
+        TAlign badgeAlign = TAlign.Right;
+        /// <summary>
+        /// 徽标方向
+        /// </summary>
+        [Description("徽标方向"), Category("徽标"), DefaultValue(TAlign.Right)]
+        public TAlign BadgeAlign
+        {
+            get => badgeAlign;
+            set
+            {
+                if (badgeAlign == value) return;
+                badgeAlign = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        float badgeSize = .6F;
+        /// <summary>
+        /// 徽标比例
+        /// </summary>
+        [Description("徽标比例"), Category("徽标"), DefaultValue(.6F)]
+        public float BadgeSize
+        {
+            get => badgeSize;
+            set
+            {
+                if (badgeSize == value) return;
+                badgeSize = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        bool badgeMode = false;
+        /// <summary>
+        /// 徽标模式（镂空）
+        /// </summary>
+        [Description("徽标模式（镂空）"), Category("徽标"), DefaultValue(false)]
+        public bool BadgeMode
+        {
+            get => badgeMode;
+            set
+            {
+                if (badgeMode == value) return;
+                badgeMode = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgefore;
+        /// <summary>
+        /// 徽标前景颜色
+        /// </summary>
+        [Description("徽标前景颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeFore
+        {
+            get => badgefore;
+            set
+            {
+                if (badgefore == value) return;
+                badgefore = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgeback;
+        /// <summary>
+        /// 徽标背景颜色
+        /// </summary>
+        [Description("徽标背景颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeBack
+        {
+            get => badgeback;
+            set
+            {
+                if (badgeback == value) return;
+                badgeback = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        Color? badgeBorderColor;
+        /// <summary>
+        /// 徽标边框颜色
+        /// </summary>
+        [Description("徽标边框颜色"), Category("徽标"), DefaultValue(null)]
+        public Color? BadgeBorderColor
+        {
+            get => badgeBorderColor;
+            set
+            {
+                if (badgeBorderColor == value) return;
+                badgeBorderColor = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        float? badgeBorderWidth;
+        /// <summary>
+        /// 徽标边框宽度
+        /// </summary>
+        [Description("徽标边框宽度"), Category("徽标"), DefaultValue(null)]
+        public float? BadgeBorderWidth
+        {
+            get => badgeBorderWidth;
+            set
+            {
+                if (badgeBorderWidth == value) return;
+                badgeBorderWidth = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        int badgeOffsetX = 1, badgeOffsetY = 1;
+        /// <summary>
+        /// 徽标偏移X
+        /// </summary>
+        [Description("徽标偏移X"), Category("徽标"), DefaultValue(1)]
+        public int BadgeOffsetX
+        {
+            get => badgeOffsetX;
+            set
+            {
+                if (badgeOffsetX == value) return;
+                badgeOffsetX = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        /// <summary>
+        /// 徽标偏移Y
+        /// </summary>
+        [Description("徽标偏移Y"), Category("徽标"), DefaultValue(1)]
+        public int BadgeOffsetY
+        {
+            get => badgeOffsetY;
+            set
+            {
+                if (badgeOffsetY == value) return;
+                badgeOffsetY = value;
+                if (badge != null || badgeSvg != null) Invalidate();
+            }
+        }
+
+        #endregion
+
+        #region 悬浮态
+
+        bool hover = false;
+        /// <summary>
+        /// 是否悬浮
+        /// </summary>
+        internal bool Hover
+        {
+            get => hover;
+            set
+            {
+                if (hover == value) return;
+                hover = value;
+                if (Config.HasAnimation(nameof(Menu)))
+                {
+                    ThreadHover?.Dispose();
+                    AnimationHover = true;
+                    ThreadHover = new AnimationTask(new AnimationFixedConfig(i =>
+                    {
+                        AnimationHoverValue = i;
+                        Invalidate();
+                    }, 20, Animation.TotalFrames(20, 200), value, AnimationType.Ball).SetEnd(() => AnimationHover = false));
+                }
+            }
+        }
+
+        #endregion
+
+        #region 内部
+
+        internal Menu? PARENT { get; set; }
+
+        #region 布局
+
+        internal Rectangle rect { get; set; }
+
+        internal bool Contains(int x, int y, int sx, int sy)
+        {
+            if (rect.Contains(x + sx, y + sy))
+            {
+                SetHover(true);
+                return true;
+            }
+            else
+            {
+                SetHover(false);
+                return false;
+            }
+        }
+        internal bool Contains(int x, int y, int sx, int sy, ref int change)
+        {
+            if (rect.Contains(x + sx, y + sy))
+            {
+                if (SetHover(true)) change++;
+                return true;
+            }
+            else
+            {
+                if (SetHover(false)) change++;
+                return false;
+            }
+        }
+
+        internal bool SetHover(bool val)
+        {
+            bool change = false;
+            if (val)
+            {
+                if (!hover) change = true;
+                Hover = true;
+            }
+            else
+            {
+                if (hover) change = true;
+                Hover = false;
+            }
+            return change;
+        }
+
+        internal float AnimationHoverValue = 0;
+        internal bool AnimationHover = false;
+        AnimationTask? ThreadHover;
+
+        #endregion
+
+        void Invalidate() => PARENT?.Invalidate();
+        void Invalidates() => PARENT?.ChangeList(true);
+
+        #endregion
+
+        #region 设置
+
+        #region 图标
+
+        public MenuButton SetIcon(Image? img)
+        {
+            icon = img;
+            return this;
+        }
+
+        public MenuButton SetIcon(string? svg)
+        {
+            iconSvg = svg;
+            return this;
+        }
+
+        public MenuButton SetIcon(Image? img, Image? hover)
+        {
+            icon = img;
+            IconActive = hover;
+            return this;
+        }
+
+        public MenuButton SetIcon(string? svg, string? hover)
+        {
+            iconSvg = svg;
+            IconActiveSvg = hover;
+            return this;
+        }
+
+        #endregion
+
+        public MenuButton SetID(string? value)
+        {
+            ID = value;
+            return this;
+        }
+
+        public MenuButton SetName(string? value)
+        {
+            Name = value;
+            return this;
+        }
+
+        public MenuButton SetVisible(bool value = false)
+        {
+            visible = value;
+            return this;
+        }
+
+        public MenuButton SetEnabled(bool value = false)
+        {
+            enabled = value;
+            return this;
+        }
+
+        #region 徽标
+
+        public MenuButton SetBadge(string? value = " ", TAlign align = TAlign.TR)
+        {
+            badge = value;
+            badgeAlign = align;
+            return this;
+        }
+        public MenuButton SetBadgeSvg(string? value, TAlign align = TAlign.TR)
+        {
+            badgeSvg = value;
+            badgeAlign = align;
+            return this;
+        }
+        public MenuButton SetBadgeOffset(int x, int y)
+        {
+            BadgeOffsetX = x;
+            BadgeOffsetY = y;
+            return this;
+        }
+        public MenuButton SetBadgeSize(float value)
+        {
+            BadgeSize = value;
+            return this;
+        }
+        public MenuButton SetBadgeFore(Color? value)
+        {
+            BadgeFore = value;
+            return this;
+        }
+        public MenuButton SetBadgeBack(Color? value)
+        {
+            BadgeBack = value;
+            return this;
+        }
+        public MenuButton SetBadgeBorderColor(Color? value)
+        {
+            BadgeBorderColor = value;
+            return this;
+        }
+        public MenuButton SetBadgeBorderWidth(float? value)
+        {
+            BadgeBorderWidth = value;
+            return this;
+        }
+        public MenuButton SetBadgeBorder(float value, Color color)
+        {
+            BadgeBorderWidth = value;
+            BadgeBorderColor = color;
+            return this;
+        }
+
+        #endregion
+
+        public MenuButton SetTag(object? value)
+        {
+            Tag = value;
+            return this;
+        }
+
+        #endregion
+    }
+
+    public class MenuDividerItem : MenuItem
+    {
+        private new string? Text => null;
+    }
+}

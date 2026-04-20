@@ -1,0 +1,50 @@
+name: 问题反馈
+description: 当你中发现了一个 Bug，导致应用崩溃或抛出异常，或者有一个组件存在问题，或者某些地方看起来不对劲。
+title:
+labels: ["BUG"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ 请**明确指出**问题复现流程，以减少维护者在排查问题上浪费过多时间，并且仔细观看完 [文档📖](https://gitee.com/antdui/AntdUI/wikis) 后再提。
+  - type: input
+    attributes:
+      label: 版本号
+      description: 请输入您使用的版本号。
+      placeholder: 例如：1.0.5，请不要填写“最新”等干扰描述，源码可填写提交id
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: .NET version
+      description: .NET SDK的版本。NET，cmd 执行 `dotnet --info`。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 操作系统
+      description: 例如：Windows 11，操作系统类型和版本
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 重现步骤
+      description: 提供一步一步的指导来重新解决这个问题。如果复制步骤很复杂，如果你附上一个带有复制操作的GIF会很有帮助。附上一个示例应用程序来重新处理这个问题将有助于我们进行调查。
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 问题描述
+      description: |
+        尽可能具体和详细，以帮助我们对您的问题进行分类。屏幕截图和/或动画对于帮助理解您面临的问题非常有用。
+
+        提示：您可以通过单击此区域将其高亮显示，然后拖动文件来附加图像或日志文件。
+        提示：您可以使用 https://www.screentogif.com/ 录制动画和视频。
+  - type: markdown
+    attributes:
+      value: |
+        🙏 我承诺将本着相互尊重、理解和友善的态度进行交流，共同维护好良好的社区氛围。

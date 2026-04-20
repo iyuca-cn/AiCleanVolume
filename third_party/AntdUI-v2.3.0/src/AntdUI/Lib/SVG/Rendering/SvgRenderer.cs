@@ -1,0 +1,145 @@
+// THIS FILE IS PART OF SVG PROJECT
+// THE SVG PROJECT IS AN OPENSOURCE LIBRARY LICENSED UNDER THE MS-PL License.
+// COPYRIGHT (C) svg-net. ALL RIGHTS RESERVED.
+// GITHUB: https://github.com/svg-net/SVG
+
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Text;
+
+namespace AntdUI.Svg
+{
+    /// <summary>
+    /// Convenience wrapper around a graphics object
+    /// </summary>
+    public sealed class SvgRenderer : ISvgRenderer, IGraphicsProvider
+    {
+        private readonly Canvas _innerGraphics;
+        private readonly bool _disposable;
+        private readonly Image _image;
+
+        private readonly Stack<ISvgBoundable> _boundables = new Stack<ISvgBoundable>();
+
+        public void SetBoundable(ISvgBoundable boundable)
+        {
+            _boundables.Push(boundable);
+        }
+        public ISvgBoundable GetBoundable()
+        {
+            return _boundables.Peek();
+        }
+        public ISvgBoundable PopBoundable()
+        {
+            return _boundables.Pop();
+        }
+
+        public float Dpi => _innerGraphics.Dpi;
+
+        public float DpiY => _innerGraphics.DpiY;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ISvgRenderer"/> class.
+        /// </summary>
+        private SvgRenderer(Canvas graphics, bool disposable = true)
+        {
+            _innerGraphics = graphics;
+            _disposable = disposable;
+        }
+        private SvgRenderer(Canvas graphics, Image image)
+            : this(graphics)
+        {
+            _image = image;
+        }
+
+        public void DrawImage(Image image, RectangleF destRect, RectangleF srcRect, GraphicsUnit graphicsUnit)
+        {
+            _innerGraphics.Image(image, destRect, srcRect, graphicsUnit);
+        }
+        public void DrawImage(Image image, RectangleF destRect, RectangleF srcRect, GraphicsUnit graphicsUnit, float opacity)
+        {
+            _innerGraphics.Image(image, destRect, srcRect, opacity, graphicsUnit);
+        }
+
+        public void DrawPath(Pen pen, GraphicsPath path) => _innerGraphics.Draw(pen, path);
+        public void FillPath(Brush brush, GraphicsPath path) => _innerGraphics.Fill(brush, path);
+        public Region GetClip()
+        {
+            return _innerGraphics.Clip;
+        }
+        public void RotateTransform(float fAngle, MatrixOrder order = MatrixOrder.Append)
+        {
+            _innerGraphics.RotateTransform(fAngle, order);
+        }
+        public void ScaleTransform(float sx, float sy, MatrixOrder order = MatrixOrder.Append)
+        {
+            _innerGraphics.ScaleTransform(sx, sy, order);
+        }
+        public void SetClip(Region region, CombineMode combineMode = CombineMode.Replace)
+        {
+            _innerGraphics.SetClip(region, combineMode);
+        }
+        public void TranslateTransform(float dx, float dy, MatrixOrder order = MatrixOrder.Append)
+        {
+            _innerGraphics.TranslateTransform(dx, dy, order);
+        }
+
+        public SmoothingMode SmoothingMode
+        {
+            get { return _innerGraphics.SmoothingMode; }
+            set { _innerGraphics.SmoothingMode = value; }
+        }
+
+        public Matrix Transform
+        {
+            get { return _innerGraphics.Transform; }
+            set { _innerGraphics.Transform = value; }
+        }
+
+        public void Dispose()
+        {
+            if (_disposable)
+                _innerGraphics.Dispose();
+            if (_image != null)
+                _image.Dispose();
+        }
+
+        Canvas IGraphicsProvider.GetGraphics() => _innerGraphics;
+
+        private static Canvas CreateGraphics(Image image)
+        {
+            var g = Graphics.FromImage(image);
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            g.CompositingQuality = CompositingQuality.HighQuality;
+            g.TextRenderingHint = TextRenderingHint.AntiAlias;
+            g.TextContrast = 1;
+            return new Core.CanvasGDI(g);
+        }
+
+        /// <summary>
+        /// Creates a new <see cref="ISvgRenderer"/> from the specified <see cref="Image"/>.
+        /// </summary>
+        /// <param name="image"><see cref="Image"/> from which to create the new <see cref="ISvgRenderer"/>.</param>
+        public static ISvgRenderer FromImage(Image image)
+        {
+            var g = CreateGraphics(image);
+            return new SvgRenderer(g);
+        }
+
+        /// <summary>
+        /// Creates a new <see cref="ISvgRenderer"/> from the specified <see cref="Graphics"/>.
+        /// </summary>
+        /// <param name="graphics">The <see cref="Graphics"/> to create the renderer from.</param>
+        public static ISvgRenderer FromGraphics(Canvas graphics)
+        {
+            return new SvgRenderer(graphics, false);
+        }
+
+        public static ISvgRenderer FromNull()
+        {
+            var img = new Bitmap(1, 1);
+            var g = CreateGraphics(img);
+            return new SvgRenderer(g, img);
+        }
+    }
+}

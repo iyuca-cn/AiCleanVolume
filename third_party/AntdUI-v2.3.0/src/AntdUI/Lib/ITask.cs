@@ -1,0 +1,305 @@
+// Copyright (C) Tom <17379620>. All Rights Reserved.
+// AntdUI WinForm Library | Licensed under Apache-2.0 License
+// Gitee: https://gitee.com/AntdUI/AntdUI
+// GitHub: https://github.com/AntdUI/AntdUI
+// GitCode: https://gitcode.com/AntdUI/AntdUI
+
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace AntdUI
+{
+    public class ITask : IDisposable
+    {
+        /// <summary>
+        /// 循环任务
+        /// </summary>
+        /// <param name="control">委托对象</param>
+        /// <param name="action">回调</param>
+        /// <param name="interval">间隔</param>
+        /// <param name="max">最大值</param>
+        /// <param name="add">更新量</param>
+        /// <param name="end">结束回调</param>
+        [Obsolete("use AnimationTask")]
+        public ITask(Control control, Func<int, bool> action, int interval, int max, int add, Action? end = null)
+        {
+            bool ok = true;
+            task = Run(() =>
+            {
+                int val = 0;
+                while (true)
+                {
+                    if (token.Wait(control))
+                    {
+                        ok = false;
+                        return;
+                    }
+                    else
+                    {
+                        val += add;
+                        if (val > max) val = 0;
+                        if (action(val)) Thread.Sleep(interval);
+                        else return;
+                    }
+                }
+            }).ContinueWith(action =>
+            {
+                if (ok && end != null) end();
+                Dispose();
+            });
+        }
+
+        /// <summary>
+        /// 循环任务
+        /// </summary>
+        /// <param name="control">委托对象</param>
+        /// <param name="action">回调</param>
+        /// <param name="interval">间隔</param>
+        /// <param name="max">最大值</param>
+        /// <param name="add">更新量</param>
+        /// <param name="end">结束回调</param>
+        [Obsolete("use AnimationTask")]
+        public ITask(Control control, Action<float> action, int interval, float max, float add, Action? end = null)
+        {
+            bool ok = true;
+            task = Run(() =>
+            {
+                float val = 0;
+                while (true)
+                {
+                    if (token.Wait(control))
+                    {
+                        ok = false;
+                        return;
+                    }
+                    else
+                    {
+                        val += add;
+                        if (val > max) val = 0;
+                        action(val);
+                        Thread.Sleep(interval);
+                    }
+                }
+            }).ContinueWith(action =>
+            {
+                if (ok && end != null) end();
+                Dispose();
+            });
+        }
+
+        /// <summary>
+        /// 循环任务
+        /// </summary>
+        /// <param name="control">委托对象</param>
+        /// <param name="action">回调</param>
+        /// <param name="interval">间隔</param>
+        /// <param name="end">结束回调</param>
+        /// <param name="sleep">运行前睡眠</param>
+        [Obsolete("use AnimationTask")]
+        public ITask(Control control, Func<bool> action, int interval, Action? end = null, int sleep = 0)
+        {
+            bool ok = true;
+            task = Run(() =>
+            {
+                if (sleep > 0) Thread.Sleep(sleep);
+                while (true)
+                {
+                    if (token.Wait(control))
+                    {
+                        ok = false;
+                        return;
+                    }
+                    else
+                    {
+                        if (action()) Thread.Sleep(interval);
+                        else return;
+                    }
+                }
+            }).ContinueWith(action =>
+            {
+                if (ok && end != null) end();
+                Dispose();
+            });
+        }
+
+        [Obsolete("use AnimationTask")]
+        public ITask(Control control, Func<bool> action)
+        {
+            task = Run(() =>
+            {
+                while (true)
+                {
+                    if (token.Wait(control)) return;
+                    else
+                    {
+                        if (action()) { }
+                        else return;
+                    }
+                }
+            }).ContinueWith(action => Dispose());
+        }
+
+        /// <summary>
+        /// 循环任务
+        /// </summary>
+        /// <param name="action">回调</param>
+        /// <param name="interval">间隔</param>
+        /// <param name="totalFrames">总帧数</param>
+        /// <param name="end">结束回调</param>
+        /// <param name="sleep">运行前睡眠</param>
+        [Obsolete("use AnimationTask")]
+        public ITask(Func<int, bool> action, int interval, int totalFrames, Action end, int sleep = 0, bool isend = false)
+        {
+            bool ok = true;
+            task = Run(() =>
+            {
+                if (sleep > 0) Thread.Sleep(sleep);
+                for (int i = 0; i < totalFrames; i++)
+                {
+                    if (token.Wait())
+                    {
+                        ok = false;
+                        return;
+                    }
+                    else
+                    {
+                        if (action(i + 1)) Thread.Sleep(interval);
+                        else return;
+                    }
+                }
+            }).ContinueWith(action =>
+            {
+                if (isend)
+                {
+                    Dispose();
+                    end();
+                }
+                else
+                {
+                    if (ok) end();
+                    Dispose();
+                }
+            });
+        }
+
+        [Obsolete("use AnimationTask")]
+        public ITask(bool _is, int interval, int totalFrames, float cold, AnimationType type, Action<int, float> action, Action end)
+        {
+            bool ok = true;
+            task = Run(() =>
+            {
+                double init_val = 1D;
+                if (_is)
+                {
+                    if (cold > -1) init_val = cold;
+                    for (int i = 0; i < totalFrames; i++)
+                    {
+                        if (token.Wait())
+                        {
+                            ok = false;
+                            return;
+                        }
+                        else
+                        {
+                            int currentFrames = i + 1;
+                            double progress = ((currentFrames * 1.0) / totalFrames);
+                            var prog = (float)(init_val - Animation.Animate(progress, init_val, type));
+                            Tag = prog;
+                            action(currentFrames, prog);
+                            Thread.Sleep(interval);
+                        }
+                    }
+                }
+                else
+                {
+                    if (cold > -1) init_val = cold;
+                    else init_val = 0;
+                    for (int i = 0; i < totalFrames; i++)
+                    {
+                        if (token.Wait())
+                        {
+                            ok = false;
+                            return;
+                        }
+                        else
+                        {
+                            int currentFrames = i + 1;
+                            double progress = ((currentFrames * 1.0) / totalFrames);
+                            var prog = (float)(Animation.Animate(progress, 1D + init_val, type) - init_val);
+                            if (prog < 0) return;
+                            Tag = prog;
+                            action(currentFrames, prog);
+                            Thread.Sleep(interval);
+                        }
+                    }
+                }
+            }).ContinueWith((action =>
+            {
+                if (ok)
+                {
+                    Tag = null;
+                    end();
+                }
+                Dispose();
+            }));
+        }
+
+        Task task;
+        public void Wait() => task.Wait();
+
+        public object? Tag { get; set; }
+
+        public void Cancel() => token?.Cancel();
+
+        public void Dispose()
+        {
+            if (token != null)
+            {
+                token?.Cancel();
+                token?.Dispose();
+                token = null;
+            }
+            GC.SuppressFinalize(this);
+        }
+
+        CancellationTokenSource? token = new CancellationTokenSource();
+
+        public static Task Run(Action action, Action? end = null)
+        {
+            if (end == null)
+            {
+#if NET40
+                return Task.Factory.StartNew(action);
+#else
+                return Task.Run(action);
+#endif
+            }
+#if NET40
+            return Task.Factory.StartNew(action).ContinueWith(action => { end(); });
+#else
+            return Task.Run(action).ContinueWith(action => { end(); });
+#endif
+        }
+
+        public static Task<TResult> Run<TResult>(Func<TResult> action)
+        {
+#if NET40
+            return Task.Factory.StartNew(action);
+#else
+            return Task.Run(action);
+#endif
+        }
+
+        public static T? Invoke<T>(Control control, Func<T> method)
+        {
+            if (control.IsDisposed || control.Disposing) return default;
+#if NET40 || NET46 || NET48
+            return (T)control.Invoke(method);
+#else
+            return control.Invoke(method);
+#endif
+        }
+    }
+}
