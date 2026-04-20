@@ -46,6 +46,7 @@ namespace AiCleanVolume.Desktop
 
         private ApplicationSettings settings;
         private StorageItem currentRoot;
+        private ScanRequest currentTreeRequest;
         private List<CleanupSuggestionRow> suggestionRows;
 
         private AntdUI.PageHeader appBar;
@@ -433,6 +434,7 @@ namespace AiCleanVolume.Desktop
             ConfigureTableSurface(storageTable);
             storageTable.FixedHeader = true;
             storageTable.ScrollBarAvoidHeader = true;
+            storageTable.ExpandChanged += StorageTable_ExpandChanged;
             storageTable.CellDoubleClick += StorageTable_CellDoubleClick;
 
             panel.Controls.Add(storageTable);
@@ -820,7 +822,7 @@ namespace AiCleanVolume.Desktop
         private void ScanCurrentLocation()
         {
             SaveSettingsFromUi();
-            ScanRequest request = BuildScanRequest();
+            ScanRequest request = BuildScanRequest(1);
             StorageItem result = null;
 
             RunBackground("正在扫描空间占用…", delegate
@@ -829,6 +831,7 @@ namespace AiCleanVolume.Desktop
             }, delegate
             {
                 currentRoot = result;
+                currentTreeRequest = CreateScanRequest(result.Path, 1, request);
                 List<StorageEntryRow> rows = new List<StorageEntryRow> { new StorageEntryRow(result) };
                 storageTable.DataSource = rows;
                 rootValueLabel.Text = result.Path;
@@ -847,11 +850,14 @@ namespace AiCleanVolume.Desktop
 
             SaveSettingsFromUi();
             IList<CleanupSuggestion> suggestions = null;
-            IList<CleanupCandidate> candidates = candidatePlanner.BuildCandidates(currentRoot, Math.Max(67108864L, settings.Scan.MinSizeMb * 1024L * 1024L / 2L), settings.Ai.MaxSuggestions * 4);
+            StorageItem analysisRoot = null;
+            ScanRequest request = BuildScanRequest(currentRoot.Path, -1);
 
             RunBackground("正在生成 AI 清理建议…", delegate
             {
-                suggestions = aiAdvisor.Analyze(currentRoot, candidates, settings);
+                analysisRoot = scanProvider.Scan(request);
+                IList<CleanupCandidate> candidates = candidatePlanner.BuildCandidates(analysisRoot, Math.Max(67108864L, settings.Scan.MinSizeMb * 1024L * 1024L / 2L), settings.Ai.MaxSuggestions * 4);
+                suggestions = aiAdvisor.Analyze(analysisRoot, candidates, settings);
                 EvaluateSandbox(suggestions);
             }, delegate
             {
@@ -934,22 +940,103 @@ namespace AiCleanVolume.Desktop
             suggestionValueLabel.Text = suggestionRows.Count + " 项";
         }
 
-        private ScanRequest BuildScanRequest()
+        private void StorageTable_ExpandChanged(object sender, AntdUI.TableExpandEventArgs e)
+        {
+            if (!e.Expand) return;
+
+            StorageEntryRow row = e.Record as StorageEntryRow;
+            if (row == null || row.IsPlaceholder || row.Item == null) return;
+            if (!row.Item.IsDirectory || row.Item.ChildrenLoaded || !row.Item.HasChildren || row.IsLoadingChildren) return;
+            if (currentTreeRequest == null) return;
+
+            row.ShowLoadingPlaceholder();
+            storageTable.Refresh();
+
+            ScanRequest request = CreateScanRequest(row.Item.Path, 1, currentTreeRequest);
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                StorageItem loaded = null;
+                Exception error = null;
+
+                try
+                {
+                    loaded = scanProvider.Scan(request);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
+
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    if (IsDisposed) return;
+
+                    if (error != null)
+                    {
+                        row.ReloadChildren();
+                        storageTable.Refresh();
+                        Log("目录节点加载失败：" + error.Message);
+                        MessageBox.Show(this, error.Message, "加载失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    ApplyScannedNode(row.Item, loaded);
+                    row.RefreshFromItem();
+                    storageTable.Refresh();
+                });
+            });
+        }
+
+        private static void ApplyScannedNode(StorageItem target, StorageItem source)
+        {
+            if (target == null || source == null) return;
+
+            target.Path = source.Path;
+            target.Name = source.Name;
+            target.Bytes = source.Bytes;
+            target.IsDirectory = source.IsDirectory;
+            target.HasChildren = source.HasChildren;
+            target.ChildrenLoaded = source.ChildrenLoaded;
+            target.DirectFileCount = source.DirectFileCount;
+            target.TotalFileCount = source.TotalFileCount;
+            target.TotalDirectoryCount = source.TotalDirectoryCount;
+            target.Children.Clear();
+            for (int i = 0; i < source.Children.Count; i++) target.Children.Add(source.Children[i]);
+        }
+
+        private ScanRequest BuildScanRequest(int loadDepth)
         {
             string location = string.IsNullOrWhiteSpace(pathInput.Text) ? "C:\\" : pathInput.Text.Trim();
+            return BuildScanRequest(location, loadDepth);
+        }
+
+        private ScanRequest BuildScanRequest(string location, int loadDepth)
+        {
             return new ScanRequest
             {
                 Location = location,
                 MinSizeBytes = ParseInt(minSizeInput.Text, 128) * 1024L * 1024L,
                 PerLevelLimit = ParseInt(limitInput.Text, 80),
-                SortMode = sortSelect.SelectedValue is ScanSortMode ? (ScanSortMode)sortSelect.SelectedValue : ScanSortMode.Allocated
+                SortMode = sortSelect.SelectedValue is ScanSortMode ? (ScanSortMode)sortSelect.SelectedValue : ScanSortMode.Allocated,
+                LoadDepth = loadDepth
             };
+        }
+
+        private static ScanRequest CreateScanRequest(string location, int loadDepth, ScanRequest template)
+        {
+            ScanRequest request = new ScanRequest();
+            request.Location = location;
+            request.SortMode = template.SortMode;
+            request.MinSizeBytes = template.MinSizeBytes;
+            request.PerLevelLimit = template.PerLevelLimit;
+            request.LoadDepth = loadDepth;
+            return request;
         }
 
         private void StorageTable_CellDoubleClick(object sender, AntdUI.TableClickEventArgs e)
         {
             StorageEntryRow row = e.Record as StorageEntryRow;
-            if (row == null) return;
+            if (row == null || row.IsPlaceholder || row.Item == null) return;
             explorerService.OpenPath(row.path, !row.Item.IsDirectory);
         }
 

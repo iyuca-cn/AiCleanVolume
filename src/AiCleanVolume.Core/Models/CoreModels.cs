@@ -38,12 +38,14 @@ namespace AiCleanVolume.Core.Models
             SortMode = ScanSortMode.Allocated;
             MinSizeBytes = 104857600;
             PerLevelLimit = 50;
+            LoadDepth = -1;
         }
 
         public string Location { get; set; }
         public ScanSortMode SortMode { get; set; }
         public long MinSizeBytes { get; set; }
         public int PerLevelLimit { get; set; }
+        public int LoadDepth { get; set; }
     }
 
     public sealed class StorageItem
@@ -51,12 +53,15 @@ namespace AiCleanVolume.Core.Models
         public StorageItem()
         {
             Children = new List<StorageItem>();
+            ChildrenLoaded = true;
         }
 
         public string Path { get; set; }
         public string Name { get; set; }
         public long Bytes { get; set; }
         public bool IsDirectory { get; set; }
+        public bool HasChildren { get; set; }
+        public bool ChildrenLoaded { get; set; }
         public int DirectFileCount { get; set; }
         public int TotalFileCount { get; set; }
         public int TotalDirectoryCount { get; set; }

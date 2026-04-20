@@ -8,20 +8,68 @@ namespace AiCleanVolume.Desktop.ViewModels
     {
         public StorageEntryRow(StorageItem item)
         {
-            Item = item;
-            name = item.Name;
-            path = item.Path;
-            size = StorageFormatting.FormatBytes(item.Bytes);
-            bytes = item.Bytes;
-            files = item.TotalFileCount;
-            dirs = item.TotalDirectoryCount;
-            kind = item.IsDirectory ? "文件夹" : "文件";
             Children = new List<StorageEntryRow>();
-            for (int i = 0; i < item.Children.Count; i++) Children.Add(new StorageEntryRow(item.Children[i]));
+            Item = item;
+            RefreshFromItem();
+        }
+
+        private StorageEntryRow(string placeholderText)
+        {
+            Children = new List<StorageEntryRow>();
+            IsPlaceholder = true;
+            name = placeholderText;
+            path = string.Empty;
+            size = string.Empty;
+            bytes = 0;
+            files = 0;
+            dirs = 0;
+            kind = string.Empty;
         }
 
         public StorageItem Item { get; private set; }
         public List<StorageEntryRow> Children { get; private set; }
+        public bool IsPlaceholder { get; private set; }
+        public bool IsLoadingChildren { get; set; }
+
+        public void RefreshFromItem()
+        {
+            if (IsPlaceholder || Item == null) return;
+
+            name = Item.Name;
+            path = Item.Path;
+            size = StorageFormatting.FormatBytes(Item.Bytes);
+            bytes = Item.Bytes;
+            files = Item.TotalFileCount;
+            dirs = Item.TotalDirectoryCount;
+            kind = Item.IsDirectory ? "文件夹" : "文件";
+            ReloadChildren();
+        }
+
+        public void ShowLoadingPlaceholder()
+        {
+            if (IsPlaceholder) return;
+            IsLoadingChildren = true;
+            Children.Clear();
+            Children.Add(new StorageEntryRow("正在加载..."));
+        }
+
+        public void ReloadChildren()
+        {
+            Children.Clear();
+            IsLoadingChildren = false;
+            if (Item == null || !Item.IsDirectory) return;
+
+            if (Item.ChildrenLoaded)
+            {
+                for (int i = 0; i < Item.Children.Count; i++)
+                {
+                    Children.Add(new StorageEntryRow(Item.Children[i]));
+                }
+                return;
+            }
+
+            if (Item.HasChildren) Children.Add(new StorageEntryRow("展开后加载"));
+        }
 
         public string name { get; set; }
         public string size { get; set; }
