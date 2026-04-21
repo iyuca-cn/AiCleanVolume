@@ -11,8 +11,6 @@ namespace AiCleanVolume.Desktop.Services
 {
     public sealed class FolderSizeRankerScanProvider : IScanProvider
     {
-        private static readonly int UnicodePreambleLength = Encoding.Unicode.GetPreamble().Length;
-
         private readonly string executablePath;
         private readonly object syncRoot = new object();
 
@@ -190,7 +188,7 @@ namespace AiCleanVolume.Desktop.Services
         private static DirectoryNodeIndex ParseDirectoryIndex(JsonTextReader reader, IDictionary<string, DirectoryNodeIndex> index)
         {
             DirectoryNodeIndex entry = new DirectoryNodeIndex();
-            entry.DirectFiles = new List<StorageItem>();
+            entry.DirectFiles = new List<FileNodeState>();
             entry.DirectDirectoryPaths = new List<string>();
 
             int directFileCount = 0;
@@ -236,7 +234,7 @@ namespace AiCleanVolume.Desktop.Services
             return entry;
         }
 
-        private static void ParseIndexedFiles(JsonTextReader reader, IList<StorageItem> target, ref int directFileCount)
+        private static void ParseIndexedFiles(JsonTextReader reader, IList<FileNodeState> target, ref int directFileCount)
         {
             if (reader.TokenType == JsonToken.Null) return;
             if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果文件数组格式错误。");
@@ -250,7 +248,7 @@ namespace AiCleanVolume.Desktop.Services
                     continue;
                 }
 
-                StorageItem file = ParseFile(reader);
+                FileNodeState file = ParseFileState(reader);
                 directFileCount++;
                 target.Add(file);
             }
@@ -282,217 +280,6 @@ namespace AiCleanVolume.Desktop.Services
             }
         }
 
-        private static Dictionary<string, DirectoryNodeIndex> BuildDirectoryIndex(string tempFilePath)
-        {
-            using (StreamReader reader = new StreamReader(tempFilePath, Encoding.Unicode, false))
-            {
-                TextReaderCursor cursor = new TextReaderCursor(reader);
-                Dictionary<string, DirectoryNodeIndex> index = new Dictionary<string, DirectoryNodeIndex>(StringComparer.OrdinalIgnoreCase);
-
-                SkipWhitespace(cursor);
-                DirectoryNodeIndex root = IndexDirectoryObject(cursor, index);
-                if (root == null) throw new InvalidOperationException("目录树缓存索引构建失败。");
-                SkipWhitespace(cursor);
-                if (cursor.Peek() != -1) throw new InvalidOperationException("目录树缓存包含多余内容。");
-                return index;
-            }
-        }
-
-        private static DirectoryNodeIndex IndexDirectoryObject(IJsonCursor cursor, IDictionary<string, DirectoryNodeIndex> index)
-        {
-            long startChar = cursor.Position;
-            Expect(cursor, '{');
-
-            string path = string.Empty;
-            long bytes = 0;
-            int directFileCount = 0;
-            int totalFiles = 0;
-            int totalDirs = 0;
-            long filesStartChar = -1;
-            int filesLengthChars = 0;
-            List<string> directDirectoryPaths = new List<string>();
-
-            SkipWhitespace(cursor);
-            if (TryConsume(cursor, '}'))
-            {
-                return RegisterDirectoryIndex(index, path, bytes, directFileCount, totalFiles, totalDirs, filesStartChar, filesLengthChars, directDirectoryPaths, startChar, cursor.Position);
-            }
-
-            while (true)
-            {
-                string propertyName = ReadString(cursor);
-                SkipWhitespace(cursor);
-                Expect(cursor, ':');
-                SkipWhitespace(cursor);
-
-                switch (propertyName)
-                {
-                    case "path":
-                        path = ReadString(cursor);
-                        break;
-                    case "bytes":
-                        bytes = ReadInt64(cursor);
-                        break;
-                    case "files":
-                        filesStartChar = cursor.Position;
-                        directFileCount = SkipAndCountFilesArray(cursor);
-                        filesLengthChars = (int)(cursor.Position - filesStartChar);
-                        break;
-                    case "children":
-                        List<DirectoryNodeIndex> children = IndexChildrenArray(cursor, index);
-                        for (int i = 0; i < children.Count; i++)
-                        {
-                            DirectoryNodeIndex child = children[i];
-                            directDirectoryPaths.Add(child.Path);
-                            totalFiles += child.TotalFileCount;
-                            totalDirs += 1 + child.TotalDirectoryCount;
-                        }
-                        break;
-                    default:
-                        SkipValue(cursor);
-                        break;
-                }
-
-                SkipWhitespace(cursor);
-                if (TryConsume(cursor, ',')) continue;
-                Expect(cursor, '}');
-                break;
-            }
-
-            return RegisterDirectoryIndex(index, path, bytes, directFileCount, totalFiles, totalDirs, filesStartChar, filesLengthChars, directDirectoryPaths, startChar, cursor.Position);
-        }
-
-        private static DirectoryNodeIndex RegisterDirectoryIndex(
-            IDictionary<string, DirectoryNodeIndex> index,
-            string path,
-            long bytes,
-            int directFileCount,
-            int totalFiles,
-            int totalDirs,
-            long filesStartChar,
-            int filesLengthChars,
-            IList<string> directDirectoryPaths,
-            long startChar,
-            long endChar)
-        {
-            DirectoryNodeIndex entry = new DirectoryNodeIndex();
-            entry.Path = path;
-            entry.Bytes = bytes;
-            entry.DirectFileCount = directFileCount;
-            entry.TotalFileCount = directFileCount + totalFiles;
-            entry.TotalDirectoryCount = totalDirs;
-            entry.FilesStartChar = filesStartChar;
-            entry.FilesLengthChars = filesLengthChars;
-            entry.StartChar = startChar;
-            entry.LengthChars = (int)(endChar - startChar);
-            entry.DirectDirectoryPaths = new List<string>(directDirectoryPaths);
-
-            string key = NormalizePathKey(path);
-            index[key] = entry;
-            return entry;
-        }
-
-        private static List<DirectoryNodeIndex> IndexChildrenArray(IJsonCursor cursor, IDictionary<string, DirectoryNodeIndex> index)
-        {
-            List<DirectoryNodeIndex> children = new List<DirectoryNodeIndex>();
-
-            if (TryConsumeLiteral(cursor, "null")) return children;
-
-            Expect(cursor, '[');
-            SkipWhitespace(cursor);
-            if (TryConsume(cursor, ']')) return children;
-
-            while (true)
-            {
-                DirectoryNodeIndex child = IndexDirectoryObject(cursor, index);
-                children.Add(child);
-
-                SkipWhitespace(cursor);
-                if (TryConsume(cursor, ',')) continue;
-                Expect(cursor, ']');
-                break;
-            }
-
-            return children;
-        }
-
-        private static int SkipAndCountFilesArray(IJsonCursor cursor)
-        {
-            if (TryConsumeLiteral(cursor, "null")) return 0;
-
-            int count = 0;
-            Expect(cursor, '[');
-            SkipWhitespace(cursor);
-            if (TryConsume(cursor, ']')) return 0;
-
-            while (true)
-            {
-                SkipValue(cursor);
-                count++;
-
-                SkipWhitespace(cursor);
-                if (TryConsume(cursor, ',')) continue;
-                Expect(cursor, ']');
-                break;
-            }
-
-            return count;
-        }
-
-        private static void SkipValue(IJsonCursor cursor)
-        {
-            SkipWhitespace(cursor);
-            int token = cursor.Peek();
-            if (token == -1) throw new InvalidOperationException("JSON 提前结束。");
-
-            switch ((char)token)
-            {
-                case '{':
-                    Expect(cursor, '{');
-                    SkipWhitespace(cursor);
-                    if (TryConsume(cursor, '}')) return;
-                    while (true)
-                    {
-                        ReadString(cursor);
-                        SkipWhitespace(cursor);
-                        Expect(cursor, ':');
-                        SkipWhitespace(cursor);
-                        SkipValue(cursor);
-                        SkipWhitespace(cursor);
-                        if (TryConsume(cursor, ',')) continue;
-                        Expect(cursor, '}');
-                        return;
-                    }
-                case '[':
-                    Expect(cursor, '[');
-                    SkipWhitespace(cursor);
-                    if (TryConsume(cursor, ']')) return;
-                    while (true)
-                    {
-                        SkipValue(cursor);
-                        SkipWhitespace(cursor);
-                        if (TryConsume(cursor, ',')) continue;
-                        Expect(cursor, ']');
-                        return;
-                    }
-                case '"':
-                    ReadString(cursor);
-                    return;
-                case 'n':
-                    ReadLiteral(cursor, "null");
-                    return;
-                case 't':
-                    ReadLiteral(cursor, "true");
-                    return;
-                case 'f':
-                    ReadLiteral(cursor, "false");
-                    return;
-                default:
-                    ReadNumber(cursor);
-                    return;
-            }
-        }
-
         private static StorageItem MaterializeDirectory(ScanSession session, DirectoryNodeIndex entry, int remainingDepth, bool isRoot)
         {
             StorageItem item = new StorageItem();
@@ -510,7 +297,7 @@ namespace AiCleanVolume.Desktop.Services
 
             for (int i = 0; i < entry.DirectFiles.Count; i++)
             {
-                item.Children.Add(CloneTree(entry.DirectFiles[i]));
+                item.Children.Add(CreateStorageFileItem(entry.DirectFiles[i]));
             }
 
             for (int i = 0; i < entry.DirectDirectoryPaths.Count; i++)
@@ -524,105 +311,19 @@ namespace AiCleanVolume.Desktop.Services
             return item;
         }
 
-        private static IList<StorageItem> ParseFilesSlice(ScanSession session, DirectoryNodeIndex entry)
-        {
-            List<StorageItem> result = new List<StorageItem>();
-            if (entry.FilesStartChar < 0 || entry.FilesLengthChars <= 0) return result;
-
-            string json = ReadUnicodeSlice(session.TempFilePath, entry.FilesStartChar, entry.FilesLengthChars);
-            if (string.IsNullOrEmpty(json)) return result;
-
-            StringCursor cursor = new StringCursor(json);
-            SkipWhitespace(cursor);
-            if (TryConsumeLiteral(cursor, "null")) return result;
-
-            Expect(cursor, '[');
-            SkipWhitespace(cursor);
-            if (TryConsume(cursor, ']')) return result;
-
-            while (true)
-            {
-                result.Add(ParseFileObject(cursor));
-                SkipWhitespace(cursor);
-                if (TryConsume(cursor, ',')) continue;
-                Expect(cursor, ']');
-                break;
-            }
-
-            return result;
-        }
-
-        private static StorageItem ParseFileObject(IJsonCursor cursor)
+        private static StorageItem CreateStorageFileItem(FileNodeState state)
         {
             StorageItem item = new StorageItem();
+            item.Path = state.Path;
+            item.Name = StorageFormatting.GetDisplayName(state.Path, false);
+            item.Bytes = state.Bytes;
             item.IsDirectory = false;
             item.HasChildren = false;
             item.ChildrenLoaded = true;
             item.DirectFileCount = 0;
             item.TotalFileCount = 1;
             item.TotalDirectoryCount = 0;
-
-            Expect(cursor, '{');
-            SkipWhitespace(cursor);
-            if (TryConsume(cursor, '}')) return item;
-
-            while (true)
-            {
-                string propertyName = ReadString(cursor);
-                SkipWhitespace(cursor);
-                Expect(cursor, ':');
-                SkipWhitespace(cursor);
-
-                switch (propertyName)
-                {
-                    case "path":
-                        item.Path = ReadString(cursor);
-                        item.Name = StorageFormatting.GetDisplayName(item.Path, false);
-                        break;
-                    case "bytes":
-                        item.Bytes = ReadInt64(cursor);
-                        break;
-                    default:
-                        SkipValue(cursor);
-                        break;
-                }
-
-                SkipWhitespace(cursor);
-                if (TryConsume(cursor, ',')) continue;
-                Expect(cursor, '}');
-                break;
-            }
-
-            if (string.IsNullOrEmpty(item.Name)) item.Name = StorageFormatting.GetDisplayName(item.Path, false);
             return item;
-        }
-
-        private static string ReadUnicodeSlice(string path, long startChar, int lengthChars)
-        {
-            if (lengthChars <= 0) return string.Empty;
-
-            byte[] buffer = new byte[lengthChars * 2];
-            int totalRead = 0;
-            using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            {
-                stream.Seek(UnicodePreambleLength + startChar * 2L, SeekOrigin.Begin);
-                while (totalRead < buffer.Length)
-                {
-                    int read = stream.Read(buffer, totalRead, buffer.Length - totalRead);
-                    if (read <= 0) break;
-                    totalRead += read;
-                }
-            }
-
-            if (totalRead == 0) return string.Empty;
-            if (totalRead != buffer.Length)
-            {
-                byte[] resized = new byte[totalRead];
-                Buffer.BlockCopy(buffer, 0, resized, 0, totalRead);
-                buffer = resized;
-            }
-
-            return Encoding.Unicode.GetString(buffer);
         }
 
         private ProcessStartInfo CreateStartInfo(ScanRequest request)
@@ -746,182 +447,6 @@ namespace AiCleanVolume.Desktop.Services
             currentTreeSession = null;
         }
 
-        private static void CopyText(TextReader source, TextWriter target)
-        {
-            char[] buffer = new char[8192];
-            while (true)
-            {
-                int read = source.Read(buffer, 0, buffer.Length);
-                if (read <= 0) break;
-                target.Write(buffer, 0, read);
-            }
-        }
-
-        private static void TryDeleteFile(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return;
-            try
-            {
-                if (File.Exists(path)) File.Delete(path);
-            }
-            catch
-            {
-            }
-        }
-
-        private static void SkipWhitespace(IJsonCursor cursor)
-        {
-            while (true)
-            {
-                int value = cursor.Peek();
-                if (value == -1) return;
-
-                char ch = (char)value;
-                if (ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n') return;
-                cursor.Read();
-            }
-        }
-
-        private static bool TryConsume(IJsonCursor cursor, char expected)
-        {
-            SkipWhitespace(cursor);
-            if (cursor.Peek() != expected) return false;
-            cursor.Read();
-            return true;
-        }
-
-        private static void Expect(IJsonCursor cursor, char expected)
-        {
-            SkipWhitespace(cursor);
-            int value = cursor.Read();
-            if (value != expected)
-            {
-                throw new InvalidOperationException("JSON 格式错误，期待 '" + expected + "'。");
-            }
-        }
-
-        private static bool TryConsumeLiteral(IJsonCursor cursor, string value)
-        {
-            SkipWhitespace(cursor);
-            int token = cursor.Peek();
-            if (token == -1 || token != value[0]) return false;
-            ReadLiteral(cursor, value);
-            return true;
-        }
-
-        private static void ReadLiteral(IJsonCursor cursor, string value)
-        {
-            for (int i = 0; i < value.Length; i++)
-            {
-                int read = cursor.Read();
-                if (read != value[i])
-                {
-                    throw new InvalidOperationException("JSON 字面量格式错误。");
-                }
-            }
-        }
-
-        private static long ReadInt64(IJsonCursor cursor)
-        {
-            SkipWhitespace(cursor);
-            bool negative = false;
-            if (cursor.Peek() == '-')
-            {
-                negative = true;
-                cursor.Read();
-            }
-
-            long value = 0;
-            bool hasDigit = false;
-            while (true)
-            {
-                int token = cursor.Peek();
-                if (token < '0' || token > '9') break;
-                hasDigit = true;
-                value = value * 10 + (cursor.Read() - '0');
-            }
-
-            if (!hasDigit) throw new InvalidOperationException("JSON 数字格式错误。");
-            return negative ? -value : value;
-        }
-
-        private static void ReadNumber(IJsonCursor cursor)
-        {
-            ReadInt64(cursor);
-        }
-
-        private static string ReadString(IJsonCursor cursor)
-        {
-            SkipWhitespace(cursor);
-            if (cursor.Read() != '"') throw new InvalidOperationException("JSON 字符串格式错误。");
-
-            StringBuilder builder = new StringBuilder();
-            while (true)
-            {
-                int value = cursor.Read();
-                if (value == -1) throw new InvalidOperationException("JSON 字符串提前结束。");
-                if (value == '"') break;
-
-                if (value != '\\')
-                {
-                    builder.Append((char)value);
-                    continue;
-                }
-
-                int escaped = cursor.Read();
-                if (escaped == -1) throw new InvalidOperationException("JSON 转义序列提前结束。");
-
-                switch ((char)escaped)
-                {
-                    case '"':
-                    case '\\':
-                    case '/':
-                        builder.Append((char)escaped);
-                        break;
-                    case 'b':
-                        builder.Append('\b');
-                        break;
-                    case 'f':
-                        builder.Append('\f');
-                        break;
-                    case 'n':
-                        builder.Append('\n');
-                        break;
-                    case 'r':
-                        builder.Append('\r');
-                        break;
-                    case 't':
-                        builder.Append('\t');
-                        break;
-                    case 'u':
-                        builder.Append((char)ReadHex16(cursor));
-                        break;
-                    default:
-                        throw new InvalidOperationException("JSON 转义序列无效。");
-                }
-            }
-
-            return builder.ToString();
-        }
-
-        private static int ReadHex16(IJsonCursor cursor)
-        {
-            int value = 0;
-            for (int i = 0; i < 4; i++)
-            {
-                int digit = cursor.Read();
-                if (digit == -1) throw new InvalidOperationException("JSON Unicode 转义提前结束。");
-
-                value <<= 4;
-                if (digit >= '0' && digit <= '9') value += digit - '0';
-                else if (digit >= 'a' && digit <= 'f') value += digit - 'a' + 10;
-                else if (digit >= 'A' && digit <= 'F') value += digit - 'A' + 10;
-                else throw new InvalidOperationException("JSON Unicode 转义格式错误。");
-            }
-
-            return value;
-        }
-
         private static StorageItem TryScanWithPlatformApi(ScanRequest request, string cliError)
         {
             if (!Directory.Exists(request.Location)) return null;
@@ -1013,16 +538,9 @@ namespace AiCleanVolume.Desktop.Services
             return item;
         }
 
-        private static StorageItem ParseFolder(JsonTextReader reader, bool isRoot, int remainingDepth)
+        private static FileNodeState ParseFileState(JsonTextReader reader)
         {
-            StorageItem item = new StorageItem();
-            item.IsDirectory = true;
-
-            List<StorageItem> directFiles = remainingDepth > 0 ? new List<StorageItem>() : null;
-            List<StorageItem> childDirectories = remainingDepth > 0 ? new List<StorageItem>() : null;
-            int directFileCount = 0;
-            int totalFiles = 0;
-            int totalDirs = 0;
+            FileNodeState item = new FileNodeState();
 
             while (reader.Read())
             {
@@ -1035,83 +553,6 @@ namespace AiCleanVolume.Desktop.Services
                     {
                         case "path":
                             item.Path = reader.Value == null ? string.Empty : reader.Value.ToString();
-                            item.Name = isRoot ? item.Path : StorageFormatting.GetDisplayName(item.Path, true);
-                            break;
-                        case "bytes":
-                            item.Bytes = ReadInt64(reader.Value);
-                            break;
-                        case "files":
-                            ParseFiles(reader, directFiles, ref directFileCount);
-                            break;
-                        case "children":
-                            if (remainingDepth > 0) ParseChildren(reader, remainingDepth, childDirectories, ref totalFiles, ref totalDirs);
-                            else ParseChildrenSummary(reader, ref totalDirs);
-                            break;
-                        default:
-                            reader.Skip();
-                            break;
-                    }
-                }
-                else if (reader.TokenType == JsonToken.EndObject)
-                {
-                    break;
-                }
-            }
-
-            item.DirectFileCount = directFileCount;
-            item.TotalFileCount = directFileCount + totalFiles;
-            item.TotalDirectoryCount = totalDirs;
-            item.HasChildren = item.DirectFileCount > 0 || item.TotalDirectoryCount > 0;
-            item.ChildrenLoaded = remainingDepth > 0;
-            if (string.IsNullOrEmpty(item.Name)) item.Name = isRoot ? item.Path : StorageFormatting.GetDisplayName(item.Path, true);
-
-            if (directFiles != null) AddAll(item.Children, directFiles);
-            if (childDirectories != null) AddAll(item.Children, childDirectories);
-            return item;
-        }
-
-        private static void ParseFiles(JsonTextReader reader, IList<StorageItem> target, ref int directFileCount)
-        {
-            if (reader.TokenType == JsonToken.Null) return;
-            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果文件数组格式错误。");
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonToken.EndArray) break;
-                if (reader.TokenType != JsonToken.StartObject)
-                {
-                    reader.Skip();
-                    continue;
-                }
-
-                StorageItem file = ParseFile(reader);
-                directFileCount++;
-                if (target != null) target.Add(file);
-            }
-        }
-
-        private static StorageItem ParseFile(JsonTextReader reader)
-        {
-            StorageItem item = new StorageItem();
-            item.IsDirectory = false;
-            item.HasChildren = false;
-            item.ChildrenLoaded = true;
-            item.DirectFileCount = 0;
-            item.TotalFileCount = 1;
-            item.TotalDirectoryCount = 0;
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonToken.PropertyName)
-                {
-                    string propertyName = reader.Value == null ? string.Empty : reader.Value.ToString();
-                    if (!reader.Read()) throw new InvalidOperationException("扫描结果不完整。");
-
-                    switch (propertyName)
-                    {
-                        case "path":
-                            item.Path = reader.Value == null ? string.Empty : reader.Value.ToString();
-                            item.Name = StorageFormatting.GetDisplayName(item.Path, false);
                             break;
                         case "bytes":
                             item.Bytes = ReadInt64(reader.Value);
@@ -1119,7 +560,7 @@ namespace AiCleanVolume.Desktop.Services
                         default:
                             reader.Skip();
                             break;
-                    }
+                        }
                 }
                 else if (reader.TokenType == JsonToken.EndObject)
                 {
@@ -1127,48 +568,7 @@ namespace AiCleanVolume.Desktop.Services
                 }
             }
 
-            if (string.IsNullOrEmpty(item.Name)) item.Name = StorageFormatting.GetDisplayName(item.Path, false);
             return item;
-        }
-
-        private static void ParseChildren(JsonTextReader reader, int remainingDepth, IList<StorageItem> target, ref int totalFiles, ref int totalDirs)
-        {
-            if (reader.TokenType == JsonToken.Null) return;
-            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果目录数组格式错误。");
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonToken.EndArray) break;
-                if (reader.TokenType != JsonToken.StartObject)
-                {
-                    reader.Skip();
-                    continue;
-                }
-
-                StorageItem child = ParseFolder(reader, false, remainingDepth > 0 ? remainingDepth - 1 : 0);
-                totalFiles += child.TotalFileCount;
-                totalDirs += 1 + child.TotalDirectoryCount;
-                if (target != null) target.Add(child);
-            }
-        }
-
-        private static void ParseChildrenSummary(JsonTextReader reader, ref int totalDirs)
-        {
-            if (reader.TokenType == JsonToken.Null) return;
-            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果目录数组格式错误。");
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonToken.EndArray) break;
-                if (reader.TokenType != JsonToken.StartObject)
-                {
-                    reader.Skip();
-                    continue;
-                }
-
-                totalDirs++;
-                reader.Skip();
-            }
         }
 
         private static FileInfo[] SafeGetFiles(DirectoryInfo directory)
@@ -1273,13 +673,11 @@ namespace AiCleanVolume.Desktop.Services
         {
             public string RootPath { get; set; }
             public string TemplateKey { get; set; }
-            public string TempFilePath { get; set; }
             public Dictionary<string, DirectoryNodeIndex> DirectoryIndex { get; set; }
 
             public void Dispose()
             {
                 DirectoryIndex = null;
-                TempFilePath = null;
             }
         }
 
@@ -1290,12 +688,14 @@ namespace AiCleanVolume.Desktop.Services
             public int DirectFileCount { get; set; }
             public int TotalFileCount { get; set; }
             public int TotalDirectoryCount { get; set; }
-            public long FilesStartChar { get; set; }
-            public int FilesLengthChars { get; set; }
-            public long StartChar { get; set; }
-            public int LengthChars { get; set; }
-            public List<StorageItem> DirectFiles { get; set; }
+            public List<FileNodeState> DirectFiles { get; set; }
             public List<string> DirectDirectoryPaths { get; set; }
+        }
+
+        private struct FileNodeState
+        {
+            public string Path { get; set; }
+            public long Bytes { get; set; }
         }
 
         private sealed class FolderNodeDto
@@ -1321,77 +721,6 @@ namespace AiCleanVolume.Desktop.Services
             }
 
             public string CliError { get; private set; }
-        }
-
-        private interface IJsonCursor
-        {
-            long Position { get; }
-            int Peek();
-            int Read();
-        }
-
-        private sealed class StringCursor : IJsonCursor
-        {
-            private readonly string text;
-            private int index;
-
-            public StringCursor(string text)
-            {
-                this.text = text ?? string.Empty;
-                index = 0;
-            }
-
-            public long Position
-            {
-                get { return index; }
-            }
-
-            public int Peek()
-            {
-                return index < text.Length ? text[index] : -1;
-            }
-
-            public int Read()
-            {
-                return index < text.Length ? text[index++] : -1;
-            }
-        }
-
-        private sealed class TextReaderCursor : IJsonCursor
-        {
-            private readonly TextReader reader;
-            private int buffered;
-            private bool hasBuffered;
-            private long position;
-
-            public TextReaderCursor(TextReader reader)
-            {
-                this.reader = reader;
-            }
-
-            public long Position
-            {
-                get { return position; }
-            }
-
-            public int Peek()
-            {
-                if (!hasBuffered)
-                {
-                    buffered = reader.Read();
-                    hasBuffered = true;
-                }
-
-                return buffered;
-            }
-
-            public int Read()
-            {
-                int value = Peek();
-                hasBuffered = false;
-                if (value != -1) position++;
-                return value;
-            }
         }
     }
 }

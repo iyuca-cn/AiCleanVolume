@@ -1104,6 +1104,7 @@ namespace AiCleanVolume.Desktop
 
             StorageEntryRow row = e.Record as StorageEntryRow;
             if (row == null || row.Item == null) return;
+            storageContextRow = row;
             SetPathInputFromStorageRow(row);
             if (!row.Item.IsDirectory || row.Item.ChildrenLoaded || !row.Item.HasChildren) return;
             if (currentTreeRequest == null) return;
@@ -1181,13 +1182,13 @@ namespace AiCleanVolume.Desktop
         private void StorageTable_CellClick(object sender, AntdUI.TableClickEventArgs eventArgs)
         {
             if (storageTable != null && storageTable.CanFocus) storageTable.Focus();
-            if (eventArgs.Button != MouseButtons.Right) return;
-
             StorageEntryRow row = eventArgs.Record as StorageEntryRow;
             if (row == null || row.Item == null) return;
 
             storageContextRow = row;
             storageTable.SetSelected(row);
+            if (eventArgs.Button != MouseButtons.Right) return;
+
             deleteStorageMenuItem.Enabled = CanOfferStorageDelete(row);
             deleteStorageMenuItem.Text = "删除" + (row.Item.IsDirectory ? "文件夹" : "文件");
             storageContextMenu.Show(storageTable, new Point(eventArgs.X, eventArgs.Y));
@@ -1209,7 +1210,7 @@ namespace AiCleanVolume.Desktop
 
         private bool TryHandleStorageDeleteShortcut()
         {
-            if (busy || activePageId != PageScan || IsEditingTextInput()) return false;
+            if (busy || activePageId != PageScan) return false;
 
             StorageEntryRow row = ResolveActiveStorageRow();
             if (row == null) return false;
@@ -1235,25 +1236,13 @@ namespace AiCleanVolume.Desktop
             int selectedIndex = storageTable.SelectedIndex;
             StorageEntryRow indexedRow = GetStorageRowAtIndex(selectedIndex);
             if (indexedRow != null) return indexedRow;
-            return selectedIndex > 0 ? GetStorageRowAtIndex(selectedIndex - 1) : null;
-        }
+            if (selectedIndex > 0)
+            {
+                StorageEntryRow indexedRowFallback = GetStorageRowAtIndex(selectedIndex - 1);
+                if (indexedRowFallback != null) return indexedRowFallback;
+            }
 
-        private bool IsEditingTextInput()
-        {
-            return ControlHasFocus(pathInput) ||
-                ControlHasFocus(minSizeInput) ||
-                ControlHasFocus(limitInput) ||
-                ControlHasFocus(endpointInput) ||
-                ControlHasFocus(apiKeyInput) ||
-                ControlHasFocus(modelInput) ||
-                ControlHasFocus(maxSuggestionsInput) ||
-                ControlHasFocus(allowRootsInput) ||
-                ControlHasFocus(logInput);
-        }
-
-        private static bool ControlHasFocus(Control control)
-        {
-            return control != null && control.ContainsFocus;
+            return storageContextRow;
         }
 
         private StorageEntryRow GetStorageRowAtIndex(int index)
@@ -1542,6 +1531,18 @@ namespace AiCleanVolume.Desktop
         {
             if (keyData == Keys.Delete && TryHandleStorageDeleteShortcut()) return true;
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Delete && TryHandleStorageDeleteShortcut())
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                return;
+            }
+
+            base.OnKeyDown(e);
         }
 
         protected override void OnLoad(EventArgs e)
