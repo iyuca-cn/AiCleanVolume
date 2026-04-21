@@ -28,7 +28,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="..\..\third_party\folder-size-ranker-cli\folder-size-ranker-cli.exe">
-      <Link>tools\folder-size-ranker-cli.exe</Link>
+      <Link>folder-size-ranker-cli.exe</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

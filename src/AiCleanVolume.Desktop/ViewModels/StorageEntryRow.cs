@@ -12,14 +12,21 @@ namespace AiCleanVolume.Desktop.ViewModels
         }
 
         public StorageEntryRow(StorageItem item, int depth)
+            : this(item, depth, null)
+        {
+        }
+
+        private StorageEntryRow(StorageItem item, int depth, StorageEntryRow parent)
         {
             Children = new List<object>();
             Item = item;
             Depth = depth;
+            Parent = parent;
             RefreshFromItem();
         }
 
         public StorageItem Item { get; private set; }
+        public StorageEntryRow Parent { get; private set; }
         public List<object> Children { get; private set; }
         public bool IsLoadingChildren { get; set; }
         public int Depth { get; private set; }
@@ -48,7 +55,7 @@ namespace AiCleanVolume.Desktop.ViewModels
             {
                 for (int i = 0; i < Item.Children.Count; i++)
                 {
-                    Children.Add(new StorageEntryRow(Item.Children[i], Depth + 1));
+                    Children.Add(new StorageEntryRow(Item.Children[i], Depth + 1, this));
                 }
                 return;
             }

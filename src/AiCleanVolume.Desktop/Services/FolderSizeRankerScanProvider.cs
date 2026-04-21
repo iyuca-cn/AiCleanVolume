@@ -20,7 +20,7 @@ namespace AiCleanVolume.Desktop.Services
 
         public FolderSizeRankerScanProvider()
         {
-            executablePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "folder-size-ranker-cli.exe");
+            executablePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "folder-size-ranker-cli.exe");
         }
 
         public StorageItem Scan(ScanRequest request)
@@ -86,41 +86,22 @@ namespace AiCleanVolume.Desktop.Services
 
         private StorageItem ScanPartial(ScanRequest request)
         {
-            ProcessStartInfo startInfo = CreateStartInfo(request);
-            using (Process process = Process.Start(startInfo))
+            try
             {
-                StorageItem root = null;
-                Exception parseError = null;
-
-                try
+                ScanSession session = EnsureTreeSession(request);
+                DirectoryNodeIndex entry;
+                if (!session.DirectoryIndex.TryGetValue(NormalizePathKey(request.Location), out entry))
                 {
-                    using (JsonTextReader reader = new JsonTextReader(process.StandardOutput))
-                    {
-                        if (!reader.Read() || reader.TokenType != JsonToken.StartObject)
-                        {
-                            throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
-                        }
-
-                        root = ParseFolder(reader, true, request.LoadDepth);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    parseError = ex;
+                    throw new InvalidOperationException("目录树会话未包含路径：" + request.Location);
                 }
 
-                string error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-                if (process.ExitCode != 0)
-                {
-                    StorageItem fallback = TryScanWithPlatformApi(request, error);
-                    if (fallback != null) return fallback;
-                    throw new InvalidOperationException("folder-size-ranker-cli 执行失败：" + error);
-                }
-
-                if (parseError != null) throw new InvalidOperationException("扫描结果解析失败：" + parseError.Message, parseError);
-                if (root == null) throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
-                return root;
+                return MaterializeDirectory(session, entry, request.LoadDepth, IsSamePath(session.RootPath, request.Location));
+            }
+            catch (CliExecutionException ex)
+            {
+                StorageItem fallback = TryScanWithPlatformApi(request, ex.Message);
+                if (fallback != null) return fallback;
+                throw;
             }
         }
 
@@ -154,44 +135,150 @@ namespace AiCleanVolume.Desktop.Services
 
         private ScanSession BuildTreeSession(ScanRequest request, string templateKey)
         {
-            string tempFilePath = Path.Combine(Path.GetTempPath(), "AiCleanVolume.TreeSession." + Guid.NewGuid().ToString("N") + ".json");
-            try
+            ProcessStartInfo startInfo = CreateStartInfo(request);
+            using (Process process = Process.Start(startInfo))
             {
-                ProcessStartInfo startInfo = CreateStartInfo(request);
-                using (Process process = Process.Start(startInfo))
-                {
-                    using (StreamWriter writer = new StreamWriter(tempFilePath, false, Encoding.Unicode))
-                    {
-                        CopyText(process.StandardOutput, writer);
-                    }
+                DirectoryNodeIndex rootEntry = null;
+                Exception parseError = null;
 
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-                    if (process.ExitCode != 0)
+                try
+                {
+                    using (JsonTextReader reader = new JsonTextReader(process.StandardOutput))
                     {
-                        throw new CliExecutionException(error);
+                        Dictionary<string, DirectoryNodeIndex> directoryIndex = BuildParsedDirectoryIndex(reader, out rootEntry);
+                        if (rootEntry == null)
+                        {
+                            throw new InvalidOperationException("目录树会话根节点为空。");
+                        }
+
+                        ScanSession session = new ScanSession();
+                        session.RootPath = rootEntry.Path;
+                        session.TemplateKey = templateKey;
+                        session.DirectoryIndex = directoryIndex;
+                        return session;
                     }
                 }
-
-                Dictionary<string, DirectoryNodeIndex> directoryIndex = BuildDirectoryIndex(tempFilePath);
-                string key = NormalizePathKey(request.Location);
-                DirectoryNodeIndex rootEntry;
-                if (!directoryIndex.TryGetValue(key, out rootEntry))
+                catch (Exception ex)
                 {
-                    throw new InvalidOperationException("目录树缓存索引未包含根路径：" + request.Location);
+                    parseError = ex;
                 }
 
-                ScanSession session = new ScanSession();
-                session.RootPath = rootEntry.Path;
-                session.TemplateKey = templateKey;
-                session.TempFilePath = tempFilePath;
-                session.DirectoryIndex = directoryIndex;
-                return session;
+                string error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                if (process.ExitCode != 0)
+                {
+                    throw new CliExecutionException(error);
+                }
+
+                if (parseError != null) throw new InvalidOperationException("扫描结果解析失败：" + parseError.Message, parseError);
+                throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
             }
-            catch
+        }
+
+        private static Dictionary<string, DirectoryNodeIndex> BuildParsedDirectoryIndex(JsonTextReader reader, out DirectoryNodeIndex rootEntry)
+        {
+            if (!reader.Read() || reader.TokenType != JsonToken.StartObject)
             {
-                TryDeleteFile(tempFilePath);
-                throw;
+                throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
+            }
+
+            Dictionary<string, DirectoryNodeIndex> index = new Dictionary<string, DirectoryNodeIndex>(StringComparer.OrdinalIgnoreCase);
+            rootEntry = ParseDirectoryIndex(reader, index);
+            return index;
+        }
+
+        private static DirectoryNodeIndex ParseDirectoryIndex(JsonTextReader reader, IDictionary<string, DirectoryNodeIndex> index)
+        {
+            DirectoryNodeIndex entry = new DirectoryNodeIndex();
+            entry.DirectFiles = new List<StorageItem>();
+            entry.DirectDirectoryPaths = new List<string>();
+
+            int directFileCount = 0;
+            int totalFiles = 0;
+            int totalDirs = 0;
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonToken.PropertyName)
+                {
+                    string propertyName = reader.Value == null ? string.Empty : reader.Value.ToString();
+                    if (!reader.Read()) throw new InvalidOperationException("扫描结果不完整。");
+
+                    switch (propertyName)
+                    {
+                        case "path":
+                            entry.Path = reader.Value == null ? string.Empty : reader.Value.ToString();
+                            break;
+                        case "bytes":
+                            entry.Bytes = ReadInt64(reader.Value);
+                            break;
+                        case "files":
+                            ParseIndexedFiles(reader, entry.DirectFiles, ref directFileCount);
+                            break;
+                        case "children":
+                            ParseIndexedChildren(reader, index, entry.DirectDirectoryPaths, ref totalFiles, ref totalDirs);
+                            break;
+                        default:
+                            reader.Skip();
+                            break;
+                    }
+                }
+                else if (reader.TokenType == JsonToken.EndObject)
+                {
+                    break;
+                }
+            }
+
+            entry.DirectFileCount = directFileCount;
+            entry.TotalFileCount = directFileCount + totalFiles;
+            entry.TotalDirectoryCount = totalDirs;
+            index[NormalizePathKey(entry.Path)] = entry;
+            return entry;
+        }
+
+        private static void ParseIndexedFiles(JsonTextReader reader, IList<StorageItem> target, ref int directFileCount)
+        {
+            if (reader.TokenType == JsonToken.Null) return;
+            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果文件数组格式错误。");
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonToken.EndArray) break;
+                if (reader.TokenType != JsonToken.StartObject)
+                {
+                    reader.Skip();
+                    continue;
+                }
+
+                StorageItem file = ParseFile(reader);
+                directFileCount++;
+                target.Add(file);
+            }
+        }
+
+        private static void ParseIndexedChildren(
+            JsonTextReader reader,
+            IDictionary<string, DirectoryNodeIndex> index,
+            IList<string> directDirectoryPaths,
+            ref int totalFiles,
+            ref int totalDirs)
+        {
+            if (reader.TokenType == JsonToken.Null) return;
+            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果目录数组格式错误。");
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonToken.EndArray) break;
+                if (reader.TokenType != JsonToken.StartObject)
+                {
+                    reader.Skip();
+                    continue;
+                }
+
+                DirectoryNodeIndex child = ParseDirectoryIndex(reader, index);
+                directDirectoryPaths.Add(child.Path);
+                totalFiles += child.TotalFileCount;
+                totalDirs += 1 + child.TotalDirectoryCount;
             }
         }
 
@@ -421,8 +508,10 @@ namespace AiCleanVolume.Desktop.Services
 
             if (remainingDepth <= 0) return item;
 
-            IList<StorageItem> files = ParseFilesSlice(session, entry);
-            for (int i = 0; i < files.Count; i++) item.Children.Add(files[i]);
+            for (int i = 0; i < entry.DirectFiles.Count; i++)
+            {
+                item.Children.Add(CloneTree(entry.DirectFiles[i]));
+            }
 
             for (int i = 0; i < entry.DirectDirectoryPaths.Count; i++)
             {
@@ -1189,8 +1278,8 @@ namespace AiCleanVolume.Desktop.Services
 
             public void Dispose()
             {
-                TryDeleteFile(TempFilePath);
                 DirectoryIndex = null;
+                TempFilePath = null;
             }
         }
 
@@ -1205,6 +1294,7 @@ namespace AiCleanVolume.Desktop.Services
             public int FilesLengthChars { get; set; }
             public long StartChar { get; set; }
             public int LengthChars { get; set; }
+            public List<StorageItem> DirectFiles { get; set; }
             public List<string> DirectDirectoryPaths { get; set; }
         }
 

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Windows.Forms;
 using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
@@ -37,7 +36,7 @@ namespace AiCleanVolume.Desktop
 
         private readonly SettingsStore settingsStore;
         private readonly IScanProvider scanProvider;
-        private readonly StorageTreePrefetchCoordinator storageTreePrefetch;
+        private readonly ReusableBackgroundWorker backgroundWorker;
         private readonly CandidatePlanner candidatePlanner;
         private readonly IAiCleanupAdvisor aiAdvisor;
         private readonly IDeletionSandbox deletionSandbox;
@@ -78,6 +77,9 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Table storageTable;
         private AntdUI.Table suggestionTable;
+        private ContextMenuStrip storageContextMenu;
+        private ToolStripMenuItem deleteStorageMenuItem;
+        private StorageEntryRow storageContextRow;
 
         private AntdUI.Switch aiEnabledSwitch;
         private AntdUI.Switch recycleSwitch;
@@ -102,6 +104,7 @@ namespace AiCleanVolume.Desktop
         private readonly string defaultDescription = "选择磁盘或目录，扫描空间占用，生成可确认的安全清理建议";
         private FormWindowState lastWindowState;
         private bool applyingNormalBounds;
+        private bool busy;
         private bool sidebarResizing;
         private int sidebarWidth;
         private int sidebarResizeStartX;
@@ -115,7 +118,7 @@ namespace AiCleanVolume.Desktop
             deletionSandbox = new DeletionSandbox();
             privilegeService = new WindowsPrivilegeService();
             scanProvider = new FolderSizeRankerScanProvider();
-            storageTreePrefetch = new StorageTreePrefetchCoordinator(scanProvider);
+            backgroundWorker = new ReusableBackgroundWorker("AiCleanVolume.UiWorker");
             aiAdvisor = new OpenAiCompatibleAdvisor(new HeuristicCleanupAdvisor());
             deletionService = new RecycleBinDeletionService();
             explorerService = new ShellExplorerService();
@@ -139,6 +142,7 @@ namespace AiCleanVolume.Desktop
             Text = AppDisplayName;
             ClientSize = DefaultClientArea;
             MinimumSize = BaseMinimumWindowSize;
+            KeyPreview = true;
 
             appBar = new AntdUI.PageHeader();
             appBar.Dock = DockStyle.Top;
@@ -559,21 +563,23 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel panel = CreateCardPanel(20);
             panel.Dock = DockStyle.Fill;
 
-            Label heading = CreateSectionTitle("空间树视图");
-
-            Label desc = CreateSectionDescription("双击文件或文件夹即可在资源管理器中定位查看。");
-
             storageTable = new AntdUI.Table();
             storageTable.Dock = DockStyle.Fill;
+            storageTable.TabStop = true;
             ConfigureTableSurface(storageTable);
             storageTable.FixedHeader = true;
             storageTable.ScrollBarAvoidHeader = true;
             storageTable.ExpandChanged += StorageTable_ExpandChanged;
+            storageTable.CellClick += StorageTable_CellClick;
             storageTable.CellDoubleClick += StorageTable_CellDoubleClick;
+            storageTable.KeyDown += StorageTable_KeyDown;
+
+            storageContextMenu = new ContextMenuStrip();
+            deleteStorageMenuItem = new ToolStripMenuItem("删除");
+            deleteStorageMenuItem.Click += DeleteStorageMenuItem_Click;
+            storageContextMenu.Items.Add(deleteStorageMenuItem);
 
             panel.Controls.Add(storageTable);
-            panel.Controls.Add(desc);
-            panel.Controls.Add(heading);
             return panel;
         }
 
@@ -971,7 +977,6 @@ namespace AiCleanVolume.Desktop
             StorageItem result = null;
             DateTime scanStartedAt = DateTime.UtcNow;
             ClearScanProviderCache();
-            storageTreePrefetch.Invalidate();
             currentTreeVersion++;
             UpdateScanProgressState("正在扫描空间占用...", 0.56F, true, AntdUI.TType.None);
 
@@ -985,7 +990,6 @@ namespace AiCleanVolume.Desktop
                 currentTreeRequest = CreateScanRequest(result.Path, 1, request);
                 List<StorageEntryRow> rows = new List<StorageEntryRow> { new StorageEntryRow(result) };
                 storageTable.DataSource = rows;
-                storageTreePrefetch.BeginSession(result, currentTreeRequest, LogBackground);
                 UpdateDriveSummaryForLocation(result.Path);
                 UpdateScanProgressState("扫描完成 " + elapsed.TotalSeconds.ToString("0.00") + " 秒", 1F, false, AntdUI.TType.Success);
                 Log("扫描完成：" + result.Path + "，大小 " + StorageFormatting.FormatBytes(result.Bytes));
@@ -1100,18 +1104,9 @@ namespace AiCleanVolume.Desktop
 
             StorageEntryRow row = e.Record as StorageEntryRow;
             if (row == null || row.Item == null) return;
+            SetPathInputFromStorageRow(row);
             if (!row.Item.IsDirectory || row.Item.ChildrenLoaded || !row.Item.HasChildren) return;
             if (currentTreeRequest == null) return;
-
-            StorageItem cached;
-            if (storageTreePrefetch.TryGetCached(row.Item.Path, out cached))
-            {
-                ApplyScannedNode(row.Item, cached);
-                row.RefreshFromItem();
-                storageTreePrefetch.PredictFrom(row.Item, row.Depth);
-                storageTable.Refresh();
-                return;
-            }
 
             if (row.IsLoadingChildren) return;
 
@@ -1119,7 +1114,7 @@ namespace AiCleanVolume.Desktop
 
             ScanRequest request = CreateScanRequest(row.Item.Path, 1, currentTreeRequest);
             int treeVersion = currentTreeVersion;
-            ThreadPool.QueueUserWorkItem(delegate
+            backgroundWorker.Enqueue(delegate
             {
                 StorageItem loaded = null;
                 Exception error = null;
@@ -1146,10 +1141,8 @@ namespace AiCleanVolume.Desktop
                         return;
                     }
 
-                    storageTreePrefetch.Remember(loaded);
                     ApplyScannedNode(row.Item, loaded);
                     row.RefreshFromItem();
-                    storageTreePrefetch.PredictFrom(row.Item, row.Depth);
                     storageTable.Refresh();
                 });
             });
@@ -1170,6 +1163,329 @@ namespace AiCleanVolume.Desktop
             target.TotalDirectoryCount = source.TotalDirectoryCount;
             target.Children.Clear();
             for (int i = 0; i < source.Children.Count; i++) target.Children.Add(source.Children[i]);
+        }
+
+        private void SetPathInputFromStorageRow(StorageEntryRow row)
+        {
+            if (row == null || row.Item == null || string.IsNullOrWhiteSpace(row.Item.Path) || pathInput == null) return;
+            if (!string.Equals(pathInput.Text, row.Item.Path, StringComparison.OrdinalIgnoreCase))
+            {
+                pathInput.Text = row.Item.Path;
+            }
+            else
+            {
+                UpdateDriveSummaryForLocation(row.Item.Path);
+            }
+        }
+
+        private void StorageTable_CellClick(object sender, AntdUI.TableClickEventArgs eventArgs)
+        {
+            if (storageTable != null && storageTable.CanFocus) storageTable.Focus();
+            if (eventArgs.Button != MouseButtons.Right) return;
+
+            StorageEntryRow row = eventArgs.Record as StorageEntryRow;
+            if (row == null || row.Item == null) return;
+
+            storageContextRow = row;
+            storageTable.SetSelected(row);
+            deleteStorageMenuItem.Enabled = CanOfferStorageDelete(row);
+            deleteStorageMenuItem.Text = "删除" + (row.Item.IsDirectory ? "文件夹" : "文件");
+            storageContextMenu.Show(storageTable, new Point(eventArgs.X, eventArgs.Y));
+        }
+
+        private void DeleteStorageMenuItem_Click(object sender, EventArgs eventArgs)
+        {
+            DeleteStorageRow(storageContextRow);
+        }
+
+        private void StorageTable_KeyDown(object sender, KeyEventArgs eventArgs)
+        {
+            if (eventArgs.KeyCode != Keys.Delete) return;
+            if (!TryHandleStorageDeleteShortcut()) return;
+
+            eventArgs.Handled = true;
+            eventArgs.SuppressKeyPress = true;
+        }
+
+        private bool TryHandleStorageDeleteShortcut()
+        {
+            if (busy || activePageId != PageScan || IsEditingTextInput()) return false;
+
+            StorageEntryRow row = ResolveActiveStorageRow();
+            if (row == null) return false;
+
+            DeleteStorageRow(row);
+            return true;
+        }
+
+        private StorageEntryRow ResolveActiveStorageRow()
+        {
+            if (storageTable == null) return null;
+
+            StorageEntryRow focusedRow = storageTable.FocusedRow as StorageEntryRow;
+            if (focusedRow != null) return focusedRow;
+
+            object[] selectedRows = storageTable.SelectedsReal();
+            for (int index = 0; index < selectedRows.Length; index++)
+            {
+                StorageEntryRow selectedRow = selectedRows[index] as StorageEntryRow;
+                if (selectedRow != null) return selectedRow;
+            }
+
+            int selectedIndex = storageTable.SelectedIndex;
+            StorageEntryRow indexedRow = GetStorageRowAtIndex(selectedIndex);
+            if (indexedRow != null) return indexedRow;
+            return selectedIndex > 0 ? GetStorageRowAtIndex(selectedIndex - 1) : null;
+        }
+
+        private bool IsEditingTextInput()
+        {
+            return ControlHasFocus(pathInput) ||
+                ControlHasFocus(minSizeInput) ||
+                ControlHasFocus(limitInput) ||
+                ControlHasFocus(endpointInput) ||
+                ControlHasFocus(apiKeyInput) ||
+                ControlHasFocus(modelInput) ||
+                ControlHasFocus(maxSuggestionsInput) ||
+                ControlHasFocus(allowRootsInput) ||
+                ControlHasFocus(logInput);
+        }
+
+        private static bool ControlHasFocus(Control control)
+        {
+            return control != null && control.ContainsFocus;
+        }
+
+        private StorageEntryRow GetStorageRowAtIndex(int index)
+        {
+            if (storageTable == null || index < 0) return null;
+
+            AntdUI.Table.IRow tableRow = storageTable.GetRow(index);
+            return tableRow == null ? null : tableRow.record as StorageEntryRow;
+        }
+
+        private bool CanOfferStorageDelete(StorageEntryRow row)
+        {
+            return row != null &&
+                row.Item != null &&
+                !string.IsNullOrWhiteSpace(row.Item.Path) &&
+                !IsProtectedStorageDeleteTarget(row.Item.Path);
+        }
+
+        private void DeleteStorageRow(StorageEntryRow row)
+        {
+            if (!ValidateStorageDeleteTarget(row)) return;
+
+            SaveSettingsFromUi();
+            SandboxEvaluation sandbox = deletionSandbox.Evaluate(row.Item.Path, settings.Sandbox, privilegeService.IsProcessElevated());
+            if (!ConfirmStorageDelete(row, sandbox)) return;
+
+            CleanupSuggestion suggestion = CreateManualStorageSuggestion(row, sandbox);
+            CleanupResult deleteResult = null;
+
+            RunBackground("正在删除文件树项目…", delegate
+            {
+                deleteResult = deletionService.Delete(suggestion, settings.Sandbox.UseRecycleBin);
+            }, delegate
+            {
+                if (deleteResult != null && deleteResult.Success)
+                {
+                    RemoveDeletedStorageRow(row);
+                    Log("文件树删除完成：" + suggestion.Path + "，" + deleteResult.Message);
+                    return;
+                }
+
+                string message = deleteResult == null ? "删除失败。" : deleteResult.Message;
+                Log("文件树删除失败：" + suggestion.Path + "，" + message);
+                MessageBox.Show(this, message, "删除失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            });
+        }
+
+        private bool ValidateStorageDeleteTarget(StorageEntryRow row)
+        {
+            if (row == null || row.Item == null || string.IsNullOrWhiteSpace(row.Item.Path))
+            {
+                MessageBox.Show(this, "删除目标为空。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
+
+            if (IsProtectedStorageDeleteTarget(row.Item.Path))
+            {
+                MessageBox.Show(this, "为避免误删，不支持直接删除当前扫描根或磁盘根目录。请展开到具体子项后再删除。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool ConfirmStorageDelete(StorageEntryRow row, SandboxEvaluation sandbox)
+        {
+            string targetType = row.Item.IsDirectory ? "文件夹" : "文件";
+            string actionText = settings.Sandbox.UseRecycleBin ? "将此" + targetType + "移入回收站" : "永久删除此" + targetType;
+            string message = "确定要" + actionText + "吗？" +
+                Environment.NewLine + Environment.NewLine +
+                row.Item.Path +
+                Environment.NewLine + Environment.NewLine +
+                "大小：" + StorageFormatting.FormatBytes(row.Item.Bytes);
+
+            if (sandbox != null && sandbox.Action == SandboxAction.RequireConfirmation)
+            {
+                message += Environment.NewLine + Environment.NewLine + "注意：该路径未命中沙盒允许位置，请确认确实要删除。";
+            }
+
+            if (!settings.Sandbox.UseRecycleBin)
+            {
+                message += Environment.NewLine + Environment.NewLine + "当前配置为永久删除，无法从回收站恢复。";
+            }
+
+            MessageBoxIcon icon = !settings.Sandbox.UseRecycleBin || (sandbox != null && sandbox.Action == SandboxAction.RequireConfirmation)
+                ? MessageBoxIcon.Warning
+                : MessageBoxIcon.Question;
+            DialogResult confirm = MessageBox.Show(this, message, "确认删除", MessageBoxButtons.OKCancel, icon);
+            return confirm == DialogResult.OK;
+        }
+
+        private static CleanupSuggestion CreateManualStorageSuggestion(StorageEntryRow row, SandboxEvaluation sandbox)
+        {
+            return new CleanupSuggestion
+            {
+                Path = row.Item.Path,
+                Name = row.Item.Name,
+                Bytes = row.Item.Bytes,
+                IsDirectory = row.Item.IsDirectory,
+                Risk = CleanupRisk.High,
+                Score = 1,
+                Selected = true,
+                Reason = "用户从文件树手动删除。",
+                Source = "文件树",
+                Status = CleanupStatus.Pending,
+                Sandbox = sandbox
+            };
+        }
+
+        private void RemoveDeletedStorageRow(StorageEntryRow row)
+        {
+            if (currentRoot == null || row == null || row.Item == null)
+            {
+                storageTable.Refresh();
+                return;
+            }
+
+            List<StorageItem> ancestors = new List<StorageItem>();
+            if (!TryRemoveStorageItem(currentRoot, row.Item, ancestors))
+            {
+                storageTable.Refresh();
+                return;
+            }
+
+            AdjustAncestorStats(ancestors, row.Item);
+            UpdatePathAfterStorageDelete(row, ancestors);
+            RebindStorageTree();
+            currentTreeVersion++;
+        }
+
+        private static bool TryRemoveStorageItem(StorageItem parent, StorageItem target, IList<StorageItem> ancestors)
+        {
+            if (parent == null || target == null || parent.Children == null) return false;
+
+            for (int index = 0; index < parent.Children.Count; index++)
+            {
+                StorageItem child = parent.Children[index];
+                if (ReferenceEquals(child, target) || IsSamePath(child.Path, target.Path))
+                {
+                    parent.Children.RemoveAt(index);
+                    if (parent.ChildrenLoaded && parent.Children.Count == 0) parent.HasChildren = false;
+                    ancestors.Add(parent);
+                    return true;
+                }
+
+                ancestors.Add(parent);
+                if (TryRemoveStorageItem(child, target, ancestors)) return true;
+                ancestors.RemoveAt(ancestors.Count - 1);
+            }
+
+            return false;
+        }
+
+        private static void AdjustAncestorStats(IList<StorageItem> ancestors, StorageItem removedItem)
+        {
+            if (ancestors == null || removedItem == null) return;
+
+            int fileDelta = removedItem.IsDirectory ? Math.Max(0, removedItem.TotalFileCount) : 1;
+            int directoryDelta = removedItem.IsDirectory ? Math.Max(0, removedItem.TotalDirectoryCount) + 1 : 0;
+
+            for (int index = 0; index < ancestors.Count; index++)
+            {
+                StorageItem ancestor = ancestors[index];
+                if (ancestor == null) continue;
+
+                ancestor.Bytes = Math.Max(0L, ancestor.Bytes - Math.Max(0L, removedItem.Bytes));
+                ancestor.TotalFileCount = Math.Max(0, ancestor.TotalFileCount - fileDelta);
+                ancestor.TotalDirectoryCount = Math.Max(0, ancestor.TotalDirectoryCount - directoryDelta);
+            }
+
+            if (!removedItem.IsDirectory && ancestors.Count > 0)
+            {
+                StorageItem directParent = ancestors[ancestors.Count - 1];
+                directParent.DirectFileCount = Math.Max(0, directParent.DirectFileCount - 1);
+            }
+        }
+
+        private void UpdatePathAfterStorageDelete(StorageEntryRow row, IList<StorageItem> ancestors)
+        {
+            if (pathInput == null || row == null || row.Item == null) return;
+            if (!IsSameOrChildPath(pathInput.Text, row.Item.Path)) return;
+
+            StorageItem parent = ancestors != null && ancestors.Count > 0 ? ancestors[ancestors.Count - 1] : currentRoot;
+            if (parent != null && !string.IsNullOrWhiteSpace(parent.Path)) pathInput.Text = parent.Path;
+            else if (currentRoot != null && !string.IsNullOrWhiteSpace(currentRoot.Path)) pathInput.Text = currentRoot.Path;
+        }
+
+        private void RebindStorageTree()
+        {
+            if (storageTable == null || currentRoot == null) return;
+
+            storageTable.DataSource = new List<StorageEntryRow> { new StorageEntryRow(currentRoot) };
+            storageTable.Refresh();
+        }
+
+        private bool IsProtectedStorageDeleteTarget(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return true;
+            if (currentRoot != null && IsSamePath(path, currentRoot.Path)) return true;
+
+            string driveRoot = TryGetDriveRoot(path);
+            return !string.IsNullOrWhiteSpace(driveRoot) && IsSamePath(path, driveRoot);
+        }
+
+        private static bool IsSamePath(string left, string right)
+        {
+            return string.Equals(NormalizePathForComparison(left), NormalizePathForComparison(right), StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSameOrChildPath(string path, string parent)
+        {
+            string normalizedPath = NormalizePathForComparison(path);
+            string normalizedParent = NormalizePathForComparison(parent);
+            if (string.IsNullOrWhiteSpace(normalizedPath) || string.IsNullOrWhiteSpace(normalizedParent)) return false;
+            if (string.Equals(normalizedPath, normalizedParent, StringComparison.OrdinalIgnoreCase)) return true;
+
+            string prefix = normalizedParent.EndsWith(":", StringComparison.Ordinal) ? normalizedParent + "\\" : normalizedParent + "\\";
+            return normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizePathForComparison(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+
+            try
+            {
+                return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
+            catch
+            {
+                return path.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            }
         }
 
         private ScanRequest BuildScanRequest(int loadDepth)
@@ -1222,12 +1538,24 @@ namespace AiCleanVolume.Desktop
             explorerService.OpenPath(row.path, !row.Suggestion.IsDirectory);
         }
 
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Delete && TryHandleStorageDeleteShortcut()) return true;
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
             ApplySidebarWidth(ResolveInitialSidebarWidth());
             ApplyNormalWindowBounds(true);
             lastWindowState = WindowState;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && backgroundWorker != null) backgroundWorker.Dispose();
+            base.Dispose(disposing);
         }
 
         protected override void OnSizeChanged(EventArgs e)
@@ -1338,7 +1666,7 @@ namespace AiCleanVolume.Desktop
         {
             SetBusy(true, caption);
             Exception error = null;
-            ThreadPool.QueueUserWorkItem(delegate
+            backgroundWorker.Enqueue(delegate
             {
                 try
                 {
@@ -1367,6 +1695,7 @@ namespace AiCleanVolume.Desktop
 
         private void SetBusy(bool busy, string description)
         {
+            this.busy = busy;
             UseWaitCursor = busy;
             if (navigationMenu != null) navigationMenu.Enabled = !busy;
             if (settingsNavButton != null) settingsNavButton.Enabled = !busy;
