@@ -30,6 +30,7 @@ namespace AiCleanVolume.Desktop.ViewModels
         public List<object> Children { get; private set; }
         public bool IsLoadingChildren { get; set; }
         public int Depth { get; private set; }
+        public bool AreChildRowsMaterialized { get; private set; }
 
         public void RefreshFromItem()
         {
@@ -49,18 +50,54 @@ namespace AiCleanVolume.Desktop.ViewModels
         {
             Children.Clear();
             IsLoadingChildren = false;
+            AreChildRowsMaterialized = false;
             if (Item == null || !Item.IsDirectory) return;
 
             if (Item.ChildrenLoaded)
             {
-                for (int i = 0; i < Item.Children.Count; i++)
-                {
-                    Children.Add(new StorageEntryRow(Item.Children[i], Depth + 1, this));
-                }
+                MaterializeLoadedChildren();
                 return;
             }
 
             if (Item.HasChildren) Children.Add(ExpandMarker.Instance);
+        }
+
+        public bool MaterializeLoadedChildren()
+        {
+            if (Item == null || !Item.IsDirectory || !Item.ChildrenLoaded) return false;
+            if (AreChildRowsMaterialized) return false;
+
+            Children.Clear();
+            for (int i = 0; i < Item.Children.Count; i++)
+            {
+                Children.Add(new StorageEntryRow(Item.Children[i], Depth + 1, this));
+            }
+
+            AreChildRowsMaterialized = true;
+            return true;
+        }
+
+        public bool ReleaseChildRows()
+        {
+            if (Item == null || !Item.IsDirectory || !Item.ChildrenLoaded || !AreChildRowsMaterialized) return false;
+
+            Children.Clear();
+            AreChildRowsMaterialized = false;
+            if (Item.Children.Count > 0) Children.Add(ExpandMarker.Instance);
+            return true;
+        }
+
+        public bool ReleaseLoadedChildren()
+        {
+            if (Item == null || !Item.IsDirectory || !Item.ChildrenLoaded) return false;
+
+            Children.Clear();
+            AreChildRowsMaterialized = false;
+            IsLoadingChildren = false;
+            Item.Children.Clear();
+            Item.ChildrenLoaded = false;
+            if (Item.HasChildren) Children.Add(ExpandMarker.Instance);
+            return true;
         }
 
         public string name { get; set; }

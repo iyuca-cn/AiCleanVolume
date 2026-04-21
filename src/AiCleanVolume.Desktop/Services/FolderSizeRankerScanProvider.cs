@@ -53,6 +53,8 @@ namespace AiCleanVolume.Desktop.Services
             clone.DirectFileCount = source.DirectFileCount;
             clone.TotalFileCount = source.TotalFileCount;
             clone.TotalDirectoryCount = source.TotalDirectoryCount;
+            clone.SessionIdentity = source.SessionIdentity;
+            clone.SessionNodeId = source.SessionNodeId;
             for (int i = 0; i < source.Children.Count; i++)
             {
                 clone.Children.Add(CloneTree(source.Children[i]));
@@ -87,13 +89,13 @@ namespace AiCleanVolume.Desktop.Services
             try
             {
                 ScanSession session = EnsureTreeSession(request);
-                DirectoryNodeIndex entry;
-                if (!session.DirectoryIndex.TryGetValue(NormalizePathKey(request.Location), out entry))
+                int nodeId = ResolveNodeId(session, request);
+                if (nodeId < 0)
                 {
                     throw new InvalidOperationException("目录树会话未包含路径：" + request.Location);
                 }
 
-                return MaterializeDirectory(session, entry, request.LoadDepth, IsSamePath(session.RootPath, request.Location));
+                return MaterializeDirectory(session, nodeId, request.LoadDepth, IsSamePath(session.RootPath, request.Location));
             }
             catch (CliExecutionException ex)
             {
@@ -105,12 +107,11 @@ namespace AiCleanVolume.Desktop.Services
 
         private ScanSession EnsureTreeSession(ScanRequest request)
         {
-            string locationKey = NormalizePathKey(request.Location);
             string templateKey = BuildTreeTemplateKey(request);
 
             lock (syncRoot)
             {
-                if (IsCompatibleTreeSession(currentTreeSession, templateKey, locationKey))
+                if (IsCompatibleTreeSession(currentTreeSession, templateKey, request))
                 {
                     return currentTreeSession;
                 }
@@ -133,27 +134,25 @@ namespace AiCleanVolume.Desktop.Services
 
         private ScanSession BuildTreeSession(ScanRequest request, string templateKey)
         {
+            string tempFilePath = Path.Combine(Path.GetTempPath(), "AiCleanVolume.TreeSession." + Guid.NewGuid().ToString("N") + ".bin");
             ProcessStartInfo startInfo = CreateStartInfo(request);
             using (Process process = Process.Start(startInfo))
             {
-                DirectoryNodeIndex rootEntry = null;
+                DirectoryNodeSummary rootEntry = null;
                 Exception parseError = null;
+                List<long> recordOffsets = new List<long>();
 
                 try
                 {
+                    using (FileStream stream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.Read))
+                    using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8))
                     using (JsonTextReader reader = new JsonTextReader(process.StandardOutput))
                     {
-                        Dictionary<string, DirectoryNodeIndex> directoryIndex = BuildParsedDirectoryIndex(reader, out rootEntry);
+                        rootEntry = BuildPersistedDirectoryIndex(reader, writer, recordOffsets);
                         if (rootEntry == null)
                         {
                             throw new InvalidOperationException("目录树会话根节点为空。");
                         }
-
-                        ScanSession session = new ScanSession();
-                        session.RootPath = rootEntry.Path;
-                        session.TemplateKey = templateKey;
-                        session.DirectoryIndex = directoryIndex;
-                        return session;
                     }
                 }
                 catch (Exception ex)
@@ -165,31 +164,49 @@ namespace AiCleanVolume.Desktop.Services
                 process.WaitForExit();
                 if (process.ExitCode != 0)
                 {
+                    TryDeleteFile(tempFilePath);
                     throw new CliExecutionException(error);
                 }
 
-                if (parseError != null) throw new InvalidOperationException("扫描结果解析失败：" + parseError.Message, parseError);
-                throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
+                if (parseError != null)
+                {
+                    TryDeleteFile(tempFilePath);
+                    throw new InvalidOperationException("扫描结果解析失败：" + parseError.Message, parseError);
+                }
+
+                if (rootEntry == null)
+                {
+                    TryDeleteFile(tempFilePath);
+                    throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
+                }
+
+                ScanSession session = new ScanSession();
+                session.RootPath = rootEntry.Path;
+                session.TemplateKey = templateKey;
+                session.SessionIdentity = Guid.NewGuid().ToString("N");
+                session.DataFilePath = tempFilePath;
+                session.RootNodeId = rootEntry.NodeId;
+                session.RecordOffsets = recordOffsets;
+                return session;
             }
         }
 
-        private static Dictionary<string, DirectoryNodeIndex> BuildParsedDirectoryIndex(JsonTextReader reader, out DirectoryNodeIndex rootEntry)
+        private static DirectoryNodeSummary BuildPersistedDirectoryIndex(JsonTextReader reader, BinaryWriter writer, IList<long> recordOffsets)
         {
             if (!reader.Read() || reader.TokenType != JsonToken.StartObject)
             {
                 throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
             }
 
-            Dictionary<string, DirectoryNodeIndex> index = new Dictionary<string, DirectoryNodeIndex>(StringComparer.OrdinalIgnoreCase);
-            rootEntry = ParseDirectoryIndex(reader, index);
-            return index;
+            return PersistDirectory(reader, writer, recordOffsets);
         }
 
-        private static DirectoryNodeIndex ParseDirectoryIndex(JsonTextReader reader, IDictionary<string, DirectoryNodeIndex> index)
+        private static DirectoryNodeSummary PersistDirectory(JsonTextReader reader, BinaryWriter writer, IList<long> recordOffsets)
         {
-            DirectoryNodeIndex entry = new DirectoryNodeIndex();
-            entry.DirectFiles = new List<FileNodeState>();
-            entry.DirectDirectoryPaths = new List<string>();
+            List<FileNodeState> directFiles = new List<FileNodeState>();
+            List<DirectoryNodeSummary> directChildren = new List<DirectoryNodeSummary>();
+            string path = string.Empty;
+            long bytes = 0;
 
             int directFileCount = 0;
             int totalFiles = 0;
@@ -205,16 +222,16 @@ namespace AiCleanVolume.Desktop.Services
                     switch (propertyName)
                     {
                         case "path":
-                            entry.Path = reader.Value == null ? string.Empty : reader.Value.ToString();
+                            path = reader.Value == null ? string.Empty : reader.Value.ToString();
                             break;
                         case "bytes":
-                            entry.Bytes = ReadInt64(reader.Value);
+                            bytes = ReadInt64(reader.Value);
                             break;
                         case "files":
-                            ParseIndexedFiles(reader, entry.DirectFiles, ref directFileCount);
+                            ParsePersistedFiles(reader, directFiles, ref directFileCount);
                             break;
                         case "children":
-                            ParseIndexedChildren(reader, index, entry.DirectDirectoryPaths, ref totalFiles, ref totalDirs);
+                            ParsePersistedChildren(reader, writer, recordOffsets, directChildren, ref totalFiles, ref totalDirs);
                             break;
                         default:
                             reader.Skip();
@@ -227,14 +244,20 @@ namespace AiCleanVolume.Desktop.Services
                 }
             }
 
+            DirectoryNodeSummary entry = new DirectoryNodeSummary();
+            entry.NodeId = recordOffsets.Count;
+            entry.Path = path;
+            entry.Bytes = bytes;
             entry.DirectFileCount = directFileCount;
             entry.TotalFileCount = directFileCount + totalFiles;
             entry.TotalDirectoryCount = totalDirs;
-            index[NormalizePathKey(entry.Path)] = entry;
+
+            recordOffsets.Add(writer.BaseStream.Position);
+            WriteDirectoryRecord(writer, entry, directFiles, directChildren);
             return entry;
         }
 
-        private static void ParseIndexedFiles(JsonTextReader reader, IList<FileNodeState> target, ref int directFileCount)
+        private static void ParsePersistedFiles(JsonTextReader reader, IList<FileNodeState> target, ref int directFileCount)
         {
             if (reader.TokenType == JsonToken.Null) return;
             if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果文件数组格式错误。");
@@ -254,10 +277,11 @@ namespace AiCleanVolume.Desktop.Services
             }
         }
 
-        private static void ParseIndexedChildren(
+        private static void ParsePersistedChildren(
             JsonTextReader reader,
-            IDictionary<string, DirectoryNodeIndex> index,
-            IList<string> directDirectoryPaths,
+            BinaryWriter writer,
+            IList<long> recordOffsets,
+            IList<DirectoryNodeSummary> directChildren,
             ref int totalFiles,
             ref int totalDirs)
         {
@@ -273,41 +297,149 @@ namespace AiCleanVolume.Desktop.Services
                     continue;
                 }
 
-                DirectoryNodeIndex child = ParseDirectoryIndex(reader, index);
-                directDirectoryPaths.Add(child.Path);
+                DirectoryNodeSummary child = PersistDirectory(reader, writer, recordOffsets);
+                directChildren.Add(child);
                 totalFiles += child.TotalFileCount;
                 totalDirs += 1 + child.TotalDirectoryCount;
             }
         }
 
-        private static StorageItem MaterializeDirectory(ScanSession session, DirectoryNodeIndex entry, int remainingDepth, bool isRoot)
+        private static void WriteDirectoryRecord(BinaryWriter writer, DirectoryNodeSummary entry, IList<FileNodeState> directFiles, IList<DirectoryNodeSummary> directChildren)
         {
-            StorageItem item = new StorageItem();
-            item.Path = entry.Path;
-            item.Name = isRoot ? entry.Path : StorageFormatting.GetDisplayName(entry.Path, true);
-            item.Bytes = entry.Bytes;
-            item.IsDirectory = true;
-            item.HasChildren = entry.DirectFileCount > 0 || entry.TotalDirectoryCount > 0;
-            item.DirectFileCount = entry.DirectFileCount;
-            item.TotalFileCount = entry.TotalFileCount;
-            item.TotalDirectoryCount = entry.TotalDirectoryCount;
-            item.ChildrenLoaded = remainingDepth > 0;
+            writer.Write(entry.Path ?? string.Empty);
+            writer.Write(entry.Bytes);
+            writer.Write(entry.DirectFileCount);
+            writer.Write(entry.TotalFileCount);
+            writer.Write(entry.TotalDirectoryCount);
 
+            writer.Write(directFiles.Count);
+            for (int i = 0; i < directFiles.Count; i++)
+            {
+                writer.Write(directFiles[i].Path ?? string.Empty);
+                writer.Write(directFiles[i].Bytes);
+            }
+
+            writer.Write(directChildren.Count);
+            for (int i = 0; i < directChildren.Count; i++)
+            {
+                DirectoryNodeSummary child = directChildren[i];
+                writer.Write(child.NodeId);
+                writer.Write(child.Path ?? string.Empty);
+                writer.Write(child.Bytes);
+                writer.Write(child.DirectFileCount);
+                writer.Write(child.TotalFileCount);
+                writer.Write(child.TotalDirectoryCount);
+            }
+        }
+
+        private static int ResolveNodeId(ScanSession session, ScanRequest request)
+        {
+            if (session == null || request == null) return -1;
+
+            if (!string.IsNullOrWhiteSpace(request.SessionIdentity) &&
+                string.Equals(session.SessionIdentity, request.SessionIdentity, StringComparison.Ordinal) &&
+                request.SessionNodeId >= 0 &&
+                session.RecordOffsets != null &&
+                request.SessionNodeId < session.RecordOffsets.Count)
+            {
+                return request.SessionNodeId;
+            }
+
+            if (IsSamePath(session.RootPath, request.Location)) return session.RootNodeId;
+            return -1;
+        }
+
+        private static StorageItem MaterializeDirectory(ScanSession session, int nodeId, int remainingDepth, bool isRoot)
+        {
+            PersistedDirectoryRecord record = ReadDirectoryRecord(session, nodeId);
+            StorageItem item = CreateStorageDirectoryItem(session, record.Summary, remainingDepth > 0, isRoot);
             if (remainingDepth <= 0) return item;
 
-            for (int i = 0; i < entry.DirectFiles.Count; i++)
+            for (int i = 0; i < record.DirectFiles.Count; i++)
             {
-                item.Children.Add(CreateStorageFileItem(entry.DirectFiles[i]));
+                item.Children.Add(CreateStorageFileItem(record.DirectFiles[i]));
             }
 
-            for (int i = 0; i < entry.DirectDirectoryPaths.Count; i++)
+            for (int i = 0; i < record.DirectChildren.Count; i++)
             {
-                string childPath = entry.DirectDirectoryPaths[i];
-                DirectoryNodeIndex childEntry;
-                if (!session.DirectoryIndex.TryGetValue(NormalizePathKey(childPath), out childEntry)) continue;
-                item.Children.Add(MaterializeDirectory(session, childEntry, remainingDepth - 1, false));
+                DirectoryNodeSummary child = record.DirectChildren[i];
+                if (remainingDepth == 1)
+                {
+                    item.Children.Add(CreateStorageDirectoryItem(session, child, false, false));
+                    continue;
+                }
+
+                item.Children.Add(MaterializeDirectory(session, child.NodeId, remainingDepth - 1, false));
             }
 
+            return item;
+        }
+
+        private static PersistedDirectoryRecord ReadDirectoryRecord(ScanSession session, int nodeId)
+        {
+            if (session == null || session.RecordOffsets == null || nodeId < 0 || nodeId >= session.RecordOffsets.Count)
+            {
+                throw new InvalidOperationException("目录树会话节点无效。");
+            }
+
+            PersistedDirectoryRecord record = new PersistedDirectoryRecord();
+            DirectoryNodeSummary summary = new DirectoryNodeSummary();
+            summary.NodeId = nodeId;
+
+            using (FileStream stream = new FileStream(session.DataFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (BinaryReader reader = new BinaryReader(stream, Encoding.UTF8))
+            {
+                stream.Seek(session.RecordOffsets[nodeId], SeekOrigin.Begin);
+
+                summary.Path = reader.ReadString();
+                summary.Bytes = reader.ReadInt64();
+                summary.DirectFileCount = reader.ReadInt32();
+                summary.TotalFileCount = reader.ReadInt32();
+                summary.TotalDirectoryCount = reader.ReadInt32();
+
+                int fileCount = reader.ReadInt32();
+                record.DirectFiles = new List<FileNodeState>(fileCount);
+                for (int i = 0; i < fileCount; i++)
+                {
+                    FileNodeState file = new FileNodeState();
+                    file.Path = reader.ReadString();
+                    file.Bytes = reader.ReadInt64();
+                    record.DirectFiles.Add(file);
+                }
+
+                int childCount = reader.ReadInt32();
+                record.DirectChildren = new List<DirectoryNodeSummary>(childCount);
+                for (int i = 0; i < childCount; i++)
+                {
+                    DirectoryNodeSummary child = new DirectoryNodeSummary();
+                    child.NodeId = reader.ReadInt32();
+                    child.Path = reader.ReadString();
+                    child.Bytes = reader.ReadInt64();
+                    child.DirectFileCount = reader.ReadInt32();
+                    child.TotalFileCount = reader.ReadInt32();
+                    child.TotalDirectoryCount = reader.ReadInt32();
+                    record.DirectChildren.Add(child);
+                }
+            }
+
+            record.Summary = summary;
+            return record;
+        }
+
+        private static StorageItem CreateStorageDirectoryItem(ScanSession session, DirectoryNodeSummary summary, bool childrenLoaded, bool isRoot)
+        {
+            StorageItem item = new StorageItem();
+            item.Path = summary.Path;
+            item.Name = isRoot ? summary.Path : StorageFormatting.GetDisplayName(summary.Path, true);
+            item.Bytes = summary.Bytes;
+            item.IsDirectory = true;
+            item.HasChildren = summary.DirectFileCount > 0 || summary.TotalDirectoryCount > 0;
+            item.ChildrenLoaded = childrenLoaded;
+            item.DirectFileCount = summary.DirectFileCount;
+            item.TotalFileCount = summary.TotalFileCount;
+            item.TotalDirectoryCount = summary.TotalDirectoryCount;
+            item.SessionIdentity = session == null ? null : session.SessionIdentity;
+            item.SessionNodeId = summary.NodeId;
             return item;
         }
 
@@ -433,11 +565,16 @@ namespace AiCleanVolume.Desktop.Services
                 request.PerLevelLimit.ToString());
         }
 
-        private static bool IsCompatibleTreeSession(ScanSession session, string templateKey, string locationKey)
+        private static bool IsCompatibleTreeSession(ScanSession session, string templateKey, ScanRequest request)
         {
             if (session == null) return false;
             if (!string.Equals(session.TemplateKey, templateKey, StringComparison.Ordinal)) return false;
-            return session.DirectoryIndex.ContainsKey(locationKey);
+            if (!string.IsNullOrWhiteSpace(request.SessionIdentity))
+            {
+                return string.Equals(session.SessionIdentity, request.SessionIdentity, StringComparison.Ordinal);
+            }
+
+            return IsSamePath(session.RootPath, request.Location);
         }
 
         private void ClearCurrentTreeSessionNoLock()
@@ -445,6 +582,18 @@ namespace AiCleanVolume.Desktop.Services
             if (currentTreeSession == null) return;
             currentTreeSession.Dispose();
             currentTreeSession = null;
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return;
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+            catch
+            {
+            }
         }
 
         private static StorageItem TryScanWithPlatformApi(ScanRequest request, string cliError)
@@ -560,7 +709,7 @@ namespace AiCleanVolume.Desktop.Services
                         default:
                             reader.Skip();
                             break;
-                        }
+                    }
                 }
                 else if (reader.TokenType == JsonToken.EndObject)
                 {
@@ -604,11 +753,6 @@ namespace AiCleanVolume.Desktop.Services
         private static int CompareByBytesDescending(StorageItem left, StorageItem right)
         {
             return right.Bytes.CompareTo(left.Bytes);
-        }
-
-        private static void AddAll(IList<StorageItem> target, IList<StorageItem> source)
-        {
-            for (int i = 0; i < source.Count; i++) target.Add(source[i]);
         }
 
         private static void AddLimited(IList<StorageItem> target, IList<StorageItem> source, int limit)
@@ -673,23 +817,34 @@ namespace AiCleanVolume.Desktop.Services
         {
             public string RootPath { get; set; }
             public string TemplateKey { get; set; }
-            public Dictionary<string, DirectoryNodeIndex> DirectoryIndex { get; set; }
+            public string SessionIdentity { get; set; }
+            public string DataFilePath { get; set; }
+            public int RootNodeId { get; set; }
+            public IList<long> RecordOffsets { get; set; }
 
             public void Dispose()
             {
-                DirectoryIndex = null;
+                RecordOffsets = null;
+                TryDeleteFile(DataFilePath);
+                DataFilePath = null;
             }
         }
 
-        private sealed class DirectoryNodeIndex
+        private sealed class PersistedDirectoryRecord
         {
+            public DirectoryNodeSummary Summary { get; set; }
+            public List<FileNodeState> DirectFiles { get; set; }
+            public List<DirectoryNodeSummary> DirectChildren { get; set; }
+        }
+
+        private sealed class DirectoryNodeSummary
+        {
+            public int NodeId { get; set; }
             public string Path { get; set; }
             public long Bytes { get; set; }
             public int DirectFileCount { get; set; }
             public int TotalFileCount { get; set; }
             public int TotalDirectoryCount { get; set; }
-            public List<FileNodeState> DirectFiles { get; set; }
-            public List<string> DirectDirectoryPaths { get; set; }
         }
 
         private struct FileNodeState

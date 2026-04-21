@@ -39,6 +39,7 @@ namespace AiCleanVolume.Core.Models
             MinSizeBytes = -1;
             PerLevelLimit = -1;
             LoadDepth = -1;
+            SessionNodeId = -1;
         }
 
         public string Location { get; set; }
@@ -46,6 +47,8 @@ namespace AiCleanVolume.Core.Models
         public long MinSizeBytes { get; set; }
         public int PerLevelLimit { get; set; }
         public int LoadDepth { get; set; }
+        public string SessionIdentity { get; set; }
+        public int SessionNodeId { get; set; }
     }
 
     public sealed class StorageItem
@@ -54,6 +57,7 @@ namespace AiCleanVolume.Core.Models
         {
             Children = new List<StorageItem>();
             ChildrenLoaded = true;
+            SessionNodeId = -1;
         }
 
         public string Path { get; set; }
@@ -66,6 +70,8 @@ namespace AiCleanVolume.Core.Models
         public int TotalFileCount { get; set; }
         public int TotalDirectoryCount { get; set; }
         public IList<StorageItem> Children { get; private set; }
+        public string SessionIdentity { get; set; }
+        public int SessionNodeId { get; set; }
     }
 
     public sealed class CleanupCandidate

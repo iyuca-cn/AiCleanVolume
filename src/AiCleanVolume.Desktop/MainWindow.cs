@@ -988,6 +988,8 @@ namespace AiCleanVolume.Desktop
                 TimeSpan elapsed = DateTime.UtcNow - scanStartedAt;
                 currentRoot = result;
                 currentTreeRequest = CreateScanRequest(result.Path, 1, request);
+                currentTreeRequest.SessionIdentity = result.SessionIdentity;
+                currentTreeRequest.SessionNodeId = result.SessionNodeId;
                 List<StorageEntryRow> rows = new List<StorageEntryRow> { new StorageEntryRow(result) };
                 storageTable.DataSource = rows;
                 UpdateDriveSummaryForLocation(result.Path);
@@ -1100,13 +1102,26 @@ namespace AiCleanVolume.Desktop
 
         private void StorageTable_ExpandChanged(object sender, AntdUI.TableExpandEventArgs e)
         {
-            if (!e.Expand) return;
-
             StorageEntryRow row = e.Record as StorageEntryRow;
             if (row == null || row.Item == null) return;
             storageContextRow = row;
             SetPathInputFromStorageRow(row);
-            if (!row.Item.IsDirectory || row.Item.ChildrenLoaded || !row.Item.HasChildren) return;
+
+            if (!e.Expand)
+            {
+                bool released = CanReloadStorageNode(row.Item) ? row.ReleaseLoadedChildren() : row.ReleaseChildRows();
+                if (released) storageTable.Refresh();
+                return;
+            }
+
+            if (!row.Item.IsDirectory || !row.Item.HasChildren) return;
+
+            if (row.Item.ChildrenLoaded)
+            {
+                if (row.MaterializeLoadedChildren()) storageTable.Refresh();
+                return;
+            }
+
             if (currentTreeRequest == null) return;
 
             if (row.IsLoadingChildren) return;
@@ -1114,6 +1129,8 @@ namespace AiCleanVolume.Desktop
             row.IsLoadingChildren = true;
 
             ScanRequest request = CreateScanRequest(row.Item.Path, 1, currentTreeRequest);
+            request.SessionIdentity = row.Item.SessionIdentity;
+            request.SessionNodeId = row.Item.SessionNodeId;
             int treeVersion = currentTreeVersion;
             backgroundWorker.Enqueue(delegate
             {
@@ -1162,6 +1179,8 @@ namespace AiCleanVolume.Desktop
             target.DirectFileCount = source.DirectFileCount;
             target.TotalFileCount = source.TotalFileCount;
             target.TotalDirectoryCount = source.TotalDirectoryCount;
+            target.SessionIdentity = source.SessionIdentity;
+            target.SessionNodeId = source.SessionNodeId;
             target.Children.Clear();
             for (int i = 0; i < source.Children.Count; i++) target.Children.Add(source.Children[i]);
         }
@@ -1369,6 +1388,7 @@ namespace AiCleanVolume.Desktop
 
             AdjustAncestorStats(ancestors, row.Item);
             UpdatePathAfterStorageDelete(row, ancestors);
+            InvalidateStorageTreeSession();
             RebindStorageTree();
             currentTreeVersion++;
         }
@@ -1503,7 +1523,24 @@ namespace AiCleanVolume.Desktop
             request.MinSizeBytes = template.MinSizeBytes;
             request.PerLevelLimit = template.PerLevelLimit;
             request.LoadDepth = loadDepth;
+            request.SessionIdentity = template.SessionIdentity;
+            request.SessionNodeId = template.SessionNodeId;
             return request;
+        }
+
+        private static bool CanReloadStorageNode(StorageItem item)
+        {
+            return item != null &&
+                !string.IsNullOrWhiteSpace(item.SessionIdentity) &&
+                item.SessionNodeId >= 0;
+        }
+
+        private void InvalidateStorageTreeSession()
+        {
+            ClearScanProviderCache();
+            if (currentTreeRequest == null) return;
+            currentTreeRequest.SessionIdentity = null;
+            currentTreeRequest.SessionNodeId = -1;
         }
 
         private void StorageTable_CellDoubleClick(object sender, AntdUI.TableClickEventArgs e)

@@ -221,6 +221,8 @@ namespace AiCleanVolume.Desktop.Services
             request.MinSizeBytes = template.MinSizeBytes;
             request.PerLevelLimit = template.PerLevelLimit;
             request.LoadDepth = template.LoadDepth;
+            request.SessionIdentity = template.SessionIdentity;
+            request.SessionNodeId = template.SessionNodeId;
             return request;
         }
 
