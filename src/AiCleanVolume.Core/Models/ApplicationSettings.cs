@@ -34,13 +34,16 @@ namespace AiCleanVolume.Core.Models
 
     public sealed class AiSettings
     {
+        private const string LegacySystemPrompt = "你是 Windows C 盘清理助手。只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON。";
+        public const string DefaultSystemPrompt = "你是 Windows C 盘清理助手。请你只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。";
+
         public AiSettings()
         {
             Enabled = false;
             Endpoint = "https://api.openai.com";
             Model = "gpt-4o-mini";
             MaxSuggestions = 30;
-            SystemPrompt = "你是 Windows C 盘清理助手。只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON。";
+            SystemPrompt = DefaultSystemPrompt;
         }
 
         public bool Enabled { get; set; }
@@ -55,9 +58,9 @@ namespace AiCleanVolume.Core.Models
             if (string.IsNullOrWhiteSpace(Endpoint)) Endpoint = "https://api.openai.com";
             if (string.IsNullOrWhiteSpace(Model)) Model = "gpt-4o-mini";
             if (MaxSuggestions <= 0) MaxSuggestions = 30;
-            if (string.IsNullOrWhiteSpace(SystemPrompt))
+            if (string.IsNullOrWhiteSpace(SystemPrompt) || string.Equals(SystemPrompt, LegacySystemPrompt, StringComparison.Ordinal))
             {
-                SystemPrompt = "你是 Windows C 盘清理助手。只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON。";
+                SystemPrompt = DefaultSystemPrompt;
             }
         }
     }

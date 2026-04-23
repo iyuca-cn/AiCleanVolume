@@ -13,7 +13,8 @@ namespace AiCleanVolume.Desktop.ViewModels
             path = suggestion.Path;
             size = StorageFormatting.FormatBytes(suggestion.Bytes);
             source = suggestion.Source;
-            reason = suggestion.Reason;
+            details = BuildDetailsText(suggestion);
+            category = CreateCategoryBadge(suggestion);
             risk = CreateRiskBadge(suggestion.Risk);
             sandbox = CreateSandboxBadge(suggestion.Sandbox);
             status = CreateStatusBadge(suggestion.Status);
@@ -39,7 +40,8 @@ namespace AiCleanVolume.Desktop.ViewModels
         public string path { get; set; }
         public string size { get; set; }
         public string source { get; set; }
-        public string reason { get; set; }
+        public string details { get; set; }
+        public AntdUI.CellBadge category { get; set; }
         public AntdUI.CellBadge risk { get; set; }
         public AntdUI.CellBadge sandbox { get; set; }
         public AntdUI.CellBadge status { get; set; }
@@ -58,10 +60,56 @@ namespace AiCleanVolume.Desktop.ViewModels
             status = CreateStatusBadge(newStatus);
             if (!string.IsNullOrWhiteSpace(message))
             {
-                reason = Suggestion.Reason + "；" + message;
-                OnPropertyChanged("reason");
+                details = BuildDetailsText(Suggestion);
+                OnPropertyChanged("details");
             }
             OnPropertyChanged("status");
+        }
+
+        private static string BuildDetailsText(CleanupSuggestion suggestion)
+        {
+            if (suggestion == null) return string.Empty;
+
+            string message = suggestion.Reason;
+            if (!string.IsNullOrWhiteSpace(suggestion.ErrorMessage)) message = string.IsNullOrWhiteSpace(message) ? suggestion.ErrorMessage : message + "；" + suggestion.ErrorMessage;
+            if (string.IsNullOrWhiteSpace(message)) return suggestion.Path;
+            return suggestion.Path + "\r\n" + message;
+        }
+
+        private static AntdUI.CellBadge CreateCategoryBadge(CleanupSuggestion suggestion)
+        {
+            string lower = ((suggestion == null ? null : suggestion.Path) ?? string.Empty).ToLowerInvariant();
+            if (lower.Contains("\\cache") || lower.Contains("\\caches") || lower.Contains("\\webcache") || lower.Contains("\\inetcache"))
+            {
+                return new AntdUI.CellBadge(AntdUI.TState.Processing, "缓存");
+            }
+
+            if (lower.Contains("\\temp") || lower.Contains("\\tmp"))
+            {
+                return new AntdUI.CellBadge(AntdUI.TState.Primary, "临时文件");
+            }
+
+            if (lower.Contains("\\log") || lower.EndsWith(".log") || lower.EndsWith(".etl"))
+            {
+                return new AntdUI.CellBadge(AntdUI.TState.Warn, "日志");
+            }
+
+            if (lower.Contains("\\dump") || lower.Contains("\\crash") || lower.EndsWith(".dmp"))
+            {
+                return new AntdUI.CellBadge(AntdUI.TState.Error, "转储");
+            }
+
+            if (lower.Contains("\\softwaredistribution") || lower.Contains("\\installer") || lower.Contains("\\setup"))
+            {
+                return new AntdUI.CellBadge(AntdUI.TState.Success, "安装残留");
+            }
+
+            if (lower.Contains("\\downloads\\") || lower.Contains("\\desktop\\"))
+            {
+                return new AntdUI.CellBadge(AntdUI.TState.Warn, "需人工确认");
+            }
+
+            return new AntdUI.CellBadge(AntdUI.TState.Default, "常规项");
         }
 
         private static AntdUI.CellBadge CreateRiskBadge(CleanupRisk risk)

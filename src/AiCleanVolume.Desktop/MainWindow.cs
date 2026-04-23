@@ -34,26 +34,34 @@ namespace AiCleanVolume.Desktop
         private const int SidebarMaxWidth = 320;
         private const int SidebarRailWidth = 10;
         private const string CustomAiPromptPresetKey = "__custom__";
+        private const string CustomAiProviderPresetKey = "__custom__";
+        private const string DefaultAiSystemPrompt = "你是 Windows C 盘清理助手。请你只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。";
         private static readonly AiPromptPreset[] AiPromptPresets =
         {
-            new AiPromptPreset("standard", "标准清理", "你是 Windows 磁盘清理助手。只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON。"),
-            new AiPromptPreset("conservative", "保守清理", "你是谨慎的 Windows 磁盘清理助手。只选择明确可再生成、低风险且常见的缓存、临时文件、浏览器缓存、下载缓存和崩溃转储。任何不确定、用户生成、业务数据、源码、项目文件、应用主体和系统核心路径都不要建议删除。输出严格 JSON。"),
-            new AiPromptPreset("cache_aggressive", "激进缓存", "你是偏激进但仍安全的 Windows 缓存清理助手。优先建议大型可再生成缓存、构建缓存、包管理缓存、浏览器缓存、临时下载和安装残留。不要选择用户文档、媒体、源码、应用程序主体、数据库或系统核心文件。输出严格 JSON。"),
-            new AiPromptPreset("developer", "开发环境", "你是面向开发者电脑的 Windows 清理助手。优先识别可重建的 node_modules 缓存、NuGet 缓存、Gradle 缓存、Maven 缓存、pip 缓存、npm/yarn/pnpm 缓存、构建输出、测试临时文件和 IDE 缓存。不要删除源码、配置、数据库、密钥、用户文档或项目根目录。输出严格 JSON。"),
-            new AiPromptPreset("system_temp", "仅系统临时", "你是 Windows 系统临时文件清理助手。只建议删除 Windows Temp、用户 Temp、INetCache、SoftwareDistribution 下载缓存、崩溃转储和明确的临时文件。不要建议删除 Program Files、Windows 核心目录、用户文档、桌面、下载目录中的个人文件。输出严格 JSON。"),
-            new AiPromptPreset("logs_first", "日志优先", "你是 Windows 日志清理助手。优先选择大型日志、轮转日志、旧崩溃转储、诊断报告和应用运行临时日志。不要删除当前应用主体、配置、数据库、用户文档或无法判断用途的文件。输出严格 JSON。"),
-            new AiPromptPreset("installer_leftovers", "安装残留", "你是 Windows 安装残留清理助手。优先识别安装包缓存、安装临时目录、升级残留、解压残留和失败安装产生的临时文件。不要删除已安装程序主体、用户数据、许可证文件或系统核心组件。输出严格 JSON。"),
-            new AiPromptPreset("browser_cache", "浏览器缓存", "你是浏览器缓存清理助手。优先选择浏览器缓存、GPUCache、Code Cache、Service Worker Cache、崩溃报告和临时网络缓存。不要删除书签、历史数据库、扩展数据、密码、用户配置或下载的个人文件。输出严格 JSON。"),
-            new AiPromptPreset("media_safe", "媒体保护", "你是保护用户媒体资料的 Windows 清理助手。可以建议删除临时文件、缓存、日志和崩溃转储，但不要删除图片、视频、音频、文档、压缩包、设计素材、工程文件和下载目录中无法确定用途的文件。输出严格 JSON。"),
-            new AiPromptPreset("large_files_review", "大文件审查", "你是大文件审查助手。只从候选清单中挑选明显可再生成或无业务价值的大型缓存、临时文件、日志和残留文件；对下载、文档、桌面、项目目录、虚拟机镜像、数据库和媒体文件保持高风险并避免建议删除。输出严格 JSON。"),
-            new AiPromptPreset("recycle_bin_safe", "回收站友好", "你是回收站删除模式下的 Windows 清理助手。优先选择放入回收站后不影响系统运行的缓存、日志、临时文件和安装残留。不要依赖回收站作为安全理由去选择不确定或用户重要数据。输出严格 JSON。"),
-            new AiPromptPreset("enterprise_safe", "办公电脑", "你是办公电脑清理助手。只建议删除缓存、临时文件、日志、崩溃转储和安装残留。不要删除企业应用数据、邮件数据、同步盘、桌面、文档、下载、项目资料、数据库、证书、密钥和配置文件。输出严格 JSON。")
+            new AiPromptPreset("standard", "标准清理", DefaultAiSystemPrompt),
+            new AiPromptPreset("conservative", "保守清理", "你是谨慎的 Windows 磁盘清理助手。只选择明确可再生成、低风险且常见的缓存、临时文件、浏览器缓存、下载缓存和崩溃转储。任何不确定、用户生成、业务数据、源码、项目文件、应用主体和系统核心路径都不要建议删除。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("cache_aggressive", "激进缓存", "你是偏激进但仍安全的 Windows 缓存清理助手。优先建议大型可再生成缓存、构建缓存、包管理缓存、浏览器缓存、临时下载和安装残留。不要选择用户文档、媒体、源码、应用程序主体、数据库或系统核心文件。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("developer", "开发环境", "你是面向开发者电脑的 Windows 清理助手。优先识别可重建的 node_modules 缓存、NuGet 缓存、Gradle 缓存、Maven 缓存、pip 缓存、npm/yarn/pnpm 缓存、构建输出、测试临时文件和 IDE 缓存。不要删除源码、配置、数据库、密钥、用户文档或项目根目录。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("system_temp", "仅系统临时", "你是 Windows 系统临时文件清理助手。只建议删除 Windows Temp、用户 Temp、INetCache、SoftwareDistribution 下载缓存、崩溃转储和明确的临时文件。不要建议删除 Program Files、Windows 核心目录、用户文档、桌面、下载目录中的个人文件。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("logs_first", "日志优先", "你是 Windows 日志清理助手。优先选择大型日志、轮转日志、旧崩溃转储、诊断报告和应用运行临时日志。不要删除当前应用主体、配置、数据库、用户文档或无法判断用途的文件。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("installer_leftovers", "安装残留", "你是 Windows 安装残留清理助手。优先识别安装包缓存、安装临时目录、升级残留、解压残留和失败安装产生的临时文件。不要删除已安装程序主体、用户数据、许可证文件或系统核心组件。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("browser_cache", "浏览器缓存", "你是浏览器缓存清理助手。优先选择浏览器缓存、GPUCache、Code Cache、Service Worker Cache、崩溃报告和临时网络缓存。不要删除书签、历史数据库、扩展数据、密码、用户配置或下载的个人文件。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("media_safe", "媒体保护", "你是保护用户媒体资料的 Windows 清理助手。可以建议删除临时文件、缓存、日志和崩溃转储，但不要删除图片、视频、音频、文档、压缩包、设计素材、工程文件和下载目录中无法确定用途的文件。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("large_files_review", "大文件审查", "你是大文件审查助手。只从候选清单中挑选明显可再生成或无业务价值的大型缓存、临时文件、日志和残留文件；对下载、文档、桌面、项目目录、虚拟机镜像、数据库和媒体文件保持高风险并避免建议删除。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("recycle_bin_safe", "回收站友好", "你是回收站删除模式下的 Windows 清理助手。优先选择放入回收站后不影响系统运行的缓存、日志、临时文件和安装残留。不要依赖回收站作为安全理由去选择不确定或用户重要数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。"),
+            new AiPromptPreset("enterprise_safe", "办公电脑", "你是办公电脑清理助手。只建议删除缓存、临时文件、日志、崩溃转储和安装残留。不要删除企业应用数据、邮件数据、同步盘、桌面、文档、下载、项目资料、数据库、证书、密钥和配置文件。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。")
+        };
+        private static readonly AiProviderPreset[] AiProviderPresets =
+        {
+            new AiProviderPreset("chatgpt", "ChatGPT / OpenAI", "https://api.openai.com", "gpt-4o-mini"),
+            new AiProviderPreset("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-chat")
         };
 
         private readonly SettingsStore settingsStore;
         private readonly IScanProvider scanProvider;
         private readonly ReusableBackgroundWorker backgroundWorker;
         private readonly CandidatePlanner candidatePlanner;
+        private readonly IAiCleanupAdvisor localAdvisor;
         private readonly IAiCleanupAdvisor aiAdvisor;
         private readonly IDeletionSandbox deletionSandbox;
         private readonly IDeletionService deletionService;
@@ -81,6 +89,7 @@ namespace AiCleanVolume.Desktop
         private Panel settingsPage;
         private AntdUI.Button scanButton;
         private AntdUI.Button analyzeButton;
+        private AntdUI.Button regularCleanButton;
         private AntdUI.Button deleteButton;
         private AntdUI.Button saveSettingsButton;
         private string activePageId;
@@ -100,11 +109,13 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Switch aiEnabledSwitch;
         private AntdUI.Switch recycleSwitch;
-        private AntdUI.Switch privilegedSwitch;
+        private AntdUI.Checkbox privilegedCheckbox;
+        private AntdUI.Checkbox privilegedQuickCheckbox;
         private AntdUI.Input endpointInput;
         private AntdUI.Input apiKeyInput;
         private AntdUI.Input modelInput;
         private AntdUI.Input maxSuggestionsInput;
+        private AntdUI.Select aiProviderPresetSelect;
         private AntdUI.Select aiPromptPresetSelect;
         private AntdUI.Input systemPromptInput;
         private AntdUI.Input allowRootsInput;
@@ -126,6 +137,8 @@ namespace AiCleanVolume.Desktop
         private bool busy;
         private bool sidebarResizing;
         private bool syncingAiPromptPreset;
+        private bool syncingAiProviderPreset;
+        private bool syncingPrivilegeCheckboxes;
         private bool storageTreeDeleteDirty;
         private int sidebarWidth;
         private int sidebarResizeStartX;
@@ -141,7 +154,8 @@ namespace AiCleanVolume.Desktop
             privilegeService = new WindowsPrivilegeService();
             scanProvider = new FolderSizeRankerScanProvider();
             backgroundWorker = new ReusableBackgroundWorker("AiCleanVolume.UiWorker");
-            aiAdvisor = new OpenAiCompatibleAdvisor(new HeuristicCleanupAdvisor());
+            localAdvisor = new HeuristicCleanupAdvisor();
+            aiAdvisor = new OpenAiCompatibleAdvisor(localAdvisor);
             deletionService = new RecycleBinDeletionService();
             explorerService = new ShellExplorerService();
             suggestionRows = new List<CleanupSuggestionRow>();
@@ -198,12 +212,16 @@ namespace AiCleanVolume.Desktop
             analyzeButton = CreateHeaderButton("AI 识别", AntdUI.TTypeMini.Success);
             analyzeButton.Click += delegate { AnalyzeSuggestions(); };
 
+            regularCleanButton = CreateHeaderButton("常规清理", AntdUI.TTypeMini.Primary);
+            regularCleanButton.Click += delegate { AnalyzeRegularSuggestions(); };
+
             scanButton = CreateToolbarActionButton("扫描", AntdUI.TTypeMini.Primary);
             scanButton.Click += delegate { ScanCurrentLocation(); };
 
             titleBar.Controls.Add(saveSettingsButton);
             titleBar.Controls.Add(deleteButton);
             titleBar.Controls.Add(analyzeButton);
+            titleBar.Controls.Add(regularCleanButton);
 
             Panel shell = new Panel();
             shell.Dock = DockStyle.Fill;
@@ -348,7 +366,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.MenuItem scanItem = CreateNavigationItem(PageScan, "扫描", "FolderOpenOutlined");
             scanItem.Select = true;
             menu.Items.Add(scanItem);
-            menu.Items.Add(CreateNavigationItem(PageSuggestions, "AI 建议", "RobotFilled"));
+            menu.Items.Add(CreateNavigationItem(PageSuggestions, "清理建议", "RobotFilled"));
             menu.Items.Add(new AntdUI.MenuDividerItem());
             menu.Items.Add(CreateNavigationItem(PageLog, "日志管理", "FileTextOutlined"));
             return menu;
@@ -635,19 +653,32 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel panel = CreateCardPanel(20);
             panel.Dock = DockStyle.Fill;
 
-            Label heading = CreateSectionTitle("AI 清理建议");
+            Label heading = CreateSectionTitle("清理建议");
 
-            Label desc = CreateSectionDescription("默认勾选候选项；双击或点击“查看”可打开对应位置。");
+            Label desc = CreateSectionDescription("支持“常规清理”和“AI 识别”；列表按清理软件风格展示，默认勾选可安全处理项。");
+
+            Panel optionsBar = new Panel();
+            optionsBar.Dock = DockStyle.Top;
+            optionsBar.Height = 34;
+            optionsBar.Padding = new Padding(0, 0, 0, 6);
+            optionsBar.BackColor = Color.Transparent;
+
+            privilegedQuickCheckbox = CreateCheckbox("完全权限模式（仅管理员运行时生效）");
+            privilegedQuickCheckbox.Dock = DockStyle.Left;
+            privilegedQuickCheckbox.Width = 280;
+            privilegedQuickCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
+            optionsBar.Controls.Add(privilegedQuickCheckbox);
 
             suggestionTable = new AntdUI.Table();
             suggestionTable.Dock = DockStyle.Fill;
-            ConfigureTableSurface(suggestionTable);
+            ConfigureCleanupListSurface(suggestionTable);
             suggestionTable.FixedHeader = true;
             suggestionTable.ScrollBarAvoidHeader = true;
             suggestionTable.CellDoubleClick += SuggestionTable_CellDoubleClick;
             suggestionTable.CellButtonClick += SuggestionTable_CellButtonClick;
 
             panel.Controls.Add(suggestionTable);
+            panel.Controls.Add(optionsBar);
             panel.Controls.Add(desc);
             panel.Controls.Add(heading);
             return panel;
@@ -664,22 +695,28 @@ namespace AiCleanVolume.Desktop
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
             layout.ColumnCount = 4;
-            layout.RowCount = 7;
+            layout.RowCount = 8;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
-            for (int i = 0; i < 5; i++) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            for (int i = 0; i < 6; i++) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 122F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             aiEnabledSwitch = new AntdUI.Switch();
             recycleSwitch = new AntdUI.Switch();
-            privilegedSwitch = new AntdUI.Switch();
+            privilegedCheckbox = CreateCheckbox("启用完全权限（管理员）");
+            privilegedCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
             endpointInput = CreateInput("https://api.openai.com");
             apiKeyInput = CreateInput("sk-...");
             modelInput = CreateInput("gpt-4o-mini");
             maxSuggestionsInput = CreateInput("30");
+            aiProviderPresetSelect = CreateSelect();
+            PopulateAiProviderPresets();
+            aiProviderPresetSelect.SelectedValueChanged += AiProviderPresetSelect_SelectedValueChanged;
+            endpointInput.TextChanged += AiEndpointOrModelInput_TextChanged;
+            modelInput.TextChanged += AiEndpointOrModelInput_TextChanged;
             aiPromptPresetSelect = CreateSelect();
             PopulateAiPromptPresets();
             aiPromptPresetSelect.SelectedValueChanged += AiPromptPresetSelect_SelectedValueChanged;
@@ -697,7 +734,7 @@ namespace AiCleanVolume.Desktop
             layout.Controls.Add(recycleSwitch, 3, 0);
 
             layout.Controls.Add(CreateCaption("完全权限"), 0, 1);
-            layout.Controls.Add(privilegedSwitch, 1, 1);
+            layout.Controls.Add(privilegedCheckbox, 1, 1);
             layout.Controls.Add(CreateCaption("建议条数"), 2, 1);
             layout.Controls.Add(maxSuggestionsInput, 3, 1);
 
@@ -710,16 +747,20 @@ namespace AiCleanVolume.Desktop
             layout.Controls.Add(CreateCaption("API Key"), 2, 3);
             layout.Controls.Add(apiKeyInput, 3, 3);
 
-            layout.Controls.Add(CreateCaption("AI 预设"), 0, 4);
-            layout.Controls.Add(aiPromptPresetSelect, 1, 4);
+            layout.Controls.Add(CreateCaption("接口预设"), 0, 4);
+            layout.Controls.Add(aiProviderPresetSelect, 1, 4);
+            layout.SetColumnSpan(aiProviderPresetSelect, 3);
+
+            layout.Controls.Add(CreateCaption("AI 预设"), 0, 5);
+            layout.Controls.Add(aiPromptPresetSelect, 1, 5);
             layout.SetColumnSpan(aiPromptPresetSelect, 3);
 
-            layout.Controls.Add(CreateCaption("系统提示"), 0, 5);
-            layout.Controls.Add(systemPromptInput, 1, 5);
+            layout.Controls.Add(CreateCaption("系统提示"), 0, 6);
+            layout.Controls.Add(systemPromptInput, 1, 6);
             layout.SetColumnSpan(systemPromptInput, 3);
 
-            layout.Controls.Add(CreateCaption("允许位置"), 0, 6);
-            layout.Controls.Add(allowRootsInput, 1, 6);
+            layout.Controls.Add(CreateCaption("允许位置"), 0, 7);
+            layout.Controls.Add(allowRootsInput, 1, 7);
             layout.SetColumnSpan(allowRootsInput, 3);
 
             panel.Controls.Add(layout);
@@ -863,6 +904,7 @@ namespace AiCleanVolume.Desktop
 
             scanButton.Visible = pageId == PageScan;
             analyzeButton.Visible = pageId == PageSuggestions;
+            regularCleanButton.Visible = pageId == PageSuggestions;
             deleteButton.Visible = pageId == PageSuggestions;
             saveSettingsButton.Visible = pageId == PageSettings;
             SyncNavigationSelection(pageId);
@@ -874,7 +916,7 @@ namespace AiCleanVolume.Desktop
             switch (pageId)
             {
                 case PageSuggestions:
-                    return AppDisplayName + " · AI 建议与查看";
+                    return AppDisplayName + " · 常规清理与 AI 建议";
                 case PageLog:
                     return AppDisplayName + " · 日志管理";
                 case PageSettings:
@@ -889,7 +931,7 @@ namespace AiCleanVolume.Desktop
             switch (pageId)
             {
                 case PageSuggestions:
-                    return "查看 AI / 本地规则生成的清理建议，支持定位和批量删除。";
+                    return "查看常规清理、AI 和本地规则生成的清理建议，支持定位和批量删除。";
                 case PageLog:
                     return "查看扫描、建议与删除流程的执行日志。";
                 case PageSettings:
@@ -918,14 +960,15 @@ namespace AiCleanVolume.Desktop
 
             suggestionTable.Columns = new AntdUI.ColumnCollection
             {
-                new AntdUI.ColumnCheck("selected", "选中").SetWidth("64"),
-                new AntdUI.Column("name", "名称").SetWidth("160"),
+                new AntdUI.ColumnCheck("selected", "选中").SetWidth("60"),
+                new AntdUI.Column("name", "清理项").SetWidth("160"),
+                new AntdUI.Column("category", "类别", AntdUI.ColumnAlign.Center).SetWidth("108"),
                 new AntdUI.Column("size", "大小", AntdUI.ColumnAlign.Right).SetWidth("104"),
                 new AntdUI.Column("risk", "风险", AntdUI.ColumnAlign.Center).SetWidth("88"),
                 new AntdUI.Column("sandbox", "沙盒", AntdUI.ColumnAlign.Center).SetWidth("96"),
+                new AntdUI.Column("source", "来源", AntdUI.ColumnAlign.Center).SetWidth("108"),
                 new AntdUI.Column("status", "状态", AntdUI.ColumnAlign.Center).SetWidth("86"),
-                new AntdUI.Column("source", "来源").SetWidth("90"),
-                new AntdUI.Column("reason", "原因").SetWidth("auto"),
+                new AntdUI.Column("details", "路径与说明").SetWidth("auto").SetLineBreak(),
                 new AntdUI.Column("actions", "操作").SetWidth("86")
             };
         }
@@ -935,18 +978,32 @@ namespace AiCleanVolume.Desktop
             settings.EnsureDefaults();
             aiEnabledSwitch.Checked = settings.Ai.Enabled;
             recycleSwitch.Checked = settings.Sandbox.UseRecycleBin;
-            privilegedSwitch.Checked = settings.Sandbox.FullyPrivilegedMode;
+            ApplyPrivilegedCheckboxState(settings.Sandbox.FullyPrivilegedMode);
             endpointInput.Text = settings.Ai.Endpoint;
             apiKeyInput.Text = settings.Ai.ApiKey;
             modelInput.Text = settings.Ai.Model;
             maxSuggestionsInput.Text = settings.Ai.MaxSuggestions.ToString();
             systemPromptInput.Text = settings.Ai.SystemPrompt;
+            SelectAiProviderPresetForSettings(settings.Ai.Endpoint, settings.Ai.Model);
             SelectAiPromptPresetForPrompt(settings.Ai.SystemPrompt);
             minSizeInput.Text = settings.Scan.MinSizeMb.ToString();
             limitInput.Text = settings.Scan.PerLevelLimit.ToString();
             sortSelect.SelectedValue = settings.Scan.SortMode;
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(settings.Sandbox.AllowedRoots);
             allowRootsInput.Text = string.Join(Environment.NewLine, new List<string>(settings.Sandbox.AllowedRoots).ToArray());
+        }
+
+        private void PopulateAiProviderPresets()
+        {
+            if (aiProviderPresetSelect == null) return;
+
+            aiProviderPresetSelect.Items.Clear();
+            aiProviderPresetSelect.Items.Add(new AntdUI.SelectItem("自定义", CustomAiProviderPresetKey));
+            for (int index = 0; index < AiProviderPresets.Length; index++)
+            {
+                AiProviderPreset preset = AiProviderPresets[index];
+                aiProviderPresetSelect.Items.Add(new AntdUI.SelectItem(preset.Name, preset.Key));
+            }
         }
 
         private void PopulateAiPromptPresets()
@@ -959,6 +1016,22 @@ namespace AiCleanVolume.Desktop
             {
                 AiPromptPreset preset = AiPromptPresets[index];
                 aiPromptPresetSelect.Items.Add(new AntdUI.SelectItem(preset.Name, preset.Key));
+            }
+        }
+
+        private void SelectAiProviderPresetForSettings(string endpoint, string model)
+        {
+            if (aiProviderPresetSelect == null) return;
+
+            AiProviderPreset preset = FindAiProviderPreset(endpoint, model);
+            syncingAiProviderPreset = true;
+            try
+            {
+                aiProviderPresetSelect.SelectedValue = preset == null ? CustomAiProviderPresetKey : preset.Key;
+            }
+            finally
+            {
+                syncingAiProviderPreset = false;
             }
         }
 
@@ -976,6 +1049,25 @@ namespace AiCleanVolume.Desktop
             {
                 syncingAiPromptPreset = false;
             }
+        }
+
+        private static AiProviderPreset FindAiProviderPreset(string endpoint, string model)
+        {
+            string normalizedEndpoint = NormalizeEndpoint(endpoint);
+            string normalizedModel = NormalizeValue(model);
+            if (string.IsNullOrWhiteSpace(normalizedEndpoint) || string.IsNullOrWhiteSpace(normalizedModel)) return null;
+
+            for (int index = 0; index < AiProviderPresets.Length; index++)
+            {
+                AiProviderPreset preset = AiProviderPresets[index];
+                if (string.Equals(NormalizeEndpoint(preset.Endpoint), normalizedEndpoint, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(NormalizeValue(preset.Model), normalizedModel, StringComparison.OrdinalIgnoreCase))
+                {
+                    return preset;
+                }
+            }
+
+            return null;
         }
 
         private static AiPromptPreset FindAiPromptPreset(string key)
@@ -1007,6 +1099,90 @@ namespace AiCleanVolume.Desktop
             return (prompt ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n").Trim();
         }
 
+        private static string NormalizeEndpoint(string endpoint)
+        {
+            string normalized = NormalizeValue(endpoint);
+            if (string.IsNullOrWhiteSpace(normalized)) return string.Empty;
+            return normalized.TrimEnd('/');
+        }
+
+        private static string NormalizeValue(string value)
+        {
+            return (value ?? string.Empty).Trim();
+        }
+
+        private static AiProviderPreset FindAiProviderPresetByKey(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            for (int index = 0; index < AiProviderPresets.Length; index++)
+            {
+                if (string.Equals(AiProviderPresets[index].Key, key, StringComparison.OrdinalIgnoreCase)) return AiProviderPresets[index];
+            }
+
+            return null;
+        }
+
+        private void PrivilegedCheckbox_CheckedChanged(object sender, AntdUI.BoolEventArgs e)
+        {
+            if (syncingPrivilegeCheckboxes) return;
+            AntdUI.Checkbox source = sender as AntdUI.Checkbox;
+            if (source == null) return;
+            ApplyPrivilegedCheckboxState(source.Checked);
+            if (settings != null && settings.Sandbox != null)
+            {
+                settings.Sandbox.FullyPrivilegedMode = source.Checked;
+                RefreshSuggestionSandboxFromCurrentSettings();
+            }
+        }
+
+        private void ApplyPrivilegedCheckboxState(bool value)
+        {
+            syncingPrivilegeCheckboxes = true;
+            try
+            {
+                if (privilegedCheckbox != null) privilegedCheckbox.Checked = value;
+                if (privilegedQuickCheckbox != null) privilegedQuickCheckbox.Checked = value;
+            }
+            finally
+            {
+                syncingPrivilegeCheckboxes = false;
+            }
+        }
+
+        private bool IsFullyPrivilegedChecked()
+        {
+            if (privilegedQuickCheckbox != null) return privilegedQuickCheckbox.Checked;
+            return privilegedCheckbox != null && privilegedCheckbox.Checked;
+        }
+
+        private void AiProviderPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        {
+            if (syncingAiProviderPreset || e.Value == null) return;
+
+            string key = e.Value.ToString();
+            if (string.Equals(key, CustomAiProviderPresetKey, StringComparison.OrdinalIgnoreCase)) return;
+
+            AiProviderPreset preset = FindAiProviderPresetByKey(key);
+            if (preset == null) return;
+
+            syncingAiProviderPreset = true;
+            try
+            {
+                if (endpointInput != null) endpointInput.Text = preset.Endpoint;
+                if (modelInput != null) modelInput.Text = preset.Model;
+            }
+            finally
+            {
+                syncingAiProviderPreset = false;
+            }
+        }
+
+        private void AiEndpointOrModelInput_TextChanged(object sender, EventArgs e)
+        {
+            if (syncingAiProviderPreset) return;
+            SelectAiProviderPresetForSettings(endpointInput == null ? null : endpointInput.Text, modelInput == null ? null : modelInput.Text);
+        }
+
         private void SaveSettings()
         {
             try
@@ -1032,7 +1208,7 @@ namespace AiCleanVolume.Desktop
             settings.Ai.MaxSuggestions = ParsePositiveInt(maxSuggestionsInput.Text, 30);
             settings.Ai.SystemPrompt = systemPromptInput.Text.Trim();
             settings.Sandbox.UseRecycleBin = recycleSwitch.Checked;
-            settings.Sandbox.FullyPrivilegedMode = privilegedSwitch.Checked;
+            settings.Sandbox.FullyPrivilegedMode = IsFullyPrivilegedChecked();
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(ParseLines(allowRootsInput.Text));
             settings.Scan.MinSizeMb = ParseInt(minSizeInput.Text, -1);
             settings.Scan.PerLevelLimit = ParseInt(limitInput.Text, -1);
@@ -1136,6 +1312,16 @@ namespace AiCleanVolume.Desktop
 
         private void AnalyzeSuggestions()
         {
+            AnalyzeSuggestionsCore(true);
+        }
+
+        private void AnalyzeRegularSuggestions()
+        {
+            AnalyzeSuggestionsCore(false);
+        }
+
+        private void AnalyzeSuggestionsCore(bool preferAi)
+        {
             if (currentRoot == null)
             {
                 MessageBox.Show(this, "请先完成一次扫描。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1146,22 +1332,31 @@ namespace AiCleanVolume.Desktop
             IList<CleanupSuggestion> suggestions = null;
             StorageItem analysisRoot = null;
             ScanRequest request = BuildScanRequest(currentRoot.Path, -1);
+            string caption = preferAi ? "正在生成 AI 清理建议…" : "正在生成常规清理列表…";
 
-            RunBackground("正在生成 AI 清理建议…", delegate
+            RunBackground(caption, delegate
             {
                 analysisRoot = scanProvider.Scan(request);
-                IList<CleanupCandidate> candidates = candidatePlanner.BuildCandidates(analysisRoot, Math.Max(67108864L, settings.Scan.MinSizeMb * 1024L * 1024L / 2L), settings.Ai.MaxSuggestions * 4);
-                suggestions = aiAdvisor.Analyze(analysisRoot, candidates, settings);
+                IList<CleanupCandidate> candidates = candidatePlanner.BuildCandidates(
+                    analysisRoot,
+                    ResolveCandidateMinBytes(preferAi),
+                    settings.Ai.MaxSuggestions * (preferAi ? 4 : 6));
+                suggestions = preferAi ? aiAdvisor.Analyze(analysisRoot, candidates, settings) : localAdvisor.Analyze(analysisRoot, candidates, settings);
                 EvaluateSandbox(suggestions);
             }, delegate
             {
                 BindSuggestions(suggestions);
-                Log((settings.Ai.Enabled ? "AI" : "本地规则") + " 建议生成完成，共 " + suggestionRows.Count + " 项。");
+                string sourceName;
+                if (preferAi) sourceName = settings.Ai.Enabled ? "AI 建议" : "本地规则回退";
+                else sourceName = "常规清理";
+                Log(sourceName + "生成完成，共 " + suggestionRows.Count + " 项。");
             });
         }
 
         private void DeleteSelectedSuggestions()
         {
+            SaveSettingsFromUi();
+            RefreshSuggestionSandboxFromCurrentSettings();
             if (suggestionRows == null || suggestionRows.Count == 0)
             {
                 MessageBox.Show(this, "当前没有可删除的建议项。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1231,6 +1426,21 @@ namespace AiCleanVolume.Desktop
                 for (int i = 0; i < suggestions.Count; i++) suggestionRows.Add(new CleanupSuggestionRow(suggestions[i]));
             }
             suggestionTable.DataSource = suggestionRows;
+        }
+
+        private void RefreshSuggestionSandboxFromCurrentSettings()
+        {
+            if (suggestionRows == null || suggestionRows.Count == 0 || settings == null || settings.Sandbox == null) return;
+
+            bool elevated = privilegeService.IsProcessElevated();
+            for (int i = 0; i < suggestionRows.Count; i++)
+            {
+                CleanupSuggestionRow row = suggestionRows[i];
+                row.Suggestion.Sandbox = deletionSandbox.Evaluate(row.Suggestion.Path, settings.Sandbox, elevated);
+                row.RefreshSandbox();
+            }
+
+            if (suggestionTable != null) suggestionTable.Refresh();
         }
 
         private void StorageTable_ExpandChanged(object sender, AntdUI.TableExpandEventArgs e)
@@ -1953,8 +2163,11 @@ namespace AiCleanVolume.Desktop
             if (limitInput != null) limitInput.Enabled = !busy;
             if (sortSelect != null) sortSelect.Enabled = !busy;
             analyzeButton.Enabled = !busy;
+            regularCleanButton.Enabled = !busy;
             deleteButton.Enabled = !busy;
             saveSettingsButton.Enabled = !busy;
+            if (privilegedCheckbox != null) privilegedCheckbox.Enabled = !busy;
+            if (privilegedQuickCheckbox != null) privilegedQuickCheckbox.Enabled = !busy;
             titleBar.Description = description;
         }
 
@@ -2179,6 +2392,15 @@ namespace AiCleanVolume.Desktop
             return int.TryParse(text, out parsed) && parsed > 0 ? parsed : fallback;
         }
 
+        private long ResolveCandidateMinBytes(bool preferAi)
+        {
+            long configured = settings != null && settings.Scan != null && settings.Scan.MinSizeMb > 0
+                ? settings.Scan.MinSizeMb * 1024L * 1024L / 2L
+                : -1L;
+            long baseline = preferAi ? 67108864L : 16777216L;
+            return Math.Max(baseline, configured);
+        }
+
         private int ResolveInitialSidebarWidth()
         {
             if (settings != null && settings.Ui != null && settings.Ui.SidebarWidth > 0)
@@ -2193,7 +2415,7 @@ namespace AiCleanVolume.Desktop
         {
             int brandWidth = MeasureTextWidth(AppDisplayName, sidebarBrandTextLabel != null ? sidebarBrandTextLabel.Font : Font) + 36;
             int menuTextWidth = 0;
-            string[] menuItems = { "扫描", "AI 建议", "日志管理" };
+            string[] menuItems = { "扫描", "清理建议", "日志管理" };
             Font menuFont = navigationMenu != null ? navigationMenu.Font : Font;
             for (int i = 0; i < menuItems.Length; i++)
             {
@@ -2368,6 +2590,17 @@ namespace AiCleanVolume.Desktop
             return input;
         }
 
+        private static AntdUI.Checkbox CreateCheckbox(string text)
+        {
+            AntdUI.Checkbox checkbox = new AntdUI.Checkbox();
+            checkbox.Dock = DockStyle.Fill;
+            checkbox.Text = text;
+            checkbox.Font = new Font("Microsoft YaHei UI", 9.5F);
+            checkbox.ForeColor = TextPrimaryColor;
+            checkbox.BackColor = Color.Transparent;
+            return checkbox;
+        }
+
         private AntdUI.Select CreateSelect()
         {
             AntdUI.Select select = new AntdUI.Select();
@@ -2388,6 +2621,14 @@ namespace AiCleanVolume.Desktop
             label.ForeColor = TextSecondaryColor;
             label.BackColor = Color.Transparent;
             return label;
+        }
+
+        private static void ConfigureCleanupListSurface(AntdUI.Table table)
+        {
+            ConfigureTableSurface(table);
+            table.RowHeight = 54;
+            table.RowHeightHeader = 42;
+            table.GapCell = 8;
         }
 
         private static Control CreateInfoCard(string title, out Label valueLabel)
@@ -2457,5 +2698,22 @@ namespace AiCleanVolume.Desktop
             public string Name { get; private set; }
             public string Prompt { get; private set; }
         }
+
+        private sealed class AiProviderPreset
+        {
+            public AiProviderPreset(string key, string name, string endpoint, string model)
+            {
+                Key = key;
+                Name = name;
+                Endpoint = endpoint;
+                Model = model;
+            }
+
+            public string Key { get; private set; }
+            public string Name { get; private set; }
+            public string Endpoint { get; private set; }
+            public string Model { get; private set; }
+        }
     }
 }
+

@@ -4,6 +4,7 @@ using System.Text;
 using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using RestSharp;
 
 namespace AiCleanVolume.Desktop.Services
@@ -27,8 +28,9 @@ namespace AiCleanVolume.Desktop.Services
             try
             {
                 string prompt = BuildPrompt(root, candidates, settings.Ai.MaxSuggestions);
-                RestClient client = new RestClient(settings.Ai.Endpoint.TrimEnd('/'));
-                RestRequest request = new RestRequest("/v1/chat/completions", Method.POST);
+                string endpoint = settings.Ai.Endpoint.TrimEnd('/');
+                RestClient client = new RestClient(endpoint);
+                RestRequest request = new RestRequest(ResolveChatCompletionsPath(endpoint), Method.POST);
                 if (!string.IsNullOrWhiteSpace(settings.Ai.ApiKey)) request.AddHeader("Authorization", "Bearer " + settings.Ai.ApiKey);
                 request.AddHeader("Content-Type", "application/json");
                 request.AddParameter("application/json", JsonConvert.SerializeObject(new
@@ -55,8 +57,7 @@ namespace AiCleanVolume.Desktop.Services
                 }
 
                 string content = ExtractJson(chat.choices[0].message.content);
-                AiSuggestionEnvelope envelope = JsonConvert.DeserializeObject<AiSuggestionEnvelope>(content);
-                IList<CleanupSuggestion> mapped = MapSuggestions(envelope, candidates);
+                IList<CleanupSuggestion> mapped = MapSuggestions(content, candidates);
                 return mapped.Count == 0 ? fallback.Analyze(root, candidates, settings) : mapped;
             }
             catch
@@ -70,7 +71,7 @@ namespace AiCleanVolume.Desktop.Services
             StringBuilder builder = new StringBuilder();
             builder.AppendLine("请从候选清单中选择可以清理的文件或文件夹。");
             builder.AppendLine("规则：只返回候选清单里的 path；不要建议删除系统核心、用户文档、应用主体；风险高就不要选。");
-            builder.AppendLine("输出 JSON 格式：{\"candidates\":[{\"path\":\"...\",\"risk\":\"Low|Medium|High\",\"score\":0.0,\"reason\":\"中文原因\"}]}");
+            builder.AppendLine("输出严格 JSON 数组，格式示例：[\"C:\\\\path1\",\"C:\\\\path2\"]。");
             builder.AppendLine("最多返回 " + (maxSuggestions <= 0 ? 30 : maxSuggestions) + " 项。");
             if (root != null) builder.AppendLine("扫描根：" + root.Path + "，总大小：" + StorageFormatting.FormatBytes(root.Bytes));
             builder.AppendLine("候选：");
@@ -86,19 +87,36 @@ namespace AiCleanVolume.Desktop.Services
             return builder.ToString();
         }
 
+        private static string ResolveChatCompletionsPath(string endpoint)
+        {
+            return endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? "/chat/completions" : "/v1/chat/completions";
+        }
+
         private static string ExtractJson(string content)
         {
-            if (string.IsNullOrWhiteSpace(content)) return "{}";
+            if (string.IsNullOrWhiteSpace(content)) return "[]";
+            content = content.Trim();
+            if (content.StartsWith("```", StringComparison.Ordinal))
+            {
+                int firstNewLine = content.IndexOf('\n');
+                if (firstNewLine >= 0) content = content.Substring(firstNewLine + 1).Trim();
+                if (content.EndsWith("```", StringComparison.Ordinal)) content = content.Substring(0, content.Length - 3).Trim();
+            }
+
+            int arrayStart = content.IndexOf('[');
+            int arrayEnd = content.LastIndexOf(']');
             int start = content.IndexOf('{');
             int end = content.LastIndexOf('}');
+            if (start >= 0 && end > start && (arrayStart < 0 || start < arrayStart)) return content.Substring(start, end - start + 1);
+            if (arrayStart >= 0 && arrayEnd > arrayStart) return content.Substring(arrayStart, arrayEnd - arrayStart + 1);
             if (start >= 0 && end > start) return content.Substring(start, end - start + 1);
             return content;
         }
 
-        private static IList<CleanupSuggestion> MapSuggestions(AiSuggestionEnvelope envelope, IList<CleanupCandidate> candidates)
+        private static IList<CleanupSuggestion> MapSuggestions(string content, IList<CleanupCandidate> candidates)
         {
             List<CleanupSuggestion> result = new List<CleanupSuggestion>();
-            if (envelope == null || envelope.candidates == null) return result;
+            if (string.IsNullOrWhiteSpace(content) || candidates == null) return result;
 
             Dictionary<string, CleanupCandidate> map = new Dictionary<string, CleanupCandidate>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < candidates.Count; i++)
@@ -106,6 +124,15 @@ namespace AiCleanVolume.Desktop.Services
                 string key = Normalize(candidates[i].Path);
                 if (!map.ContainsKey(key)) map.Add(key, candidates[i]);
             }
+
+            JToken token = JToken.Parse(content);
+            if (token.Type == JTokenType.Array)
+            {
+                return MapSuggestions((JArray)token, map);
+            }
+
+            AiSuggestionEnvelope envelope = token.Type == JTokenType.Object ? token.ToObject<AiSuggestionEnvelope>() : null;
+            if (envelope == null || envelope.candidates == null) return result;
 
             for (int i = 0; i < envelope.candidates.Count; i++)
             {
@@ -124,6 +151,37 @@ namespace AiCleanVolume.Desktop.Services
                     Risk = risk,
                     Score = dto.score,
                     Reason = string.IsNullOrWhiteSpace(dto.reason) ? candidate.ReasonHint : dto.reason,
+                    Source = "AI 判断",
+                    Selected = true
+                });
+            }
+
+            return result;
+        }
+
+        private static IList<CleanupSuggestion> MapSuggestions(JArray paths, IDictionary<string, CleanupCandidate> map)
+        {
+            List<CleanupSuggestion> result = new List<CleanupSuggestion>();
+            if (paths == null || map == null) return result;
+
+            for (int i = 0; i < paths.Count; i++)
+            {
+                JToken token = paths[i];
+                if (token == null || token.Type != JTokenType.String) continue;
+
+                CleanupCandidate candidate;
+                if (!map.TryGetValue(Normalize(token.ToString()), out candidate)) continue;
+                if (candidate.Risk == CleanupRisk.High) continue;
+
+                result.Add(new CleanupSuggestion
+                {
+                    Path = candidate.Path,
+                    Name = candidate.Name,
+                    Bytes = candidate.Bytes,
+                    IsDirectory = candidate.IsDirectory,
+                    Risk = candidate.Risk,
+                    Score = candidate.Risk == CleanupRisk.Low ? 0.9 : 0.65,
+                    Reason = candidate.ReasonHint,
                     Source = "AI 判断",
                     Selected = true
                 });
