@@ -28,7 +28,7 @@ namespace AiCleanVolume.Desktop.Services
             try
             {
                 string prompt = BuildPrompt(root, candidates, settings.Ai.MaxSuggestions);
-                string endpoint = settings.Ai.Endpoint.TrimEnd('/');
+                string endpoint = NormalizeEndpoint(settings.Ai.Endpoint);
                 string accessMode = AiSettings.NormalizeAccessMode(settings.Ai.AccessMode);
                 RestClient client = new RestClient(endpoint);
                 RestRequest request = new RestRequest(ResolveChatCompletionsPath(endpoint), Method.POST);
@@ -100,6 +100,18 @@ namespace AiCleanVolume.Desktop.Services
         private static string ResolveChatCompletionsPath(string endpoint)
         {
             return endpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? "/chat/completions" : "/v1/chat/completions";
+        }
+
+        private static string NormalizeEndpoint(string endpoint)
+        {
+            string normalized = (endpoint ?? string.Empty).Trim().TrimEnd('/');
+            const string ChatCompletionsSuffix = "/chat/completions";
+            if (normalized.EndsWith(ChatCompletionsSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(0, normalized.Length - ChatCompletionsSuffix.Length).TrimEnd('/');
+            }
+
+            return normalized;
         }
 
         private static string ExtractJson(string content)
