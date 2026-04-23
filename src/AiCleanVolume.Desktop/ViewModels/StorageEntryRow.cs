@@ -36,6 +36,14 @@ namespace AiCleanVolume.Desktop.ViewModels
         {
             if (Item == null) return;
 
+            RefreshDisplayValues();
+            ReloadChildren();
+        }
+
+        public void RefreshDisplayValues()
+        {
+            if (Item == null) return;
+
             name = Item.Name;
             path = Item.Path;
             size = StorageFormatting.FormatBytes(Item.Bytes);
@@ -43,7 +51,6 @@ namespace AiCleanVolume.Desktop.ViewModels
             files = Item.TotalFileCount;
             dirs = Item.TotalDirectoryCount;
             kind = Item.IsDirectory ? "文件夹" : "文件";
-            ReloadChildren();
         }
 
         public void ReloadChildren()

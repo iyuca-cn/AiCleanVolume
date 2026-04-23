@@ -33,6 +33,22 @@ namespace AiCleanVolume.Desktop
         private const int SidebarMinWidth = 180;
         private const int SidebarMaxWidth = 320;
         private const int SidebarRailWidth = 10;
+        private const string CustomAiPromptPresetKey = "__custom__";
+        private static readonly AiPromptPreset[] AiPromptPresets =
+        {
+            new AiPromptPreset("standard", "标准清理", "你是 Windows 磁盘清理助手。只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON。"),
+            new AiPromptPreset("conservative", "保守清理", "你是谨慎的 Windows 磁盘清理助手。只选择明确可再生成、低风险且常见的缓存、临时文件、浏览器缓存、下载缓存和崩溃转储。任何不确定、用户生成、业务数据、源码、项目文件、应用主体和系统核心路径都不要建议删除。输出严格 JSON。"),
+            new AiPromptPreset("cache_aggressive", "激进缓存", "你是偏激进但仍安全的 Windows 缓存清理助手。优先建议大型可再生成缓存、构建缓存、包管理缓存、浏览器缓存、临时下载和安装残留。不要选择用户文档、媒体、源码、应用程序主体、数据库或系统核心文件。输出严格 JSON。"),
+            new AiPromptPreset("developer", "开发环境", "你是面向开发者电脑的 Windows 清理助手。优先识别可重建的 node_modules 缓存、NuGet 缓存、Gradle 缓存、Maven 缓存、pip 缓存、npm/yarn/pnpm 缓存、构建输出、测试临时文件和 IDE 缓存。不要删除源码、配置、数据库、密钥、用户文档或项目根目录。输出严格 JSON。"),
+            new AiPromptPreset("system_temp", "仅系统临时", "你是 Windows 系统临时文件清理助手。只建议删除 Windows Temp、用户 Temp、INetCache、SoftwareDistribution 下载缓存、崩溃转储和明确的临时文件。不要建议删除 Program Files、Windows 核心目录、用户文档、桌面、下载目录中的个人文件。输出严格 JSON。"),
+            new AiPromptPreset("logs_first", "日志优先", "你是 Windows 日志清理助手。优先选择大型日志、轮转日志、旧崩溃转储、诊断报告和应用运行临时日志。不要删除当前应用主体、配置、数据库、用户文档或无法判断用途的文件。输出严格 JSON。"),
+            new AiPromptPreset("installer_leftovers", "安装残留", "你是 Windows 安装残留清理助手。优先识别安装包缓存、安装临时目录、升级残留、解压残留和失败安装产生的临时文件。不要删除已安装程序主体、用户数据、许可证文件或系统核心组件。输出严格 JSON。"),
+            new AiPromptPreset("browser_cache", "浏览器缓存", "你是浏览器缓存清理助手。优先选择浏览器缓存、GPUCache、Code Cache、Service Worker Cache、崩溃报告和临时网络缓存。不要删除书签、历史数据库、扩展数据、密码、用户配置或下载的个人文件。输出严格 JSON。"),
+            new AiPromptPreset("media_safe", "媒体保护", "你是保护用户媒体资料的 Windows 清理助手。可以建议删除临时文件、缓存、日志和崩溃转储，但不要删除图片、视频、音频、文档、压缩包、设计素材、工程文件和下载目录中无法确定用途的文件。输出严格 JSON。"),
+            new AiPromptPreset("large_files_review", "大文件审查", "你是大文件审查助手。只从候选清单中挑选明显可再生成或无业务价值的大型缓存、临时文件、日志和残留文件；对下载、文档、桌面、项目目录、虚拟机镜像、数据库和媒体文件保持高风险并避免建议删除。输出严格 JSON。"),
+            new AiPromptPreset("recycle_bin_safe", "回收站友好", "你是回收站删除模式下的 Windows 清理助手。优先选择放入回收站后不影响系统运行的缓存、日志、临时文件和安装残留。不要依赖回收站作为安全理由去选择不确定或用户重要数据。输出严格 JSON。"),
+            new AiPromptPreset("enterprise_safe", "办公电脑", "你是办公电脑清理助手。只建议删除缓存、临时文件、日志、崩溃转储和安装残留。不要删除企业应用数据、邮件数据、同步盘、桌面、文档、下载、项目资料、数据库、证书、密钥和配置文件。输出严格 JSON。")
+        };
 
         private readonly SettingsStore settingsStore;
         private readonly IScanProvider scanProvider;
@@ -78,6 +94,7 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Table storageTable;
         private AntdUI.Table suggestionTable;
         private ContextMenuStrip storageContextMenu;
+        private ToolStripMenuItem openStorageMenuItem;
         private ToolStripMenuItem deleteStorageMenuItem;
         private StorageEntryRow storageContextRow;
 
@@ -88,6 +105,8 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Input apiKeyInput;
         private AntdUI.Input modelInput;
         private AntdUI.Input maxSuggestionsInput;
+        private AntdUI.Select aiPromptPresetSelect;
+        private AntdUI.Input systemPromptInput;
         private AntdUI.Input allowRootsInput;
         private AntdUI.Input logInput;
 
@@ -106,9 +125,12 @@ namespace AiCleanVolume.Desktop
         private bool applyingNormalBounds;
         private bool busy;
         private bool sidebarResizing;
+        private bool syncingAiPromptPreset;
+        private bool storageTreeDeleteDirty;
         private int sidebarWidth;
         private int sidebarResizeStartX;
         private int sidebarResizeStartWidth;
+        private readonly HashSet<string> expandedStoragePaths;
 
         public MainWindow()
         {
@@ -123,6 +145,7 @@ namespace AiCleanVolume.Desktop
             deletionService = new RecycleBinDeletionService();
             explorerService = new ShellExplorerService();
             suggestionRows = new List<CleanupSuggestionRow>();
+            expandedStoragePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             lastWindowState = FormWindowState.Normal;
             sidebarWidth = 0;
 
@@ -575,8 +598,12 @@ namespace AiCleanVolume.Desktop
             storageTable.KeyDown += StorageTable_KeyDown;
 
             storageContextMenu = new ContextMenuStrip();
+            openStorageMenuItem = new ToolStripMenuItem("在文件资源管理器打开");
+            openStorageMenuItem.Click += OpenStorageMenuItem_Click;
             deleteStorageMenuItem = new ToolStripMenuItem("删除");
             deleteStorageMenuItem.Click += DeleteStorageMenuItem_Click;
+            storageContextMenu.Items.Add(openStorageMenuItem);
+            storageContextMenu.Items.Add(new ToolStripSeparator());
             storageContextMenu.Items.Add(deleteStorageMenuItem);
 
             panel.Controls.Add(storageTable);
@@ -637,12 +664,13 @@ namespace AiCleanVolume.Desktop
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
             layout.ColumnCount = 4;
-            layout.RowCount = 6;
+            layout.RowCount = 7;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
             for (int i = 0; i < 5; i++) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 122F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             aiEnabledSwitch = new AntdUI.Switch();
@@ -652,6 +680,13 @@ namespace AiCleanVolume.Desktop
             apiKeyInput = CreateInput("sk-...");
             modelInput = CreateInput("gpt-4o-mini");
             maxSuggestionsInput = CreateInput("30");
+            aiPromptPresetSelect = CreateSelect();
+            PopulateAiPromptPresets();
+            aiPromptPresetSelect.SelectedValueChanged += AiPromptPresetSelect_SelectedValueChanged;
+            systemPromptInput = CreateInput("系统提示词");
+            systemPromptInput.Multiline = true;
+            systemPromptInput.AutoScroll = true;
+            systemPromptInput.TextChanged += SystemPromptInput_TextChanged;
             allowRootsInput = CreateInput("每行一个允许位置");
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
@@ -675,10 +710,17 @@ namespace AiCleanVolume.Desktop
             layout.Controls.Add(CreateCaption("API Key"), 2, 3);
             layout.Controls.Add(apiKeyInput, 3, 3);
 
-            layout.Controls.Add(CreateCaption("允许位置"), 0, 4);
-            layout.Controls.Add(allowRootsInput, 1, 4);
+            layout.Controls.Add(CreateCaption("AI 预设"), 0, 4);
+            layout.Controls.Add(aiPromptPresetSelect, 1, 4);
+            layout.SetColumnSpan(aiPromptPresetSelect, 3);
+
+            layout.Controls.Add(CreateCaption("系统提示"), 0, 5);
+            layout.Controls.Add(systemPromptInput, 1, 5);
+            layout.SetColumnSpan(systemPromptInput, 3);
+
+            layout.Controls.Add(CreateCaption("允许位置"), 0, 6);
+            layout.Controls.Add(allowRootsInput, 1, 6);
             layout.SetColumnSpan(allowRootsInput, 3);
-            layout.SetRowSpan(allowRootsInput, 2);
 
             panel.Controls.Add(layout);
             panel.Controls.Add(heading);
@@ -898,10 +940,71 @@ namespace AiCleanVolume.Desktop
             apiKeyInput.Text = settings.Ai.ApiKey;
             modelInput.Text = settings.Ai.Model;
             maxSuggestionsInput.Text = settings.Ai.MaxSuggestions.ToString();
+            systemPromptInput.Text = settings.Ai.SystemPrompt;
+            SelectAiPromptPresetForPrompt(settings.Ai.SystemPrompt);
             minSizeInput.Text = settings.Scan.MinSizeMb.ToString();
             limitInput.Text = settings.Scan.PerLevelLimit.ToString();
             sortSelect.SelectedValue = settings.Scan.SortMode;
+            settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(settings.Sandbox.AllowedRoots);
             allowRootsInput.Text = string.Join(Environment.NewLine, new List<string>(settings.Sandbox.AllowedRoots).ToArray());
+        }
+
+        private void PopulateAiPromptPresets()
+        {
+            if (aiPromptPresetSelect == null) return;
+
+            aiPromptPresetSelect.Items.Clear();
+            aiPromptPresetSelect.Items.Add(new AntdUI.SelectItem("自定义", CustomAiPromptPresetKey));
+            for (int index = 0; index < AiPromptPresets.Length; index++)
+            {
+                AiPromptPreset preset = AiPromptPresets[index];
+                aiPromptPresetSelect.Items.Add(new AntdUI.SelectItem(preset.Name, preset.Key));
+            }
+        }
+
+        private void SelectAiPromptPresetForPrompt(string prompt)
+        {
+            if (aiPromptPresetSelect == null) return;
+
+            AiPromptPreset preset = FindAiPromptPresetByPrompt(prompt);
+            syncingAiPromptPreset = true;
+            try
+            {
+                aiPromptPresetSelect.SelectedValue = preset == null ? CustomAiPromptPresetKey : preset.Key;
+            }
+            finally
+            {
+                syncingAiPromptPreset = false;
+            }
+        }
+
+        private static AiPromptPreset FindAiPromptPreset(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            for (int index = 0; index < AiPromptPresets.Length; index++)
+            {
+                if (string.Equals(AiPromptPresets[index].Key, key, StringComparison.OrdinalIgnoreCase)) return AiPromptPresets[index];
+            }
+
+            return null;
+        }
+
+        private static AiPromptPreset FindAiPromptPresetByPrompt(string prompt)
+        {
+            string normalizedPrompt = NormalizePromptForComparison(prompt);
+            if (string.IsNullOrWhiteSpace(normalizedPrompt)) return null;
+
+            for (int index = 0; index < AiPromptPresets.Length; index++)
+            {
+                if (string.Equals(NormalizePromptForComparison(AiPromptPresets[index].Prompt), normalizedPrompt, StringComparison.Ordinal)) return AiPromptPresets[index];
+            }
+
+            return null;
+        }
+
+        private static string NormalizePromptForComparison(string prompt)
+        {
+            return (prompt ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n").Trim();
         }
 
         private void SaveSettings()
@@ -927,9 +1030,10 @@ namespace AiCleanVolume.Desktop
             settings.Ai.ApiKey = apiKeyInput.Text.Trim();
             settings.Ai.Model = modelInput.Text.Trim();
             settings.Ai.MaxSuggestions = ParsePositiveInt(maxSuggestionsInput.Text, 30);
+            settings.Ai.SystemPrompt = systemPromptInput.Text.Trim();
             settings.Sandbox.UseRecycleBin = recycleSwitch.Checked;
             settings.Sandbox.FullyPrivilegedMode = privilegedSwitch.Checked;
-            settings.Sandbox.AllowedRoots = ParseLines(allowRootsInput.Text);
+            settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(ParseLines(allowRootsInput.Text));
             settings.Scan.MinSizeMb = ParseInt(minSizeInput.Text, -1);
             settings.Scan.PerLevelLimit = ParseInt(limitInput.Text, -1);
             if (sortSelect.SelectedValue is ScanSortMode) settings.Scan.SortMode = (ScanSortMode)sortSelect.SelectedValue;
@@ -970,6 +1074,33 @@ namespace AiCleanVolume.Desktop
             UpdateDriveSummaryForLocation(location);
         }
 
+        private void AiPromptPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        {
+            if (syncingAiPromptPreset || e.Value == null) return;
+
+            string key = e.Value.ToString();
+            if (string.Equals(key, CustomAiPromptPresetKey, StringComparison.OrdinalIgnoreCase)) return;
+
+            AiPromptPreset preset = FindAiPromptPreset(key);
+            if (preset == null || systemPromptInput == null) return;
+
+            syncingAiPromptPreset = true;
+            try
+            {
+                systemPromptInput.Text = preset.Prompt;
+            }
+            finally
+            {
+                syncingAiPromptPreset = false;
+            }
+        }
+
+        private void SystemPromptInput_TextChanged(object sender, EventArgs e)
+        {
+            if (syncingAiPromptPreset || systemPromptInput == null) return;
+            SelectAiPromptPresetForPrompt(systemPromptInput.Text);
+        }
+
         private void ScanCurrentLocation()
         {
             SaveSettingsFromUi();
@@ -978,6 +1109,8 @@ namespace AiCleanVolume.Desktop
             DateTime scanStartedAt = DateTime.UtcNow;
             ClearScanProviderCache();
             currentTreeVersion++;
+            expandedStoragePaths.Clear();
+            storageTreeDeleteDirty = false;
             UpdateScanProgressState("正在扫描空间占用...", 0.56F, true, AntdUI.TType.None);
 
             RunBackground("正在扫描空间占用…", delegate
@@ -1106,10 +1239,11 @@ namespace AiCleanVolume.Desktop
             if (row == null || row.Item == null) return;
             storageContextRow = row;
             SetPathInputFromStorageRow(row);
+            TrackStorageExpandedPath(row, e.Expand);
 
             if (!e.Expand)
             {
-                bool released = CanReloadStorageNode(row.Item) ? row.ReleaseLoadedChildren() : row.ReleaseChildRows();
+                bool released = !storageTreeDeleteDirty && CanReloadStorageNode(row.Item) ? row.ReleaseLoadedChildren() : row.ReleaseChildRows();
                 if (released) storageTable.Refresh();
                 return;
             }
@@ -1208,9 +1342,21 @@ namespace AiCleanVolume.Desktop
             storageTable.SetSelected(row);
             if (eventArgs.Button != MouseButtons.Right) return;
 
+            openStorageMenuItem.Enabled = !string.IsNullOrWhiteSpace(row.Item.Path);
             deleteStorageMenuItem.Enabled = CanOfferStorageDelete(row);
             deleteStorageMenuItem.Text = "删除" + (row.Item.IsDirectory ? "文件夹" : "文件");
             storageContextMenu.Show(storageTable, new Point(eventArgs.X, eventArgs.Y));
+        }
+
+        private void OpenStorageMenuItem_Click(object sender, EventArgs eventArgs)
+        {
+            OpenStorageRow(storageContextRow);
+        }
+
+        private void OpenStorageRow(StorageEntryRow row)
+        {
+            if (row == null || row.Item == null || string.IsNullOrWhiteSpace(row.Item.Path)) return;
+            explorerService.OpenPath(row.Item.Path, !row.Item.IsDirectory);
         }
 
         private void DeleteStorageMenuItem_Click(object sender, EventArgs eventArgs)
@@ -1328,11 +1474,9 @@ namespace AiCleanVolume.Desktop
 
         private bool ConfirmStorageDelete(StorageEntryRow row, SandboxEvaluation sandbox)
         {
-            string targetType = row.Item.IsDirectory ? "文件夹" : "文件";
-            string actionText = settings.Sandbox.UseRecycleBin ? "将此" + targetType + "移入回收站" : "永久删除此" + targetType;
-            string message = "确定要" + actionText + "吗？" +
+            string message = "确认要删除此文件（夹）吗？" +
                 Environment.NewLine + Environment.NewLine +
-                row.Item.Path +
+                "路径：" + row.Item.Path +
                 Environment.NewLine + Environment.NewLine +
                 "大小：" + StorageFormatting.FormatBytes(row.Item.Bytes);
 
@@ -1346,10 +1490,15 @@ namespace AiCleanVolume.Desktop
                 message += Environment.NewLine + Environment.NewLine + "当前配置为永久删除，无法从回收站恢复。";
             }
 
-            MessageBoxIcon icon = !settings.Sandbox.UseRecycleBin || (sandbox != null && sandbox.Action == SandboxAction.RequireConfirmation)
-                ? MessageBoxIcon.Warning
-                : MessageBoxIcon.Question;
-            DialogResult confirm = MessageBox.Show(this, message, "确认删除", MessageBoxButtons.OKCancel, icon);
+            AntdUI.TType icon = !settings.Sandbox.UseRecycleBin || (sandbox != null && sandbox.Action == SandboxAction.RequireConfirmation)
+                ? AntdUI.TType.Warn
+                : AntdUI.TType.Info;
+            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "确认删除", message, icon);
+            config.OkText = "确认删除";
+            config.CancelText = "取消";
+            config.OkType = AntdUI.TTypeMini.Error;
+            config.MaskClosable = false;
+            DialogResult confirm = AntdUI.Modal.open(config);
             return confirm == DialogResult.OK;
         }
 
@@ -1379,18 +1528,69 @@ namespace AiCleanVolume.Desktop
                 return;
             }
 
+            StorageItem removedItem = row.Item;
             List<StorageItem> ancestors = new List<StorageItem>();
-            if (!TryRemoveStorageItem(currentRoot, row.Item, ancestors))
+            if (!TryRemoveStorageItem(currentRoot, removedItem, ancestors))
             {
                 storageTable.Refresh();
                 return;
             }
 
-            AdjustAncestorStats(ancestors, row.Item);
+            AdjustAncestorStats(ancestors, removedItem);
             UpdatePathAfterStorageDelete(row, ancestors);
-            InvalidateStorageTreeSession();
-            RebindStorageTree();
+            RemoveStorageRowFromParent(row);
+            RefreshStorageAncestorRows(row.Parent);
+            RemoveExpandedStoragePathsFor(removedItem.Path);
             currentTreeVersion++;
+            storageTreeDeleteDirty = true;
+            if (row.Parent != null) storageTable.SetSelected(row.Parent);
+            storageTable.Refresh();
+        }
+
+        private static void RemoveStorageRowFromParent(StorageEntryRow row)
+        {
+            if (row == null || row.Parent == null || row.Parent.Children == null) return;
+            row.Parent.Children.Remove(row);
+        }
+
+        private static void RefreshStorageAncestorRows(StorageEntryRow row)
+        {
+            StorageEntryRow current = row;
+            while (current != null)
+            {
+                current.RefreshDisplayValues();
+                current = current.Parent;
+            }
+        }
+
+        private void RemoveExpandedStoragePathsFor(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || expandedStoragePaths.Count == 0) return;
+
+            List<string> removeKeys = new List<string>();
+            foreach (string expandedPath in expandedStoragePaths)
+            {
+                if (IsSameOrChildPath(expandedPath, path)) removeKeys.Add(expandedPath);
+            }
+
+            for (int index = 0; index < removeKeys.Count; index++) expandedStoragePaths.Remove(removeKeys[index]);
+        }
+
+        private void TrackStorageExpandedPath(StorageEntryRow row, bool expanded)
+        {
+            if (row == null || row.Item == null || string.IsNullOrWhiteSpace(row.Item.Path)) return;
+
+            string key = NormalizePathForComparison(row.Item.Path);
+            if (string.IsNullOrWhiteSpace(key)) return;
+
+            if (expanded) expandedStoragePaths.Add(key);
+            else expandedStoragePaths.Remove(key);
+        }
+
+        private bool IsStorageRowExpanded(StorageEntryRow row)
+        {
+            if (row == null || row.Item == null || string.IsNullOrWhiteSpace(row.Item.Path)) return false;
+            return expandedStoragePaths.Contains(NormalizePathForComparison(row.Item.Path));
         }
 
         private static bool TryRemoveStorageItem(StorageItem parent, StorageItem target, IList<StorageItem> ancestors)
@@ -1547,7 +1747,15 @@ namespace AiCleanVolume.Desktop
         {
             StorageEntryRow row = e.Record as StorageEntryRow;
             if (row == null || row.Item == null) return;
-            explorerService.OpenPath(row.path, !row.Item.IsDirectory);
+            storageContextRow = row;
+            if (row.Item.IsDirectory && row.Item.HasChildren)
+            {
+                bool expanded = IsStorageRowExpanded(row);
+                storageTable.Expand(row, !expanded);
+                return;
+            }
+
+            OpenStorageRow(row);
         }
 
         private void SuggestionTable_CellDoubleClick(object sender, AntdUI.TableClickEventArgs e)
@@ -2160,6 +2368,16 @@ namespace AiCleanVolume.Desktop
             return input;
         }
 
+        private AntdUI.Select CreateSelect()
+        {
+            AntdUI.Select select = new AntdUI.Select();
+            select.Dock = DockStyle.Fill;
+            select.DropDownArrow = true;
+            select.ListAutoWidth = true;
+            select.Font = Font;
+            return select;
+        }
+
         private static Label CreateCaption(string text)
         {
             Label label = new Label();
@@ -2224,6 +2442,20 @@ namespace AiCleanVolume.Desktop
         {
             public CleanupSuggestionRow Row { get; set; }
             public CleanupResult Result { get; set; }
+        }
+
+        private sealed class AiPromptPreset
+        {
+            public AiPromptPreset(string key, string name, string prompt)
+            {
+                Key = key;
+                Name = name;
+                Prompt = prompt;
+            }
+
+            public string Key { get; private set; }
+            public string Name { get; private set; }
+            public string Prompt { get; private set; }
         }
     }
 }
