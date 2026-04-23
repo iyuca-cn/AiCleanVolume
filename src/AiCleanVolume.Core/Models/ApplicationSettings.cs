@@ -36,25 +36,32 @@ namespace AiCleanVolume.Core.Models
     {
         private const string LegacySystemPrompt = "你是 Windows C 盘清理助手。只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON。";
         public const string DefaultSystemPrompt = "你是 Windows C 盘清理助手。请你只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。";
+        public const string StandardApiAccessMode = "standard_api";
+        public const string TwoApiAccessMode = "two_api";
 
         public AiSettings()
         {
             Enabled = false;
+            AccessMode = StandardApiAccessMode;
             Endpoint = "https://api.openai.com";
             Model = "gpt-4o-mini";
             MaxSuggestions = 30;
             SystemPrompt = DefaultSystemPrompt;
+            ModelCookieMappings = new List<AiModelCookieMapping>();
         }
 
         public bool Enabled { get; set; }
+        public string AccessMode { get; set; }
         public string Endpoint { get; set; }
         public string ApiKey { get; set; }
         public string Model { get; set; }
         public int MaxSuggestions { get; set; }
         public string SystemPrompt { get; set; }
+        public IList<AiModelCookieMapping> ModelCookieMappings { get; set; }
 
         public void EnsureDefaults()
         {
+            AccessMode = NormalizeAccessMode(AccessMode);
             if (string.IsNullOrWhiteSpace(Endpoint)) Endpoint = "https://api.openai.com";
             if (string.IsNullOrWhiteSpace(Model)) Model = "gpt-4o-mini";
             if (MaxSuggestions <= 0) MaxSuggestions = 30;
@@ -62,7 +69,60 @@ namespace AiCleanVolume.Core.Models
             {
                 SystemPrompt = DefaultSystemPrompt;
             }
+            ModelCookieMappings = NormalizeModelCookieMappings(ModelCookieMappings);
         }
+
+        public static string NormalizeAccessMode(string value)
+        {
+            string normalized = NormalizeValue(value);
+            if (string.Equals(normalized, TwoApiAccessMode, StringComparison.OrdinalIgnoreCase)) return TwoApiAccessMode;
+            return StandardApiAccessMode;
+        }
+
+        public static IList<AiModelCookieMapping> NormalizeModelCookieMappings(IEnumerable<AiModelCookieMapping> mappings)
+        {
+            List<AiModelCookieMapping> result = new List<AiModelCookieMapping>();
+            Dictionary<string, int> indexes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (mappings == null) return result;
+
+            foreach (AiModelCookieMapping mapping in mappings)
+            {
+                if (mapping == null) continue;
+                string model = NormalizeValue(mapping.Model);
+                string cookie = NormalizeValue(mapping.Cookie);
+                if (string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(cookie)) continue;
+
+                AiModelCookieMapping normalized = new AiModelCookieMapping
+                {
+                    Model = model,
+                    Cookie = cookie
+                };
+
+                int existingIndex;
+                if (indexes.TryGetValue(model, out existingIndex))
+                {
+                    result[existingIndex] = normalized;
+                }
+                else
+                {
+                    indexes.Add(model, result.Count);
+                    result.Add(normalized);
+                }
+            }
+
+            return result;
+        }
+
+        private static string NormalizeValue(string value)
+        {
+            return (value ?? string.Empty).Trim();
+        }
+    }
+
+    public sealed class AiModelCookieMapping
+    {
+        public string Model { get; set; }
+        public string Cookie { get; set; }
     }
 
     public sealed class SandboxSettings

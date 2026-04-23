@@ -29,10 +29,20 @@ namespace AiCleanVolume.Desktop.Services
             {
                 string prompt = BuildPrompt(root, candidates, settings.Ai.MaxSuggestions);
                 string endpoint = settings.Ai.Endpoint.TrimEnd('/');
+                string accessMode = AiSettings.NormalizeAccessMode(settings.Ai.AccessMode);
                 RestClient client = new RestClient(endpoint);
                 RestRequest request = new RestRequest(ResolveChatCompletionsPath(endpoint), Method.POST);
-                if (!string.IsNullOrWhiteSpace(settings.Ai.ApiKey)) request.AddHeader("Authorization", "Bearer " + settings.Ai.ApiKey);
                 request.AddHeader("Content-Type", "application/json");
+                if (string.Equals(accessMode, AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase))
+                {
+                    string providerCookie = ResolveProviderCookie(settings.Ai);
+                    if (string.IsNullOrWhiteSpace(providerCookie)) return fallback.Analyze(root, candidates, settings);
+                    request.AddHeader("X-Provider-Cookie", providerCookie);
+                }
+                else if (!string.IsNullOrWhiteSpace(settings.Ai.ApiKey))
+                {
+                    request.AddHeader("Authorization", "Bearer " + settings.Ai.ApiKey);
+                }
                 request.AddParameter("application/json", JsonConvert.SerializeObject(new
                 {
                     model = settings.Ai.Model,
@@ -190,12 +200,35 @@ namespace AiCleanVolume.Desktop.Services
             return result;
         }
 
+        private static string ResolveProviderCookie(AiSettings settings)
+        {
+            if (settings == null || string.IsNullOrWhiteSpace(settings.Model) || settings.ModelCookieMappings == null) return null;
+
+            string currentModel = NormalizeValue(settings.Model);
+            for (int i = 0; i < settings.ModelCookieMappings.Count; i++)
+            {
+                AiModelCookieMapping mapping = settings.ModelCookieMappings[i];
+                if (mapping == null) continue;
+                if (!string.Equals(NormalizeValue(mapping.Model), currentModel, StringComparison.OrdinalIgnoreCase)) continue;
+
+                string cookie = NormalizeValue(mapping.Cookie);
+                return string.IsNullOrWhiteSpace(cookie) ? null : cookie;
+            }
+
+            return null;
+        }
+
         private static CleanupRisk ParseRisk(string value, CleanupRisk fallbackRisk)
         {
             if (string.Equals(value, "Low", StringComparison.OrdinalIgnoreCase)) return CleanupRisk.Low;
             if (string.Equals(value, "Medium", StringComparison.OrdinalIgnoreCase)) return CleanupRisk.Medium;
             if (string.Equals(value, "High", StringComparison.OrdinalIgnoreCase)) return CleanupRisk.High;
             return fallbackRisk;
+        }
+
+        private static string NormalizeValue(string value)
+        {
+            return (value ?? string.Empty).Trim();
         }
 
         private static string Normalize(string path)

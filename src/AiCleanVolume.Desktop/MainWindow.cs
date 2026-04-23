@@ -115,6 +115,7 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Switch recycleSwitch;
         private AntdUI.Checkbox privilegedCheckbox;
         private AntdUI.Checkbox privilegedQuickCheckbox;
+        private AntdUI.Select aiAccessModeSelect;
         private AntdUI.Input endpointInput;
         private AntdUI.Input apiKeyInput;
         private AntdUI.Input modelInput;
@@ -122,6 +123,7 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Select aiProviderPresetSelect;
         private AntdUI.Select aiPromptPresetSelect;
         private AntdUI.Input systemPromptInput;
+        private AntdUI.Input modelCookieMappingsInput;
         private AntdUI.Input allowRootsInput;
         private AntdUI.Input logInput;
 
@@ -714,12 +716,14 @@ namespace AiCleanVolume.Desktop
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
             layout.ColumnCount = 4;
-            layout.RowCount = 8;
+            layout.RowCount = 10;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
             for (int i = 0; i < 6; i++) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 86F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 122F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
@@ -727,6 +731,9 @@ namespace AiCleanVolume.Desktop
             recycleSwitch = new AntdUI.Switch();
             privilegedCheckbox = CreateCheckbox("启用完全权限（管理员）");
             privilegedCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
+            aiAccessModeSelect = CreateSelect();
+            PopulateAiAccessModes();
+            aiAccessModeSelect.SelectedValueChanged += AiAccessModeSelect_SelectedValueChanged;
             endpointInput = CreateInput("https://api.openai.com");
             apiKeyInput = CreateInput("sk-...");
             modelInput = CreateInput("gpt-4o-mini");
@@ -743,6 +750,9 @@ namespace AiCleanVolume.Desktop
             systemPromptInput.Multiline = true;
             systemPromptInput.AutoScroll = true;
             systemPromptInput.TextChanged += SystemPromptInput_TextChanged;
+            modelCookieMappingsInput = CreateInput("每行一条：provider/model=完整 Cookie 字符串");
+            modelCookieMappingsInput.Multiline = true;
+            modelCookieMappingsInput.AutoScroll = true;
             allowRootsInput = CreateInput("每行一个允许位置");
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
@@ -757,29 +767,37 @@ namespace AiCleanVolume.Desktop
             layout.Controls.Add(CreateCaption("建议条数"), 2, 1);
             layout.Controls.Add(maxSuggestionsInput, 3, 1);
 
-            layout.Controls.Add(CreateCaption("接口地址"), 0, 2);
-            layout.Controls.Add(endpointInput, 1, 2);
+            layout.Controls.Add(CreateCaption("接入类型"), 0, 2);
+            layout.Controls.Add(aiAccessModeSelect, 1, 2);
+            layout.SetColumnSpan(aiAccessModeSelect, 3);
+
+            layout.Controls.Add(CreateCaption("接口地址"), 0, 3);
+            layout.Controls.Add(endpointInput, 1, 3);
             layout.SetColumnSpan(endpointInput, 3);
 
-            layout.Controls.Add(CreateCaption("模型"), 0, 3);
-            layout.Controls.Add(modelInput, 1, 3);
-            layout.Controls.Add(CreateCaption("API Key"), 2, 3);
-            layout.Controls.Add(apiKeyInput, 3, 3);
+            layout.Controls.Add(CreateCaption("模型"), 0, 4);
+            layout.Controls.Add(modelInput, 1, 4);
+            layout.Controls.Add(CreateCaption("API Key"), 2, 4);
+            layout.Controls.Add(apiKeyInput, 3, 4);
 
-            layout.Controls.Add(CreateCaption("接口预设"), 0, 4);
-            layout.Controls.Add(aiProviderPresetSelect, 1, 4);
+            layout.Controls.Add(CreateCaption("接口预设"), 0, 5);
+            layout.Controls.Add(aiProviderPresetSelect, 1, 5);
             layout.SetColumnSpan(aiProviderPresetSelect, 3);
 
-            layout.Controls.Add(CreateCaption("AI 预设"), 0, 5);
-            layout.Controls.Add(aiPromptPresetSelect, 1, 5);
+            layout.Controls.Add(CreateCaption("模型 Cookie"), 0, 6);
+            layout.Controls.Add(modelCookieMappingsInput, 1, 6);
+            layout.SetColumnSpan(modelCookieMappingsInput, 3);
+
+            layout.Controls.Add(CreateCaption("AI 预设"), 0, 7);
+            layout.Controls.Add(aiPromptPresetSelect, 1, 7);
             layout.SetColumnSpan(aiPromptPresetSelect, 3);
 
-            layout.Controls.Add(CreateCaption("系统提示"), 0, 6);
-            layout.Controls.Add(systemPromptInput, 1, 6);
+            layout.Controls.Add(CreateCaption("系统提示"), 0, 8);
+            layout.Controls.Add(systemPromptInput, 1, 8);
             layout.SetColumnSpan(systemPromptInput, 3);
 
-            layout.Controls.Add(CreateCaption("允许位置"), 0, 7);
-            layout.Controls.Add(allowRootsInput, 1, 7);
+            layout.Controls.Add(CreateCaption("允许位置"), 0, 9);
+            layout.Controls.Add(allowRootsInput, 1, 9);
             layout.SetColumnSpan(allowRootsInput, 3);
 
             panel.Controls.Add(layout);
@@ -954,7 +972,7 @@ namespace AiCleanVolume.Desktop
                 case PageLog:
                     return "查看扫描、建议与删除流程的执行日志。";
                 case PageSettings:
-                    return "配置 AI 接口、建议数量、沙盒白名单和删除策略。";
+                    return "配置标准 API / 2API、建议数量、沙盒白名单和删除策略。";
                 default:
                     return "选择磁盘或目录，扫描空间占用，并快速进入空间树分析。";
             }
@@ -998,11 +1016,14 @@ namespace AiCleanVolume.Desktop
             aiEnabledSwitch.Checked = settings.Ai.Enabled;
             recycleSwitch.Checked = settings.Sandbox.UseRecycleBin;
             ApplyPrivilegedCheckboxState(settings.Sandbox.FullyPrivilegedMode);
+            aiAccessModeSelect.SelectedValue = settings.Ai.AccessMode;
             endpointInput.Text = settings.Ai.Endpoint;
             apiKeyInput.Text = settings.Ai.ApiKey;
             modelInput.Text = settings.Ai.Model;
             maxSuggestionsInput.Text = settings.Ai.MaxSuggestions.ToString();
             systemPromptInput.Text = settings.Ai.SystemPrompt;
+            modelCookieMappingsInput.Text = FormatModelCookieMappings(settings.Ai.ModelCookieMappings);
+            UpdateAiAccessModeUi();
             SelectAiProviderPresetForSettings(settings.Ai.Endpoint, settings.Ai.Model);
             SelectAiPromptPresetForPrompt(settings.Ai.SystemPrompt);
             minSizeInput.Text = settings.Scan.MinSizeMb.ToString();
@@ -1010,6 +1031,15 @@ namespace AiCleanVolume.Desktop
             sortSelect.SelectedValue = settings.Scan.SortMode;
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(settings.Sandbox.AllowedRoots);
             allowRootsInput.Text = string.Join(Environment.NewLine, new List<string>(settings.Sandbox.AllowedRoots).ToArray());
+        }
+
+        private void PopulateAiAccessModes()
+        {
+            if (aiAccessModeSelect == null) return;
+
+            aiAccessModeSelect.Items.Clear();
+            aiAccessModeSelect.Items.Add(new AntdUI.SelectItem("标准 API", AiSettings.StandardApiAccessMode));
+            aiAccessModeSelect.Items.Add(new AntdUI.SelectItem("2API", AiSettings.TwoApiAccessMode));
         }
 
         private void PopulateAiProviderPresets()
@@ -1179,6 +1209,31 @@ namespace AiCleanVolume.Desktop
             return privilegedCheckbox != null && privilegedCheckbox.Checked;
         }
 
+        private void AiAccessModeSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        {
+            UpdateAiAccessModeUi();
+        }
+
+        private void UpdateAiAccessModeUi()
+        {
+            bool twoApi = string.Equals(ResolveSelectedAiAccessMode(), AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase);
+            if (apiKeyInput != null)
+            {
+                apiKeyInput.Enabled = !twoApi;
+                apiKeyInput.PlaceholderText = twoApi ? "2API 模式不使用 API Key" : "sk-...";
+            }
+            if (modelCookieMappingsInput != null)
+            {
+                modelCookieMappingsInput.Enabled = true;
+            }
+        }
+
+        private string ResolveSelectedAiAccessMode()
+        {
+            if (aiAccessModeSelect == null || aiAccessModeSelect.SelectedValue == null) return AiSettings.StandardApiAccessMode;
+            return AiSettings.NormalizeAccessMode(aiAccessModeSelect.SelectedValue.ToString());
+        }
+
         private void AiProviderPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
             if (syncingAiProviderPreset || e.Value == null) return;
@@ -1226,11 +1281,13 @@ namespace AiCleanVolume.Desktop
         private void SaveSettingsFromUi()
         {
             settings.Ai.Enabled = aiEnabledSwitch.Checked;
+            settings.Ai.AccessMode = ResolveSelectedAiAccessMode();
             settings.Ai.Endpoint = endpointInput.Text.Trim();
             settings.Ai.ApiKey = apiKeyInput.Text.Trim();
             settings.Ai.Model = modelInput.Text.Trim();
             settings.Ai.MaxSuggestions = ParsePositiveInt(maxSuggestionsInput.Text, 30);
             settings.Ai.SystemPrompt = systemPromptInput.Text.Trim();
+            settings.Ai.ModelCookieMappings = ParseModelCookieMappings(modelCookieMappingsInput.Text);
             settings.Sandbox.UseRecycleBin = recycleSwitch.Checked;
             settings.Sandbox.FullyPrivilegedMode = IsFullyPrivilegedChecked();
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(ParseLines(allowRootsInput.Text));
@@ -2519,6 +2576,44 @@ namespace AiCleanVolume.Desktop
                 if (!string.IsNullOrWhiteSpace(value)) result.Add(value);
             }
             return result;
+        }
+
+        private static IList<AiModelCookieMapping> ParseModelCookieMappings(string text)
+        {
+            List<AiModelCookieMapping> mappings = new List<AiModelCookieMapping>();
+            string[] parts = (text ?? string.Empty).Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string line = parts[i].Trim();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                int separatorIndex = line.IndexOf('=');
+                if (separatorIndex <= 0 || separatorIndex == line.Length - 1) continue;
+
+                string model = line.Substring(0, separatorIndex).Trim();
+                string cookie = line.Substring(separatorIndex + 1).Trim();
+                if (string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(cookie)) continue;
+
+                mappings.Add(new AiModelCookieMapping
+                {
+                    Model = model,
+                    Cookie = cookie
+                });
+            }
+
+            return AiSettings.NormalizeModelCookieMappings(mappings);
+        }
+
+        private static string FormatModelCookieMappings(IEnumerable<AiModelCookieMapping> mappings)
+        {
+            IList<AiModelCookieMapping> normalized = AiSettings.NormalizeModelCookieMappings(mappings);
+            List<string> lines = new List<string>();
+            for (int i = 0; i < normalized.Count; i++)
+            {
+                lines.Add(normalized[i].Model + "=" + normalized[i].Cookie);
+            }
+
+            return string.Join(Environment.NewLine, lines.ToArray());
         }
 
         private static int ParsePositiveInt(string text, int fallback)
