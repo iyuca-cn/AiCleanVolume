@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
@@ -35,7 +36,7 @@ namespace AiCleanVolume.Desktop
         private const int SidebarRailWidth = 10;
         private const string CustomAiPromptPresetKey = "__custom__";
         private const string CustomAiProviderPresetKey = "__custom__";
-        private const string DefaultAiSystemPrompt = "你是 Windows C 盘清理助手。请你只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。";
+        private const string DefaultAiSystemPrompt = "你是 Windows 磁盘清理助手。请你只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。";
         private static readonly AiPromptPreset[] AiPromptPresets =
         {
             new AiPromptPreset("standard", "标准清理", DefaultAiSystemPrompt),
@@ -92,6 +93,9 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Button regularCleanButton;
         private AntdUI.Button deleteButton;
         private AntdUI.Button saveSettingsButton;
+        private AntdUI.Button selectAllSuggestionsButton;
+        private AntdUI.Button clearAllSuggestionsButton;
+        private AntdUI.Button invertSuggestionsButton;
         private string activePageId;
 
         private AntdUI.Select driveSelect;
@@ -663,11 +667,26 @@ namespace AiCleanVolume.Desktop
             optionsBar.Padding = new Padding(0, 0, 0, 6);
             optionsBar.BackColor = Color.Transparent;
 
+            invertSuggestionsButton = CreateSuggestionActionButton("反选", AntdUI.TTypeMini.Default);
+            invertSuggestionsButton.Click += delegate { InvertSuggestionSelection(); };
+            invertSuggestionsButton.Dock = DockStyle.Right;
+
+            clearAllSuggestionsButton = CreateSuggestionActionButton("全不选", AntdUI.TTypeMini.Default);
+            clearAllSuggestionsButton.Click += delegate { SetSuggestionSelection(false); };
+            clearAllSuggestionsButton.Dock = DockStyle.Right;
+
+            selectAllSuggestionsButton = CreateSuggestionActionButton("全选", AntdUI.TTypeMini.Primary);
+            selectAllSuggestionsButton.Click += delegate { SetSuggestionSelection(true); };
+            selectAllSuggestionsButton.Dock = DockStyle.Right;
+
             privilegedQuickCheckbox = CreateCheckbox("完全权限模式（仅管理员运行时生效）");
             privilegedQuickCheckbox.Dock = DockStyle.Left;
             privilegedQuickCheckbox.Width = 280;
             privilegedQuickCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
             optionsBar.Controls.Add(privilegedQuickCheckbox);
+            optionsBar.Controls.Add(invertSuggestionsButton);
+            optionsBar.Controls.Add(clearAllSuggestionsButton);
+            optionsBar.Controls.Add(selectAllSuggestionsButton);
 
             suggestionTable = new AntdUI.Table();
             suggestionTable.Dock = DockStyle.Fill;
@@ -1096,7 +1115,12 @@ namespace AiCleanVolume.Desktop
 
         private static string NormalizePromptForComparison(string prompt)
         {
-            return (prompt ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n").Trim();
+            string normalized = (prompt ?? string.Empty).Replace("\r\n", "\n").Replace("\r", "\n").Trim();
+            normalized = Regex.Replace(normalized, "[A-Za-z]\\s*盘", "{driveLabel}");
+            normalized = Regex.Replace(normalized, "[A-Za-z]:\\\\", "{driveRoot}");
+            normalized = normalized.Replace("当前重点分析 Windows {driveLabel}（{driveRoot}）下的候选路径。", string.Empty);
+            normalized = Regex.Replace(normalized, "Windows\\s*\\{driveLabel\\}\\s*清理助手", "Windows 磁盘清理助手");
+            return normalized;
         }
 
         private static string NormalizeEndpoint(string endpoint)
@@ -1231,6 +1255,7 @@ namespace AiCleanVolume.Desktop
             driveSelect.SelectedValue = defaultDrive;
             pathInput.Text = defaultDrive;
             UpdateDriveSummaryForLocation(defaultDrive);
+            RefreshPromptForCurrentLocation();
         }
 
         private void DriveSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
@@ -1238,6 +1263,7 @@ namespace AiCleanVolume.Desktop
             if (e.Value == null) return;
             pathInput.Text = e.Value.ToString();
             UpdateDriveSummaryForLocation(pathInput.Text);
+            RefreshPromptForCurrentLocation();
         }
 
         private void PathInput_TextChanged(object sender, EventArgs e)
@@ -1248,6 +1274,7 @@ namespace AiCleanVolume.Desktop
                 location = driveSelect.SelectedValue.ToString();
             }
             UpdateDriveSummaryForLocation(location);
+            RefreshPromptForCurrentLocation();
         }
 
         private void AiPromptPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
@@ -1263,7 +1290,7 @@ namespace AiCleanVolume.Desktop
             syncingAiPromptPreset = true;
             try
             {
-                systemPromptInput.Text = preset.Prompt;
+                systemPromptInput.Text = preset.BuildPrompt(GetPromptDriveRoot());
             }
             finally
             {
@@ -1279,17 +1306,25 @@ namespace AiCleanVolume.Desktop
 
         private void ScanCurrentLocation()
         {
+            ScanCurrentLocation(null, null);
+        }
+
+        private void ScanCurrentLocation(Action onCompleted, string statusText)
+        {
             SaveSettingsFromUi();
-            ScanRequest request = BuildScanRequest(1);
+            string location = ResolveSelectedLocation();
+            ScanRequest request = BuildScanRequest(location, 1);
             StorageItem result = null;
             DateTime scanStartedAt = DateTime.UtcNow;
             ClearScanProviderCache();
             currentTreeVersion++;
             expandedStoragePaths.Clear();
             storageTreeDeleteDirty = false;
-            UpdateScanProgressState("正在扫描空间占用...", 0.56F, true, AntdUI.TType.None);
+            string progressText = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用..." : statusText;
+            string workerCaption = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用…" : statusText;
+            UpdateScanProgressState(progressText, 0.56F, true, AntdUI.TType.None);
 
-            RunBackground("正在扫描空间占用…", delegate
+            RunBackground(workerCaption, delegate
             {
                 result = scanProvider.Scan(request);
             }, delegate
@@ -1304,6 +1339,7 @@ namespace AiCleanVolume.Desktop
                 UpdateDriveSummaryForLocation(result.Path);
                 UpdateScanProgressState("扫描完成 " + elapsed.TotalSeconds.ToString("0.00") + " 秒", 1F, false, AntdUI.TType.Success);
                 Log("扫描完成：" + result.Path + "，大小 " + StorageFormatting.FormatBytes(result.Bytes));
+                if (onCompleted != null) onCompleted();
             }, delegate
             {
                 UpdateScanProgressState("扫描失败", 1F, false, AntdUI.TType.Error);
@@ -1322,16 +1358,23 @@ namespace AiCleanVolume.Desktop
 
         private void AnalyzeSuggestionsCore(bool preferAi)
         {
-            if (currentRoot == null)
+            string location = ResolveSelectedLocation();
+            if (NeedAutoScanBeforeAnalyze(location))
             {
-                MessageBox.Show(this, "请先完成一次扫描。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string actionName = preferAi ? "AI 识别" : "常规清理";
+                Log("未发现当前所选位置的扫描结果，先自动扫描：" + location);
+                ScanCurrentLocation(delegate
+                {
+                    Log("自动扫描完成，继续执行" + actionName + "。");
+                    AnalyzeSuggestionsCore(preferAi);
+                }, "未发现当前所选位置的扫描结果，正在自动扫描...");
                 return;
             }
 
             SaveSettingsFromUi();
             IList<CleanupSuggestion> suggestions = null;
             StorageItem analysisRoot = null;
-            ScanRequest request = BuildScanRequest(currentRoot.Path, -1);
+            ScanRequest request = BuildScanRequest(location, -1);
             string caption = preferAi ? "正在生成 AI 清理建议…" : "正在生成常规清理列表…";
 
             RunBackground(caption, delegate
@@ -1909,8 +1952,97 @@ namespace AiCleanVolume.Desktop
 
         private ScanRequest BuildScanRequest(int loadDepth)
         {
-            string location = string.IsNullOrWhiteSpace(pathInput.Text) ? "C:\\" : pathInput.Text.Trim();
+            string location = ResolveSelectedLocation();
             return BuildScanRequest(location, loadDepth);
+        }
+
+        private string ResolveSelectedLocation()
+        {
+            string location = pathInput == null ? null : pathInput.Text;
+            if (string.IsNullOrWhiteSpace(location) && driveSelect != null && driveSelect.SelectedValue != null)
+            {
+                location = driveSelect.SelectedValue.ToString();
+            }
+
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                string defaultDrive = Environment.GetEnvironmentVariable("SystemDrive");
+                if (string.IsNullOrWhiteSpace(defaultDrive)) defaultDrive = "C:";
+                location = defaultDrive.TrimEnd('\\') + "\\";
+            }
+
+            return location.Trim();
+        }
+
+        private bool NeedAutoScanBeforeAnalyze(string location)
+        {
+            if (currentRoot == null) return true;
+            return !IsSamePath(currentRoot.Path, location);
+        }
+
+        private void SetSuggestionSelection(bool selected)
+        {
+            if (suggestionRows == null || suggestionRows.Count == 0) return;
+
+            for (int i = 0; i < suggestionRows.Count; i++)
+            {
+                CleanupSuggestionRow row = suggestionRows[i];
+                if (row == null || row.Suggestion == null || row.Suggestion.Status == CleanupStatus.Deleted) continue;
+                row.selected = selected;
+            }
+
+            if (suggestionTable != null) suggestionTable.Refresh();
+        }
+
+        private void InvertSuggestionSelection()
+        {
+            if (suggestionRows == null || suggestionRows.Count == 0) return;
+
+            for (int i = 0; i < suggestionRows.Count; i++)
+            {
+                CleanupSuggestionRow row = suggestionRows[i];
+                if (row == null || row.Suggestion == null || row.Suggestion.Status == CleanupStatus.Deleted) continue;
+                row.selected = !row.selected;
+            }
+
+            if (suggestionTable != null) suggestionTable.Refresh();
+        }
+
+        private void RefreshPromptForCurrentLocation()
+        {
+            if (systemPromptInput == null) return;
+
+            AiPromptPreset preset = null;
+            if (aiPromptPresetSelect != null && aiPromptPresetSelect.SelectedValue != null)
+            {
+                string key = aiPromptPresetSelect.SelectedValue.ToString();
+                if (!string.Equals(key, CustomAiPromptPresetKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    preset = FindAiPromptPreset(key);
+                }
+            }
+
+            if (preset == null) preset = FindAiPromptPresetByPrompt(systemPromptInput.Text);
+            if (preset == null) return;
+
+            syncingAiPromptPreset = true;
+            try
+            {
+                if (aiPromptPresetSelect != null) aiPromptPresetSelect.SelectedValue = preset.Key;
+                systemPromptInput.Text = preset.BuildPrompt(GetPromptDriveRoot());
+            }
+            finally
+            {
+                syncingAiPromptPreset = false;
+            }
+        }
+
+        private string GetPromptDriveRoot()
+        {
+            string driveRoot = TryGetDriveRoot(ResolveSelectedLocation());
+            if (string.IsNullOrWhiteSpace(driveRoot) && currentRoot != null) driveRoot = TryGetDriveRoot(currentRoot.Path);
+            if (string.IsNullOrWhiteSpace(driveRoot)) driveRoot = "C:\\";
+            return driveRoot;
         }
 
         private ScanRequest BuildScanRequest(string location, int loadDepth)
@@ -2166,6 +2298,9 @@ namespace AiCleanVolume.Desktop
             regularCleanButton.Enabled = !busy;
             deleteButton.Enabled = !busy;
             saveSettingsButton.Enabled = !busy;
+            if (selectAllSuggestionsButton != null) selectAllSuggestionsButton.Enabled = !busy;
+            if (clearAllSuggestionsButton != null) clearAllSuggestionsButton.Enabled = !busy;
+            if (invertSuggestionsButton != null) invertSuggestionsButton.Enabled = !busy;
             if (privilegedCheckbox != null) privilegedCheckbox.Enabled = !busy;
             if (privilegedQuickCheckbox != null) privilegedQuickCheckbox.Enabled = !busy;
             titleBar.Description = description;
@@ -2575,6 +2710,20 @@ namespace AiCleanVolume.Desktop
             return button;
         }
 
+        private static AntdUI.Button CreateSuggestionActionButton(string text, AntdUI.TTypeMini type)
+        {
+            AntdUI.Button button = new AntdUI.Button();
+            button.AutoSizeMode = AntdUI.TAutoSize.None;
+            button.Text = text;
+            button.Type = type;
+            button.Width = 78;
+            button.Height = 28;
+            button.Radius = 6;
+            button.BorderWidth = 1F;
+            button.Margin = new Padding(8, 0, 0, 0);
+            return button;
+        }
+
         private static AntdUI.Input CreateInput(string placeholder)
         {
             AntdUI.Input input = new AntdUI.Input();
@@ -2697,6 +2846,31 @@ namespace AiCleanVolume.Desktop
             public string Key { get; private set; }
             public string Name { get; private set; }
             public string Prompt { get; private set; }
+
+            public string BuildPrompt(string driveRoot)
+            {
+                return BuildDriveScopedPrompt(Prompt, driveRoot);
+            }
+        }
+
+        private static string BuildDriveScopedPrompt(string prompt, string driveRoot)
+        {
+            string driveLabel = FormatDriveLabel(driveRoot);
+            string normalizedRoot = NormalizeDriveRootText(driveRoot);
+            return "当前重点分析 Windows " + driveLabel + "（" + normalizedRoot + "）下的候选路径。" + prompt;
+        }
+
+        private static string NormalizeDriveRootText(string driveRoot)
+        {
+            string root = TryGetDriveRoot(driveRoot);
+            return string.IsNullOrWhiteSpace(root) ? "当前所选位置" : root;
+        }
+
+        private static string FormatDriveLabel(string driveRoot)
+        {
+            string root = TryGetDriveRoot(driveRoot);
+            if (string.IsNullOrWhiteSpace(root) || root.Length < 2) return "当前磁盘";
+            return char.ToUpperInvariant(root[0]) + "盘";
         }
 
         private sealed class AiProviderPreset
