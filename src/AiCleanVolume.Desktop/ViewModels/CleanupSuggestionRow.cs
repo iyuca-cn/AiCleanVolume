@@ -18,7 +18,11 @@ namespace AiCleanVolume.Desktop.ViewModels
             risk = CreateRiskBadge(suggestion.Risk);
             sandbox = CreateSandboxBadge(suggestion.Sandbox);
             status = CreateStatusBadge(suggestion.Status);
-            actions = new AntdUI.CellLink[] { new AntdUI.CellButton("open", "查看", AntdUI.TTypeMini.Primary).SetBorder().SetGhost() };
+            actions = new AntdUI.CellLink[]
+            {
+                new AntdUI.CellButton("open", "查看", AntdUI.TTypeMini.Primary).SetBorder().SetGhost(),
+                new AntdUI.CellButton("delete", "删除", AntdUI.TTypeMini.Error).SetBorder().SetGhost()
+            };
         }
 
         public CleanupSuggestion Suggestion { get; private set; }

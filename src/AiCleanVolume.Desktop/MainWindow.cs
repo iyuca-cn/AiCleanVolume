@@ -1055,7 +1055,7 @@ namespace AiCleanVolume.Desktop
                 new AntdUI.Column("source", "来源", AntdUI.ColumnAlign.Center).SetWidth("108"),
                 new AntdUI.Column("status", "状态", AntdUI.ColumnAlign.Center).SetWidth("86"),
                 new AntdUI.Column("details", "路径与说明").SetWidth("auto").SetLineBreak(),
-                new AntdUI.Column("actions", "操作").SetWidth("86")
+                new AntdUI.Column("actions", "操作").SetWidth("132")
             };
         }
 
@@ -1779,7 +1779,7 @@ namespace AiCleanVolume.Desktop
             RefreshSuggestionSandboxFromCurrentSettings();
             if (suggestionRows == null || suggestionRows.Count == 0)
             {
-                MessageBox.Show(this, "当前没有可删除的建议项。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AntdUI.Modal.open(this, "提示", "当前没有可删除的建议项。", AntdUI.TType.Info);
                 return;
             }
 
@@ -1797,11 +1797,42 @@ namespace AiCleanVolume.Desktop
 
             if (selectedRows.Count == 0)
             {
-                MessageBox.Show(this, "请先勾选至少一项。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AntdUI.Modal.open(this, "提示", "请先勾选至少一项。", AntdUI.TType.Info);
                 return;
             }
 
-            string message = "即将删除 " + selectedRows.Count + " 项。" +
+            DeleteSuggestionRows(selectedRows);
+        }
+
+        private void DeleteSingleSuggestion(CleanupSuggestionRow row)
+        {
+            if (row == null || row.Suggestion == null) return;
+            SaveSettingsFromUi();
+            RefreshSuggestionSandboxFromCurrentSettings();
+            if (row.Suggestion.Status == CleanupStatus.Deleted)
+            {
+                AntdUI.Modal.open(this, "提示", "该建议项已删除。", AntdUI.TType.Info);
+                return;
+            }
+
+            DeleteSuggestionRows(new List<CleanupSuggestionRow> { row });
+        }
+
+        private void DeleteSuggestionRows(List<CleanupSuggestionRow> rows)
+        {
+            if (rows == null || rows.Count == 0) return;
+
+            int needConfirmation = 0;
+            long totalBytes = 0;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                CleanupSuggestionRow row = rows[i];
+                if (row == null || row.Suggestion == null) continue;
+                totalBytes += row.Suggestion.Bytes;
+                if (row.Suggestion.Sandbox != null && row.Suggestion.Sandbox.Action == SandboxAction.RequireConfirmation) needConfirmation++;
+            }
+
+            string message = "即将删除 " + rows.Count + " 项。" +
                 Environment.NewLine + Environment.NewLine +
                 "总大小：" + StorageFormatting.FormatBytes(totalBytes);
             if (needConfirmation > 0)
@@ -1809,12 +1840,9 @@ namespace AiCleanVolume.Desktop
                 message += Environment.NewLine + Environment.NewLine + "其中 " + needConfirmation + " 项未命中白名单，需要你承担确认责任。";
             }
 
-            if (!settings.Sandbox.UseRecycleBin)
-            {
-                message += Environment.NewLine + Environment.NewLine + "当前配置为永久删除，无法从回收站恢复。";
-            }
+            message += Environment.NewLine + Environment.NewLine + "当前使用 WinAPI 直接删除，不经过回收站，无法从回收站恢复。";
 
-            AntdUI.TType icon = needConfirmation > 0 || !settings.Sandbox.UseRecycleBin ? AntdUI.TType.Warn : AntdUI.TType.Info;
+            AntdUI.TType icon = AntdUI.TType.Warn;
             AntdUI.Modal.Config config = AntdUI.Modal.config(this, "确认删除", message, icon);
             config.OkText = "确认删除";
             config.CancelText = "取消";
@@ -1824,24 +1852,37 @@ namespace AiCleanVolume.Desktop
             if (confirm != DialogResult.OK) return;
 
             List<DeletionOutcome> outcomes = new List<DeletionOutcome>();
+            DateTime deleteStartedAt = DateTime.UtcNow;
             RunBackground("正在执行删除…", delegate
             {
-                for (int i = 0; i < selectedRows.Count; i++)
+                for (int i = 0; i < rows.Count; i++)
                 {
-                    CleanupSuggestionRow row = selectedRows[i];
+                    CleanupSuggestionRow row = rows[i];
+                    if (row == null || row.Suggestion == null) continue;
                     CleanupResult result = deletionService.Delete(row.Suggestion, settings.Sandbox.UseRecycleBin);
                     outcomes.Add(new DeletionOutcome { Row = row, Result = result });
                 }
             }, delegate
             {
+                int successCount = 0;
+                int failedCount = 0;
                 for (int i = 0; i < outcomes.Count; i++)
                 {
                     DeletionOutcome outcome = outcomes[i];
-                    if (outcome.Result.Success) outcome.Row.SetStatus(CleanupStatus.Deleted, outcome.Result.Message);
-                    else outcome.Row.SetStatus(CleanupStatus.Failed, outcome.Result.Message);
+                    if (outcome.Result.Success)
+                    {
+                        outcome.Row.SetStatus(CleanupStatus.Deleted, outcome.Result.Message);
+                        successCount++;
+                    }
+                    else
+                    {
+                        outcome.Row.SetStatus(CleanupStatus.Failed, outcome.Result.Message);
+                        failedCount++;
+                    }
                 }
                 suggestionTable.Refresh();
-                Log("删除流程执行完成。");
+                TimeSpan elapsed = DateTime.UtcNow - deleteStartedAt;
+                Log("删除流程执行完成：成功 " + successCount + " 项，失败 " + failedCount + " 项，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒。");
             });
         }
 
@@ -2534,7 +2575,9 @@ namespace AiCleanVolume.Desktop
         {
             CleanupSuggestionRow row = e.Record as CleanupSuggestionRow;
             if (row == null) return;
-            explorerService.OpenPath(row.path, !row.Suggestion.IsDirectory);
+            string key = e.Btn == null ? null : e.Btn.Id;
+            if (string.Equals(key, "delete", StringComparison.OrdinalIgnoreCase)) DeleteSingleSuggestion(row);
+            else explorerService.OpenPath(row.path, !row.Suggestion.IsDirectory);
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
