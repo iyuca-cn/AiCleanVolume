@@ -63,7 +63,7 @@ namespace AiCleanVolume.Desktop
         private readonly ReusableBackgroundWorker backgroundWorker;
         private readonly CandidatePlanner candidatePlanner;
         private readonly IAiCleanupAdvisor localAdvisor;
-        private readonly IAiCleanupAdvisor aiAdvisor;
+        private readonly OpenAiCompatibleAdvisor aiAdvisor;
         private readonly IDeletionSandbox deletionSandbox;
         private readonly IDeletionService deletionService;
         private readonly IExplorerService explorerService;
@@ -93,6 +93,7 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Button regularCleanButton;
         private AntdUI.Button deleteButton;
         private AntdUI.Button saveSettingsButton;
+        private AntdUI.Button testAiSettingsButton;
         private AntdUI.Button selectAllSuggestionsButton;
         private AntdUI.Button clearAllSuggestionsButton;
         private AntdUI.Button invertSuggestionsButton;
@@ -761,6 +762,8 @@ namespace AiCleanVolume.Desktop
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             aiEnabledSwitch = new AntdUI.Switch();
+            testAiSettingsButton = CreateSettingsActionButton("测试 AI", AntdUI.TTypeMini.Primary);
+            testAiSettingsButton.Click += delegate { TestAiSettings(); };
             recycleSwitch = new AntdUI.Switch();
             privilegedCheckbox = CreateCheckbox("启用完全权限（管理员）");
             privilegedCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
@@ -791,7 +794,7 @@ namespace AiCleanVolume.Desktop
             allowRootsInput.AutoScroll = true;
 
             layout.Controls.Add(CreateCaption("AI"), 0, 0);
-            layout.Controls.Add(aiEnabledSwitch, 1, 0);
+            layout.Controls.Add(CreateAiSettingsHeaderControls(), 1, 0);
             layout.Controls.Add(CreateCaption("回收站"), 2, 0);
             layout.Controls.Add(recycleSwitch, 3, 0);
 
@@ -1313,6 +1316,36 @@ namespace AiCleanVolume.Desktop
             }
         }
 
+        private void TestAiSettings()
+        {
+            try
+            {
+                SaveSettingsFromUi();
+                settings.Ai.Enabled = IsAiConfigured(settings.Ai);
+                aiEnabledSwitch.Checked = settings.Ai.Enabled;
+                Log("AI 配置测试开始：Enabled=" + settings.Ai.Enabled + "，AccessMode=" + settings.Ai.AccessMode + "，Endpoint=" + settings.Ai.Endpoint + "，Model=" + settings.Ai.Model + "。");
+            }
+            catch (Exception ex)
+            {
+                Log("AI 配置测试准备失败：" + ex.Message);
+                MessageBox.Show(this, ex.Message, "测试失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            string resultMessage = null;
+            bool success = false;
+            RunBackground("正在测试 AI 配置…", delegate
+            {
+                AiConnectionTestResult result = aiAdvisor.TestConnection(settings);
+                success = result != null && result.Success;
+                resultMessage = result == null ? "AI 配置测试失败：未返回测试结果。" : result.Message;
+                LogBackground(resultMessage);
+            }, delegate
+            {
+                MessageBox.Show(this, resultMessage ?? "AI 配置测试完成。", success ? "测试成功" : "测试失败", MessageBoxButtons.OK, success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            });
+        }
+
         private void SaveSettingsFromUi()
         {
             settings.Ai.Enabled = aiEnabledSwitch.Checked;
@@ -1330,6 +1363,11 @@ namespace AiCleanVolume.Desktop
             settings.Scan.PerLevelLimit = ParseInt(limitInput.Text, -1);
             if (sortSelect.SelectedValue is ScanSortMode) settings.Scan.SortMode = (ScanSortMode)sortSelect.SelectedValue;
             settings.EnsureDefaults();
+        }
+
+        private static bool IsAiConfigured(AiSettings ai)
+        {
+            return ai != null && !string.IsNullOrWhiteSpace(ai.Endpoint) && !string.IsNullOrWhiteSpace(ai.Model);
         }
 
         private void LoadDrives()
@@ -1485,6 +1523,12 @@ namespace AiCleanVolume.Desktop
             }
 
             SaveSettingsFromUi();
+            if (preferAi && !settings.Ai.Enabled && IsAiConfigured(settings.Ai))
+            {
+                settings.Ai.Enabled = true;
+                aiEnabledSwitch.Checked = true;
+                Log("AI 配置已填写，自动启用 AI 识别。");
+            }
             IList<CleanupSuggestion> suggestions = null;
             StorageItem analysisRoot = null;
             ScanRequest request = BuildSuggestionScanRequest(location, -1);
@@ -2466,6 +2510,7 @@ namespace AiCleanVolume.Desktop
             regularCleanButton.Enabled = !busy;
             deleteButton.Enabled = !busy;
             saveSettingsButton.Enabled = !busy;
+            if (testAiSettingsButton != null) testAiSettingsButton.Enabled = !busy;
             if (selectAllSuggestionsButton != null) selectAllSuggestionsButton.Enabled = !busy;
             if (clearAllSuggestionsButton != null) clearAllSuggestionsButton.Enabled = !busy;
             if (invertSuggestionsButton != null) invertSuggestionsButton.Enabled = !busy;
@@ -2953,6 +2998,35 @@ namespace AiCleanVolume.Desktop
             button.BorderWidth = 1F;
             button.Margin = new Padding(8, 0, 0, 0);
             return button;
+        }
+
+        private static AntdUI.Button CreateSettingsActionButton(string text, AntdUI.TTypeMini type)
+        {
+            AntdUI.Button button = new AntdUI.Button();
+            button.Dock = DockStyle.Fill;
+            button.AutoSizeMode = AntdUI.TAutoSize.None;
+            button.Text = text;
+            button.Type = type;
+            button.Height = 34;
+            button.Radius = 6;
+            button.BorderWidth = 1F;
+            button.Margin = new Padding(0, 4, 8, 4);
+            return button;
+        }
+
+        private Control CreateAiSettingsHeaderControls()
+        {
+            TableLayoutPanel panel = new TableLayoutPanel();
+            panel.Dock = DockStyle.Fill;
+            panel.BackColor = Color.Transparent;
+            panel.ColumnCount = 2;
+            panel.RowCount = 1;
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74F));
+            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            panel.Controls.Add(aiEnabledSwitch, 0, 0);
+            panel.Controls.Add(testAiSettingsButton, 1, 0);
+            return panel;
         }
 
         private static AntdUI.Input CreateInput(string placeholder)

@@ -43,27 +43,13 @@ namespace AiCleanVolume.Desktop.Services
                 RestClient client = new RestClient(endpoint);
                 RestRequest request = new RestRequest(path, Method.POST);
                 request.AddHeader("Content-Type", "application/json");
-                if (string.Equals(accessMode, AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase))
+                string authMessage;
+                if (!AddAuthHeaders(request, settings.Ai, accessMode, out authMessage))
                 {
-                    string providerCookie = ResolveProviderCookie(settings.Ai);
-                    if (string.IsNullOrWhiteSpace(providerCookie))
-                    {
-                        WriteLog("2API Cookie 为空或未匹配当前模型，使用本地规则。model=" + settings.Ai.Model + " mappingCount=" + (settings.Ai.ModelCookieMappings == null ? 0 : settings.Ai.ModelCookieMappings.Count));
-                        return fallback.Analyze(root, candidates, settings);
-                    }
-                    request.AddHeader("X-Provider-Cookie", providerCookie);
-                    request.AddHeader("Cookie", providerCookie);
-                    WriteLog("2API Cookie 已添加：" + MaskSecret(providerCookie) + "，长度 " + providerCookie.Length + "。");
+                    WriteLog(authMessage + "，使用本地规则。");
+                    return fallback.Analyze(root, candidates, settings);
                 }
-                else if (!string.IsNullOrWhiteSpace(settings.Ai.ApiKey))
-                {
-                    request.AddHeader("Authorization", "Bearer " + settings.Ai.ApiKey);
-                    WriteLog("标准 API Key 已添加：" + MaskSecret(settings.Ai.ApiKey) + "。");
-                }
-                else
-                {
-                    WriteLog("标准 API 模式未填写 API Key，将直接请求接口。若服务要求鉴权可能失败。");
-                }
+                WriteLog(authMessage);
                 string body = JsonConvert.SerializeObject(new
                 {
                     model = settings.Ai.Model,
@@ -111,9 +97,87 @@ namespace AiCleanVolume.Desktop.Services
             }
         }
 
+        public AiConnectionTestResult TestConnection(ApplicationSettings settings)
+        {
+            if (settings == null || settings.Ai == null || string.IsNullOrWhiteSpace(settings.Ai.Endpoint) || string.IsNullOrWhiteSpace(settings.Ai.Model))
+            {
+                return AiConnectionTestResult.Fail("AI 配置不完整：请填写接口地址和模型。");
+            }
+
+            try
+            {
+                string endpoint = NormalizeEndpoint(settings.Ai.Endpoint);
+                string accessMode = AiSettings.NormalizeAccessMode(settings.Ai.AccessMode);
+                string path = ResolveChatCompletionsPath(endpoint);
+                RestClient client = new RestClient(endpoint);
+                RestRequest request = new RestRequest(path, Method.POST);
+                request.AddHeader("Content-Type", "application/json");
+                string authMessage;
+                if (!AddAuthHeaders(request, settings.Ai, accessMode, out authMessage))
+                {
+                    return AiConnectionTestResult.Fail(authMessage);
+                }
+                WriteLog("AI 配置测试鉴权：" + authMessage);
+
+                string body = JsonConvert.SerializeObject(new
+                {
+                    model = settings.Ai.Model,
+                    temperature = 0,
+                    max_tokens = 8,
+                    messages = new object[]
+                    {
+                        new { role = "user", content = "请只回复 OK，用于连接测试。" }
+                    }
+                });
+                request.AddParameter("application/json", body, ParameterType.RequestBody);
+                WriteLog("AI 配置测试请求发送：POST " + endpoint + path + " model=" + settings.Ai.Model + "。");
+
+                DateTime startedAt = DateTime.UtcNow;
+                IRestResponse response = client.Execute(request);
+                TimeSpan elapsed = DateTime.UtcNow - startedAt;
+                if (response == null || response.ResponseStatus != ResponseStatus.Completed || (int)response.StatusCode >= 400)
+                {
+                    return AiConnectionTestResult.Fail("AI 配置测试失败：" + BuildResponseSummary(response, elapsed));
+                }
+
+                return AiConnectionTestResult.Ok("AI 配置测试成功：" + BuildResponseSummary(response, elapsed));
+            }
+            catch (Exception ex)
+            {
+                return AiConnectionTestResult.Fail("AI 配置测试异常：" + ex.GetType().Name + " " + ex.Message);
+            }
+        }
+
         private void WriteLog(string message)
         {
             if (log != null) log(message);
+        }
+
+        private static bool AddAuthHeaders(RestRequest request, AiSettings settings, string accessMode, out string message)
+        {
+            if (string.Equals(accessMode, AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase))
+            {
+                string providerCookie = ResolveProviderCookie(settings);
+                if (string.IsNullOrWhiteSpace(providerCookie))
+                {
+                    message = "2API Cookie 为空或未匹配当前模型。model=" + settings.Model + " mappingCount=" + (settings.ModelCookieMappings == null ? 0 : settings.ModelCookieMappings.Count);
+                    return false;
+                }
+                request.AddHeader("X-Provider-Cookie", providerCookie);
+                request.AddHeader("Cookie", providerCookie);
+                message = "2API Cookie 已添加：" + MaskSecret(providerCookie) + "，长度 " + providerCookie.Length + "。";
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+            {
+                request.AddHeader("Authorization", "Bearer " + settings.ApiKey);
+                message = "标准 API Key 已添加：" + MaskSecret(settings.ApiKey) + "。";
+                return true;
+            }
+
+            message = "标准 API 模式未填写 API Key，将直接请求接口。若服务要求鉴权可能失败。";
+            return true;
         }
 
         private static string BuildResponseSummary(IRestResponse response, TimeSpan elapsed)
@@ -337,6 +401,28 @@ namespace AiCleanVolume.Desktop.Services
             public string risk { get; set; }
             public double score { get; set; }
             public string reason { get; set; }
+        }
+    }
+
+    public sealed class AiConnectionTestResult
+    {
+        public bool Success { get; private set; }
+        public string Message { get; private set; }
+
+        private AiConnectionTestResult(bool success, string message)
+        {
+            Success = success;
+            Message = message;
+        }
+
+        public static AiConnectionTestResult Ok(string message)
+        {
+            return new AiConnectionTestResult(true, message);
+        }
+
+        public static AiConnectionTestResult Fail(string message)
+        {
+            return new AiConnectionTestResult(false, message);
         }
     }
 }
