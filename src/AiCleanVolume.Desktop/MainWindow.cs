@@ -62,6 +62,7 @@ namespace AiCleanVolume.Desktop
         private readonly IScanProvider scanProvider;
         private readonly ReusableBackgroundWorker backgroundWorker;
         private readonly CandidatePlanner candidatePlanner;
+        private readonly ConfiguredPathCleanupPlanner configuredPathCleanupPlanner;
         private readonly IAiCleanupAdvisor localAdvisor;
         private readonly OpenAiCompatibleAdvisor aiAdvisor;
         private readonly IDeletionSandbox deletionSandbox;
@@ -91,6 +92,7 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Button scanButton;
         private AntdUI.Button analyzeButton;
         private AntdUI.Button regularCleanButton;
+        private AntdUI.Button superCleanButton;
         private AntdUI.Button deleteButton;
         private AntdUI.Button saveSettingsButton;
         private AntdUI.Button testAiSettingsButton;
@@ -163,6 +165,7 @@ namespace AiCleanVolume.Desktop
             settingsStore = new SettingsStore();
             settings = settingsStore.Load();
             candidatePlanner = new CandidatePlanner();
+            configuredPathCleanupPlanner = new ConfiguredPathCleanupPlanner();
             deletionSandbox = new DeletionSandbox();
             privilegeService = new WindowsPrivilegeService();
             scanProvider = new FolderSizeRankerScanProvider();
@@ -228,12 +231,16 @@ namespace AiCleanVolume.Desktop
             regularCleanButton = CreateHeaderButton("常规清理", AntdUI.TTypeMini.Primary);
             regularCleanButton.Click += delegate { AnalyzeRegularSuggestions(); };
 
+            superCleanButton = CreateHeaderButton("超级清理", AntdUI.TTypeMini.Warn);
+            superCleanButton.Click += delegate { AnalyzeSuperSuggestions(); };
+
             scanButton = CreateToolbarActionButton("扫描", AntdUI.TTypeMini.Primary);
             scanButton.Click += delegate { ScanCurrentLocation(); };
 
             titleBar.Controls.Add(saveSettingsButton);
             titleBar.Controls.Add(deleteButton);
             titleBar.Controls.Add(analyzeButton);
+            titleBar.Controls.Add(superCleanButton);
             titleBar.Controls.Add(regularCleanButton);
 
             Panel shell = new Panel();
@@ -668,7 +675,7 @@ namespace AiCleanVolume.Desktop
 
             Label heading = CreateSectionTitle("清理建议");
 
-            Label desc = CreateSectionDescription("支持“常规清理”和“AI 识别”；列表按清理软件风格展示，默认勾选可安全处理项。");
+            Label desc = CreateSectionDescription("支持“常规清理”（仅内置/配置路径汇总）、“超级清理”（扫描规则）和“AI 识别”；列表默认勾选可安全处理项。");
 
             Panel optionsBar = new Panel();
             optionsBar.Dock = DockStyle.Top;
@@ -991,6 +998,7 @@ namespace AiCleanVolume.Desktop
             scanButton.Visible = pageId == PageScan;
             analyzeButton.Visible = pageId == PageSuggestions;
             regularCleanButton.Visible = pageId == PageSuggestions;
+            superCleanButton.Visible = pageId == PageSuggestions;
             deleteButton.Visible = pageId == PageSuggestions;
             saveSettingsButton.Visible = pageId == PageSettings;
             SyncNavigationSelection(pageId);
@@ -1002,7 +1010,7 @@ namespace AiCleanVolume.Desktop
             switch (pageId)
             {
                 case PageSuggestions:
-                    return AppDisplayName + " · 常规清理与 AI 建议";
+                    return AppDisplayName + " · 清理建议";
                 case PageLog:
                     return AppDisplayName + " · 日志管理";
                 case PageSettings:
@@ -1017,7 +1025,7 @@ namespace AiCleanVolume.Desktop
             switch (pageId)
             {
                 case PageSuggestions:
-                    return "查看常规清理、AI 和本地规则生成的清理建议，支持定位和批量删除。";
+                    return "查看常规路径、超级扫描和 AI 生成的清理建议，支持定位和批量删除。";
                 case PageLog:
                     return "查看扫描、建议与删除流程的执行日志。";
                 case PageSettings:
@@ -1718,7 +1726,34 @@ namespace AiCleanVolume.Desktop
 
         private void AnalyzeRegularSuggestions()
         {
+            AnalyzeConfiguredPathSuggestions();
+        }
+
+        private void AnalyzeSuperSuggestions()
+        {
             AnalyzeSuggestionsCore(false);
+        }
+
+        private void AnalyzeConfiguredPathSuggestions()
+        {
+            SaveSettingsFromUi();
+            IList<CleanupSuggestion> suggestions = null;
+            DateTime analyzeStartedAt = DateTime.UtcNow;
+            string caption = "正在汇总常规清理路径…";
+            Log("常规清理开始：仅使用内置和已配置允许位置进行汇总清理。");
+
+            RunBackground(caption, delegate
+            {
+                int maxCount = settings != null && settings.Ai != null ? settings.Ai.MaxSuggestions : 30;
+                suggestions = configuredPathCleanupPlanner.BuildSuggestions(settings, maxCount);
+                LogBackground("常规路径汇总完成：count=" + (suggestions == null ? 0 : suggestions.Count) + "。");
+                EvaluateSandbox(suggestions);
+            }, delegate
+            {
+                BindSuggestions(suggestions);
+                TimeSpan elapsed = DateTime.UtcNow - analyzeStartedAt;
+                Log("常规清理生成完成，共 " + suggestionRows.Count + " 项，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒。");
+            });
         }
 
         private void AnalyzeSuggestionsCore(bool preferAi)
@@ -1726,7 +1761,7 @@ namespace AiCleanVolume.Desktop
             string location = ResolveSuggestionLocation();
             if (NeedAutoScanBeforeAnalyze(location))
             {
-                string actionName = preferAi ? "AI 识别" : "常规清理";
+                string actionName = preferAi ? "AI 识别" : "超级清理";
                 Log("未发现当前所选位置的扫描结果，先自动扫描：" + location);
                 ScanSuggestionLocation(location, delegate
                 {
@@ -1746,9 +1781,9 @@ namespace AiCleanVolume.Desktop
             IList<CleanupSuggestion> suggestions = null;
             StorageItem analysisRoot = null;
             ScanRequest request = BuildSuggestionScanRequest(location, -1);
-            string caption = preferAi ? "正在生成 AI 清理建议…" : "正在生成常规清理列表…";
+            string caption = preferAi ? "正在生成 AI 清理建议…" : "正在生成超级清理列表…";
             DateTime analyzeStartedAt = DateTime.UtcNow;
-            Log((preferAi ? "AI 识别" : "常规清理") + "开始：" + DescribeScanRequest(request) + "，AIEnabled=" + settings.Ai.Enabled + "，AccessMode=" + settings.Ai.AccessMode + "，Endpoint=" + settings.Ai.Endpoint + "，Model=" + settings.Ai.Model + "，CookieMappings=" + (settings.Ai.ModelCookieMappings == null ? 0 : settings.Ai.ModelCookieMappings.Count) + "。");
+            Log((preferAi ? "AI 识别" : "超级清理") + "开始：" + DescribeScanRequest(request) + "，AIEnabled=" + settings.Ai.Enabled + "，AccessMode=" + settings.Ai.AccessMode + "，Endpoint=" + settings.Ai.Endpoint + "，Model=" + settings.Ai.Model + "，CookieMappings=" + (settings.Ai.ModelCookieMappings == null ? 0 : settings.Ai.ModelCookieMappings.Count) + "。");
 
             RunBackground(caption, delegate
             {
@@ -1760,14 +1795,14 @@ namespace AiCleanVolume.Desktop
                     settings.Ai.MaxSuggestions * (preferAi ? 4 : 6));
                 LogBackground("候选构建完成：count=" + candidates.Count + "，minBytes=" + StorageFormatting.FormatBytes(ResolveCandidateMinBytes(preferAi)) + "。");
                 suggestions = preferAi ? aiAdvisor.Analyze(analysisRoot, candidates, settings) : localAdvisor.Analyze(analysisRoot, candidates, settings);
-                LogBackground((preferAi ? "AI/回退" : "常规") + "建议原始结果：count=" + (suggestions == null ? 0 : suggestions.Count) + "。");
+                LogBackground((preferAi ? "AI/回退" : "超级") + "建议原始结果：count=" + (suggestions == null ? 0 : suggestions.Count) + "。");
                 EvaluateSandbox(suggestions);
             }, delegate
             {
                 BindSuggestions(suggestions);
                 string sourceName;
                 if (preferAi) sourceName = settings.Ai.Enabled ? "AI 建议" : "本地规则回退";
-                else sourceName = "常规清理";
+                else sourceName = "超级清理";
                 TimeSpan elapsed = DateTime.UtcNow - analyzeStartedAt;
                 Log(sourceName + "生成完成，共 " + suggestionRows.Count + " 项，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒。");
             });
