@@ -12,16 +12,24 @@ namespace AiCleanVolume.Desktop.Services
     public sealed class OpenAiCompatibleAdvisor : IAiCleanupAdvisor
     {
         private readonly IAiCleanupAdvisor fallback;
+        private readonly Action<string> log;
 
         public OpenAiCompatibleAdvisor(IAiCleanupAdvisor fallback)
+            : this(fallback, null)
+        {
+        }
+
+        public OpenAiCompatibleAdvisor(IAiCleanupAdvisor fallback, Action<string> log)
         {
             this.fallback = fallback;
+            this.log = log;
         }
 
         public IList<CleanupSuggestion> Analyze(StorageItem root, IList<CleanupCandidate> candidates, ApplicationSettings settings)
         {
             if (settings == null || settings.Ai == null || !settings.Ai.Enabled || string.IsNullOrWhiteSpace(settings.Ai.Endpoint) || string.IsNullOrWhiteSpace(settings.Ai.Model))
             {
+                WriteLog("AI 未启用或配置不完整，使用本地规则。Enabled=" + (settings != null && settings.Ai != null && settings.Ai.Enabled) + " EndpointEmpty=" + (settings == null || settings.Ai == null || string.IsNullOrWhiteSpace(settings.Ai.Endpoint)) + " ModelEmpty=" + (settings == null || settings.Ai == null || string.IsNullOrWhiteSpace(settings.Ai.Model)));
                 return fallback.Analyze(root, candidates, settings);
             }
 
@@ -30,20 +38,33 @@ namespace AiCleanVolume.Desktop.Services
                 string prompt = BuildPrompt(root, candidates, settings.Ai.MaxSuggestions);
                 string endpoint = NormalizeEndpoint(settings.Ai.Endpoint);
                 string accessMode = AiSettings.NormalizeAccessMode(settings.Ai.AccessMode);
+                string path = ResolveChatCompletionsPath(endpoint);
+                WriteLog("AI 请求准备：mode=" + accessMode + " endpoint=" + endpoint + " path=" + path + " model=" + settings.Ai.Model + " candidates=" + (candidates == null ? 0 : candidates.Count) + " promptChars=" + prompt.Length + " maxSuggestions=" + settings.Ai.MaxSuggestions);
                 RestClient client = new RestClient(endpoint);
-                RestRequest request = new RestRequest(ResolveChatCompletionsPath(endpoint), Method.POST);
+                RestRequest request = new RestRequest(path, Method.POST);
                 request.AddHeader("Content-Type", "application/json");
                 if (string.Equals(accessMode, AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase))
                 {
                     string providerCookie = ResolveProviderCookie(settings.Ai);
-                    if (string.IsNullOrWhiteSpace(providerCookie)) return fallback.Analyze(root, candidates, settings);
+                    if (string.IsNullOrWhiteSpace(providerCookie))
+                    {
+                        WriteLog("2API Cookie 为空或未匹配当前模型，使用本地规则。model=" + settings.Ai.Model + " mappingCount=" + (settings.Ai.ModelCookieMappings == null ? 0 : settings.Ai.ModelCookieMappings.Count));
+                        return fallback.Analyze(root, candidates, settings);
+                    }
                     request.AddHeader("X-Provider-Cookie", providerCookie);
+                    request.AddHeader("Cookie", providerCookie);
+                    WriteLog("2API Cookie 已添加：" + MaskSecret(providerCookie) + "，长度 " + providerCookie.Length + "。");
                 }
                 else if (!string.IsNullOrWhiteSpace(settings.Ai.ApiKey))
                 {
                     request.AddHeader("Authorization", "Bearer " + settings.Ai.ApiKey);
+                    WriteLog("标准 API Key 已添加：" + MaskSecret(settings.Ai.ApiKey) + "。");
                 }
-                request.AddParameter("application/json", JsonConvert.SerializeObject(new
+                else
+                {
+                    WriteLog("标准 API 模式未填写 API Key，将直接请求接口。若服务要求鉴权可能失败。");
+                }
+                string body = JsonConvert.SerializeObject(new
                 {
                     model = settings.Ai.Model,
                     temperature = 0.1,
@@ -52,28 +73,70 @@ namespace AiCleanVolume.Desktop.Services
                         new { role = "system", content = settings.Ai.SystemPrompt },
                         new { role = "user", content = prompt }
                     }
-                }), ParameterType.RequestBody);
+                });
+                request.AddParameter("application/json", body, ParameterType.RequestBody);
+                WriteLog("AI 请求发送：POST " + endpoint + path + " bodyChars=" + body.Length + "。");
 
+                DateTime startedAt = DateTime.UtcNow;
                 IRestResponse response = client.Execute(request);
+                TimeSpan elapsed = DateTime.UtcNow - startedAt;
                 if (response == null || response.ResponseStatus != ResponseStatus.Completed || (int)response.StatusCode >= 400)
                 {
+                    WriteLog("AI 请求失败，使用本地规则。responseNull=" + (response == null) + BuildResponseSummary(response, elapsed));
                     return fallback.Analyze(root, candidates, settings);
                 }
+                WriteLog("AI 请求成功：" + BuildResponseSummary(response, elapsed));
 
                 ChatCompletionResponse chat = JsonConvert.DeserializeObject<ChatCompletionResponse>(response.Content);
                 if (chat == null || chat.choices == null || chat.choices.Count == 0 || chat.choices[0].message == null)
                 {
+                    WriteLog("AI 响应结构无效，使用本地规则。contentPreview=" + Preview(response.Content, 500));
                     return fallback.Analyze(root, candidates, settings);
                 }
 
                 string content = ExtractJson(chat.choices[0].message.content);
                 IList<CleanupSuggestion> mapped = MapSuggestions(content, candidates);
-                return mapped.Count == 0 ? fallback.Analyze(root, candidates, settings) : mapped;
+                WriteLog("AI 响应解析完成：contentChars=" + (chat.choices[0].message.content == null ? 0 : chat.choices[0].message.content.Length) + " jsonChars=" + content.Length + " mapped=" + mapped.Count + "。");
+                if (mapped.Count == 0)
+                {
+                    WriteLog("AI 没有映射到候选路径，使用本地规则。jsonPreview=" + Preview(content, 500));
+                    return fallback.Analyze(root, candidates, settings);
+                }
+                return mapped;
             }
-            catch
+            catch (Exception ex)
             {
+                WriteLog("AI 调用异常，使用本地规则：" + ex.GetType().Name + " " + ex.Message);
                 return fallback.Analyze(root, candidates, settings);
             }
+        }
+
+        private void WriteLog(string message)
+        {
+            if (log != null) log(message);
+        }
+
+        private static string BuildResponseSummary(IRestResponse response, TimeSpan elapsed)
+        {
+            if (response == null) return " elapsed=" + elapsed.TotalMilliseconds.ToString("0") + "ms";
+            string error = string.IsNullOrWhiteSpace(response.ErrorMessage) ? string.Empty : " error=" + response.ErrorMessage;
+            return " status=" + (int)response.StatusCode + " " + response.StatusDescription + " responseStatus=" + response.ResponseStatus + " elapsed=" + elapsed.TotalMilliseconds.ToString("0") + "ms contentChars=" + (response.Content == null ? 0 : response.Content.Length) + error + " contentPreview=" + Preview(response.Content, 500);
+        }
+
+        private static string MaskSecret(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "<empty>";
+            string trimmed = value.Trim();
+            if (trimmed.Length <= 8) return "***" + trimmed.Length + " chars";
+            return trimmed.Substring(0, 4) + "..." + trimmed.Substring(trimmed.Length - 4) + " (" + trimmed.Length + " chars)";
+        }
+
+        private static string Preview(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            string normalized = value.Replace("\r", " ").Replace("\n", " ").Trim();
+            if (normalized.Length <= maxLength) return normalized;
+            return normalized.Substring(0, maxLength) + "...";
         }
 
         private static string BuildPrompt(StorageItem root, IList<CleanupCandidate> candidates, int maxSuggestions)

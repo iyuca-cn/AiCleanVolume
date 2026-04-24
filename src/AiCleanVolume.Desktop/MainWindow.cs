@@ -99,10 +99,13 @@ namespace AiCleanVolume.Desktop
         private string activePageId;
 
         private AntdUI.Select driveSelect;
+        private AntdUI.Select suggestionDriveSelect;
         private AntdUI.Select sortSelect;
         private AntdUI.Input pathInput;
         private AntdUI.Input minSizeInput;
         private AntdUI.Input limitInput;
+        private AntdUI.Input suggestionMinSizeInput;
+        private AntdUI.Input suggestionLimitInput;
 
         private AntdUI.Table storageTable;
         private AntdUI.Table suggestionTable;
@@ -161,7 +164,7 @@ namespace AiCleanVolume.Desktop
             scanProvider = new FolderSizeRankerScanProvider();
             backgroundWorker = new ReusableBackgroundWorker("AiCleanVolume.UiWorker");
             localAdvisor = new HeuristicCleanupAdvisor();
-            aiAdvisor = new OpenAiCompatibleAdvisor(localAdvisor);
+            aiAdvisor = new OpenAiCompatibleAdvisor(localAdvisor, LogBackground);
             deletionService = new RecycleBinDeletionService();
             explorerService = new ShellExplorerService();
             suggestionRows = new List<CleanupSuggestionRow>();
@@ -690,6 +693,35 @@ namespace AiCleanVolume.Desktop
             optionsBar.Controls.Add(clearAllSuggestionsButton);
             optionsBar.Controls.Add(selectAllSuggestionsButton);
 
+            TableLayoutPanel scanOptionsBar = new TableLayoutPanel();
+            scanOptionsBar.Dock = DockStyle.Top;
+            scanOptionsBar.Height = 42;
+            scanOptionsBar.Padding = new Padding(0, 0, 0, 8);
+            scanOptionsBar.BackColor = Color.Transparent;
+            scanOptionsBar.ColumnCount = 7;
+            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160F));
+            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
+            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78F));
+            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90F));
+            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78F));
+            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+            suggestionDriveSelect = CreateSelect();
+            suggestionDriveSelect.ListAutoWidth = true;
+            suggestionDriveSelect.SelectedValueChanged += SuggestionDriveSelect_SelectedValueChanged;
+            suggestionMinSizeInput = CreateInput("最小值（单位MB）");
+            suggestionMinSizeInput.Text = "128";
+            suggestionLimitInput = CreateInput("数量限制，-1 不限");
+            suggestionLimitInput.Text = "-1";
+
+            scanOptionsBar.Controls.Add(CreateToolbarCaption("盘符:"), 0, 0);
+            scanOptionsBar.Controls.Add(suggestionDriveSelect, 1, 0);
+            scanOptionsBar.Controls.Add(CreateToolbarCaption("最小值（MB）:"), 2, 0);
+            scanOptionsBar.Controls.Add(suggestionMinSizeInput, 3, 0);
+            scanOptionsBar.Controls.Add(CreateToolbarCaption("数量限制:"), 4, 0);
+            scanOptionsBar.Controls.Add(suggestionLimitInput, 5, 0);
+
             suggestionTable = new AntdUI.Table();
             suggestionTable.Dock = DockStyle.Fill;
             ConfigureCleanupListSurface(suggestionTable);
@@ -699,6 +731,7 @@ namespace AiCleanVolume.Desktop
             suggestionTable.CellButtonClick += SuggestionTable_CellButtonClick;
 
             panel.Controls.Add(suggestionTable);
+            panel.Controls.Add(scanOptionsBar);
             panel.Controls.Add(optionsBar);
             panel.Controls.Add(desc);
             panel.Controls.Add(heading);
@@ -750,9 +783,9 @@ namespace AiCleanVolume.Desktop
             systemPromptInput.Multiline = true;
             systemPromptInput.AutoScroll = true;
             systemPromptInput.TextChanged += SystemPromptInput_TextChanged;
-            modelCookieMappingsInput = CreateInput("每行一条：provider/model=完整 Cookie 字符串");
-            modelCookieMappingsInput.Multiline = true;
-            modelCookieMappingsInput.AutoScroll = true;
+            modelCookieMappingsInput = CreateInput("直接粘贴当前模型的一整行 Cookie；也兼容 model=Cookie");
+            modelCookieMappingsInput.Multiline = false;
+            modelCookieMappingsInput.AutoScroll = false;
             allowRootsInput = CreateInput("每行一个允许位置");
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
@@ -1022,12 +1055,14 @@ namespace AiCleanVolume.Desktop
             modelInput.Text = settings.Ai.Model;
             maxSuggestionsInput.Text = settings.Ai.MaxSuggestions.ToString();
             systemPromptInput.Text = settings.Ai.SystemPrompt;
-            modelCookieMappingsInput.Text = FormatModelCookieMappings(settings.Ai.ModelCookieMappings);
+            modelCookieMappingsInput.Text = FormatModelCookieMappings(settings.Ai.ModelCookieMappings, settings.Ai.Model);
             UpdateAiAccessModeUi();
             SelectAiProviderPresetForSettings(settings.Ai.Endpoint, settings.Ai.Model);
             SelectAiPromptPresetForPrompt(settings.Ai.SystemPrompt);
             minSizeInput.Text = settings.Scan.MinSizeMb.ToString();
             limitInput.Text = settings.Scan.PerLevelLimit.ToString();
+            if (suggestionMinSizeInput != null) suggestionMinSizeInput.Text = "128";
+            if (suggestionLimitInput != null) suggestionLimitInput.Text = "-1";
             sortSelect.SelectedValue = settings.Scan.SortMode;
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(settings.Sandbox.AllowedRoots);
             allowRootsInput.Text = string.Join(Environment.NewLine, new List<string>(settings.Sandbox.AllowedRoots).ToArray());
@@ -1287,7 +1322,7 @@ namespace AiCleanVolume.Desktop
             settings.Ai.Model = modelInput.Text.Trim();
             settings.Ai.MaxSuggestions = ParsePositiveInt(maxSuggestionsInput.Text, 30);
             settings.Ai.SystemPrompt = systemPromptInput.Text.Trim();
-            settings.Ai.ModelCookieMappings = ParseModelCookieMappings(modelCookieMappingsInput.Text);
+            settings.Ai.ModelCookieMappings = ParseModelCookieMappings(modelCookieMappingsInput.Text, settings.Ai.Model);
             settings.Sandbox.UseRecycleBin = recycleSwitch.Checked;
             settings.Sandbox.FullyPrivilegedMode = IsFullyPrivilegedChecked();
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(ParseLines(allowRootsInput.Text));
@@ -1300,16 +1335,19 @@ namespace AiCleanVolume.Desktop
         private void LoadDrives()
         {
             driveSelect.Items.Clear();
+            if (suggestionDriveSelect != null) suggestionDriveSelect.Items.Clear();
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 if (drive.DriveType != DriveType.Fixed) continue;
                 driveSelect.Items.Add(new AntdUI.SelectItem(drive.Name, drive.Name));
+                if (suggestionDriveSelect != null) suggestionDriveSelect.Items.Add(new AntdUI.SelectItem(drive.Name, drive.Name));
             }
 
             string defaultDrive = Environment.GetEnvironmentVariable("SystemDrive");
             if (string.IsNullOrWhiteSpace(defaultDrive)) defaultDrive = "C:";
             defaultDrive = defaultDrive.TrimEnd('\\') + "\\";
             driveSelect.SelectedValue = defaultDrive;
+            if (suggestionDriveSelect != null) suggestionDriveSelect.SelectedValue = defaultDrive;
             pathInput.Text = defaultDrive;
             UpdateDriveSummaryForLocation(defaultDrive);
             RefreshPromptForCurrentLocation();
@@ -1320,6 +1358,11 @@ namespace AiCleanVolume.Desktop
             if (e.Value == null) return;
             pathInput.Text = e.Value.ToString();
             UpdateDriveSummaryForLocation(pathInput.Text);
+            RefreshPromptForCurrentLocation();
+        }
+
+        private void SuggestionDriveSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        {
             RefreshPromptForCurrentLocation();
         }
 
@@ -1371,6 +1414,18 @@ namespace AiCleanVolume.Desktop
             SaveSettingsFromUi();
             string location = ResolveSelectedLocation();
             ScanRequest request = BuildScanRequest(location, 1);
+            ScanLocation(request, onCompleted, statusText);
+        }
+
+        private void ScanSuggestionLocation(string location, Action onCompleted, string statusText)
+        {
+            SaveSettingsFromUi();
+            ScanRequest request = BuildSuggestionScanRequest(location, 1);
+            ScanLocation(request, onCompleted, statusText);
+        }
+
+        private void ScanLocation(ScanRequest request, Action onCompleted, string statusText)
+        {
             StorageItem result = null;
             DateTime scanStartedAt = DateTime.UtcNow;
             ClearScanProviderCache();
@@ -1380,6 +1435,7 @@ namespace AiCleanVolume.Desktop
             string progressText = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用..." : statusText;
             string workerCaption = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用…" : statusText;
             UpdateScanProgressState(progressText, 0.56F, true, AntdUI.TType.None);
+            Log("扫描开始：" + DescribeScanRequest(request));
 
             RunBackground(workerCaption, delegate
             {
@@ -1395,7 +1451,7 @@ namespace AiCleanVolume.Desktop
                 storageTable.DataSource = rows;
                 UpdateDriveSummaryForLocation(result.Path);
                 UpdateScanProgressState("扫描完成 " + elapsed.TotalSeconds.ToString("0.00") + " 秒", 1F, false, AntdUI.TType.Success);
-                Log("扫描完成：" + result.Path + "，大小 " + StorageFormatting.FormatBytes(result.Bytes));
+                Log("扫描完成：" + result.Path + "，大小 " + StorageFormatting.FormatBytes(result.Bytes) + "，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒，子项 " + (result.Children == null ? 0 : result.Children.Count) + "。");
                 if (onCompleted != null) onCompleted();
             }, delegate
             {
@@ -1415,12 +1471,12 @@ namespace AiCleanVolume.Desktop
 
         private void AnalyzeSuggestionsCore(bool preferAi)
         {
-            string location = ResolveSelectedLocation();
+            string location = ResolveSuggestionLocation();
             if (NeedAutoScanBeforeAnalyze(location))
             {
                 string actionName = preferAi ? "AI 识别" : "常规清理";
                 Log("未发现当前所选位置的扫描结果，先自动扫描：" + location);
-                ScanCurrentLocation(delegate
+                ScanSuggestionLocation(location, delegate
                 {
                     Log("自动扫描完成，继续执行" + actionName + "。");
                     AnalyzeSuggestionsCore(preferAi);
@@ -1431,17 +1487,22 @@ namespace AiCleanVolume.Desktop
             SaveSettingsFromUi();
             IList<CleanupSuggestion> suggestions = null;
             StorageItem analysisRoot = null;
-            ScanRequest request = BuildScanRequest(location, -1);
+            ScanRequest request = BuildSuggestionScanRequest(location, -1);
             string caption = preferAi ? "正在生成 AI 清理建议…" : "正在生成常规清理列表…";
+            DateTime analyzeStartedAt = DateTime.UtcNow;
+            Log((preferAi ? "AI 识别" : "常规清理") + "开始：" + DescribeScanRequest(request) + "，AIEnabled=" + settings.Ai.Enabled + "，AccessMode=" + settings.Ai.AccessMode + "，Endpoint=" + settings.Ai.Endpoint + "，Model=" + settings.Ai.Model + "，CookieMappings=" + (settings.Ai.ModelCookieMappings == null ? 0 : settings.Ai.ModelCookieMappings.Count) + "。");
 
             RunBackground(caption, delegate
             {
                 analysisRoot = scanProvider.Scan(request);
+                LogBackground("候选构建开始：root=" + (analysisRoot == null ? string.Empty : analysisRoot.Path) + "，rootSize=" + (analysisRoot == null ? string.Empty : StorageFormatting.FormatBytes(analysisRoot.Bytes)) + "。");
                 IList<CleanupCandidate> candidates = candidatePlanner.BuildCandidates(
                     analysisRoot,
                     ResolveCandidateMinBytes(preferAi),
                     settings.Ai.MaxSuggestions * (preferAi ? 4 : 6));
+                LogBackground("候选构建完成：count=" + candidates.Count + "，minBytes=" + StorageFormatting.FormatBytes(ResolveCandidateMinBytes(preferAi)) + "。");
                 suggestions = preferAi ? aiAdvisor.Analyze(analysisRoot, candidates, settings) : localAdvisor.Analyze(analysisRoot, candidates, settings);
+                LogBackground((preferAi ? "AI/回退" : "常规") + "建议原始结果：count=" + (suggestions == null ? 0 : suggestions.Count) + "。");
                 EvaluateSandbox(suggestions);
             }, delegate
             {
@@ -1449,7 +1510,8 @@ namespace AiCleanVolume.Desktop
                 string sourceName;
                 if (preferAi) sourceName = settings.Ai.Enabled ? "AI 建议" : "本地规则回退";
                 else sourceName = "常规清理";
-                Log(sourceName + "生成完成，共 " + suggestionRows.Count + " 项。");
+                TimeSpan elapsed = DateTime.UtcNow - analyzeStartedAt;
+                Log(sourceName + "生成完成，共 " + suggestionRows.Count + " 项，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒。");
             });
         }
 
@@ -1465,11 +1527,13 @@ namespace AiCleanVolume.Desktop
 
             List<CleanupSuggestionRow> selectedRows = new List<CleanupSuggestionRow>();
             int needConfirmation = 0;
+            long totalBytes = 0;
             for (int i = 0; i < suggestionRows.Count; i++)
             {
                 CleanupSuggestionRow row = suggestionRows[i];
                 if (!row.Suggestion.Selected || row.Suggestion.Status == CleanupStatus.Deleted) continue;
                 selectedRows.Add(row);
+                totalBytes += row.Suggestion.Bytes;
                 if (row.Suggestion.Sandbox != null && row.Suggestion.Sandbox.Action == SandboxAction.RequireConfirmation) needConfirmation++;
             }
 
@@ -1479,11 +1543,26 @@ namespace AiCleanVolume.Desktop
                 return;
             }
 
-            DialogResult confirm = MessageBox.Show(this,
-                "即将删除 " + selectedRows.Count + " 项。" + (needConfirmation > 0 ? "其中 " + needConfirmation + " 项未命中白名单，需要你承担确认责任。" : string.Empty),
-                "确认删除",
-                MessageBoxButtons.OKCancel,
-                needConfirmation > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Question);
+            string message = "即将删除 " + selectedRows.Count + " 项。" +
+                Environment.NewLine + Environment.NewLine +
+                "总大小：" + StorageFormatting.FormatBytes(totalBytes);
+            if (needConfirmation > 0)
+            {
+                message += Environment.NewLine + Environment.NewLine + "其中 " + needConfirmation + " 项未命中白名单，需要你承担确认责任。";
+            }
+
+            if (!settings.Sandbox.UseRecycleBin)
+            {
+                message += Environment.NewLine + Environment.NewLine + "当前配置为永久删除，无法从回收站恢复。";
+            }
+
+            AntdUI.TType icon = needConfirmation > 0 || !settings.Sandbox.UseRecycleBin ? AntdUI.TType.Warn : AntdUI.TType.Info;
+            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "确认删除", message, icon);
+            config.OkText = "确认删除";
+            config.CancelText = "取消";
+            config.OkType = AntdUI.TTypeMini.Error;
+            config.MaskClosable = false;
+            DialogResult confirm = AntdUI.Modal.open(config);
             if (confirm != DialogResult.OK) return;
 
             List<DeletionOutcome> outcomes = new List<DeletionOutcome>();
@@ -2031,6 +2110,17 @@ namespace AiCleanVolume.Desktop
             return location.Trim();
         }
 
+        private string ResolveSuggestionLocation()
+        {
+            if (suggestionDriveSelect != null && suggestionDriveSelect.SelectedValue != null)
+            {
+                string selected = suggestionDriveSelect.SelectedValue.ToString();
+                if (!string.IsNullOrWhiteSpace(selected)) return selected.Trim();
+            }
+
+            return ResolveSelectedLocation();
+        }
+
         private bool NeedAutoScanBeforeAnalyze(string location)
         {
             if (currentRoot == null) return true;
@@ -2096,7 +2186,7 @@ namespace AiCleanVolume.Desktop
 
         private string GetPromptDriveRoot()
         {
-            string driveRoot = TryGetDriveRoot(ResolveSelectedLocation());
+            string driveRoot = TryGetDriveRoot(activePageId == PageSuggestions ? ResolveSuggestionLocation() : ResolveSelectedLocation());
             if (string.IsNullOrWhiteSpace(driveRoot) && currentRoot != null) driveRoot = TryGetDriveRoot(currentRoot.Path);
             if (string.IsNullOrWhiteSpace(driveRoot)) driveRoot = "C:\\";
             return driveRoot;
@@ -2114,6 +2204,18 @@ namespace AiCleanVolume.Desktop
             };
         }
 
+        private ScanRequest BuildSuggestionScanRequest(string location, int loadDepth)
+        {
+            return new ScanRequest
+            {
+                Location = location,
+                MinSizeBytes = ParseMinSizeBytes(suggestionMinSizeInput == null ? null : suggestionMinSizeInput.Text, 128),
+                PerLevelLimit = ParseInt(suggestionLimitInput == null ? null : suggestionLimitInput.Text, -1),
+                SortMode = sortSelect.SelectedValue is ScanSortMode ? (ScanSortMode)sortSelect.SelectedValue : ScanSortMode.Allocated,
+                LoadDepth = loadDepth
+            };
+        }
+
         private static ScanRequest CreateScanRequest(string location, int loadDepth, ScanRequest template)
         {
             ScanRequest request = new ScanRequest();
@@ -2125,6 +2227,12 @@ namespace AiCleanVolume.Desktop
             request.SessionIdentity = template.SessionIdentity;
             request.SessionNodeId = template.SessionNodeId;
             return request;
+        }
+
+        private static string DescribeScanRequest(ScanRequest request)
+        {
+            if (request == null) return "<null>";
+            return "location=" + request.Location + "，minSize=" + (request.MinSizeBytes < 0 ? "不限" : StorageFormatting.FormatBytes(request.MinSizeBytes)) + "，limit=" + request.PerLevelLimit + "，sort=" + request.SortMode + "，loadDepth=" + request.LoadDepth + "，session=" + request.SessionIdentity + "/" + request.SessionNodeId;
         }
 
         private static bool CanReloadStorageNode(StorageItem item)
@@ -2328,7 +2436,7 @@ namespace AiCleanVolume.Desktop
                     if (error != null)
                     {
                         if (onError != null) onError();
-                        Log(caption + "失败：" + error.Message);
+                        Log(caption + "失败：" + error.Message + Environment.NewLine + error);
                         MessageBox.Show(this, error.Message, "操作失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
@@ -2350,6 +2458,9 @@ namespace AiCleanVolume.Desktop
             if (pathInput != null) pathInput.Enabled = !busy;
             if (minSizeInput != null) minSizeInput.Enabled = !busy;
             if (limitInput != null) limitInput.Enabled = !busy;
+            if (suggestionDriveSelect != null) suggestionDriveSelect.Enabled = !busy;
+            if (suggestionMinSizeInput != null) suggestionMinSizeInput.Enabled = !busy;
+            if (suggestionLimitInput != null) suggestionLimitInput.Enabled = !busy;
             if (sortSelect != null) sortSelect.Enabled = !busy;
             analyzeButton.Enabled = !busy;
             regularCleanButton.Enabled = !busy;
@@ -2578,7 +2689,7 @@ namespace AiCleanVolume.Desktop
             return result;
         }
 
-        private static IList<AiModelCookieMapping> ParseModelCookieMappings(string text)
+        private static IList<AiModelCookieMapping> ParseModelCookieMappings(string text, string currentModel)
         {
             List<AiModelCookieMapping> mappings = new List<AiModelCookieMapping>();
             string[] parts = (text ?? string.Empty).Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
@@ -2588,10 +2699,18 @@ namespace AiCleanVolume.Desktop
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
                 int separatorIndex = line.IndexOf('=');
-                if (separatorIndex <= 0 || separatorIndex == line.Length - 1) continue;
-
-                string model = line.Substring(0, separatorIndex).Trim();
-                string cookie = line.Substring(separatorIndex + 1).Trim();
+                string model;
+                string cookie;
+                if (separatorIndex > 0 && separatorIndex < line.Length - 1 && LooksLikeModelCookieMapping(line, separatorIndex))
+                {
+                    model = line.Substring(0, separatorIndex).Trim();
+                    cookie = line.Substring(separatorIndex + 1).Trim();
+                }
+                else
+                {
+                    model = currentModel;
+                    cookie = line;
+                }
                 if (string.IsNullOrWhiteSpace(model) || string.IsNullOrWhiteSpace(cookie)) continue;
 
                 mappings.Add(new AiModelCookieMapping
@@ -2604,9 +2723,26 @@ namespace AiCleanVolume.Desktop
             return AiSettings.NormalizeModelCookieMappings(mappings);
         }
 
-        private static string FormatModelCookieMappings(IEnumerable<AiModelCookieMapping> mappings)
+        private static bool LooksLikeModelCookieMapping(string line, int separatorIndex)
+        {
+            string left = line.Substring(0, separatorIndex).Trim();
+            if (string.IsNullOrWhiteSpace(left)) return false;
+            if (left.IndexOf(';') >= 0 || left.IndexOf(' ') >= 0 || left.IndexOf('\t') >= 0) return false;
+            return left.IndexOf('/') >= 0 || left.IndexOf(':') >= 0 || left.IndexOf('.') >= 0 || left.StartsWith("gpt", StringComparison.OrdinalIgnoreCase) || left.StartsWith("claude", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string FormatModelCookieMappings(IEnumerable<AiModelCookieMapping> mappings, string currentModel)
         {
             IList<AiModelCookieMapping> normalized = AiSettings.NormalizeModelCookieMappings(mappings);
+            string model = (currentModel ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(model))
+            {
+                for (int i = normalized.Count - 1; i >= 0; i--)
+                {
+                    if (string.Equals(normalized[i].Model, model, StringComparison.OrdinalIgnoreCase)) return normalized[i].Cookie;
+                }
+            }
+
             List<string> lines = new List<string>();
             for (int i = 0; i < normalized.Count; i++)
             {
