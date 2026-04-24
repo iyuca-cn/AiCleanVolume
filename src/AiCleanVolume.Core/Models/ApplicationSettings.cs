@@ -38,16 +38,18 @@ namespace AiCleanVolume.Core.Models
         public const string DefaultSystemPrompt = "你是 Windows C 盘清理助手。请你只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。";
         public const string StandardApiAccessMode = "standard_api";
         public const string TwoApiAccessMode = "two_api";
+        public const string DefaultModel = "gpt-5.4";
 
         public AiSettings()
         {
             Enabled = false;
             AccessMode = StandardApiAccessMode;
             Endpoint = "https://api.openai.com";
-            Model = "gpt-4o-mini";
+            Model = DefaultModel;
             MaxSuggestions = 30;
             SystemPrompt = DefaultSystemPrompt;
             ModelCookieMappings = new List<AiModelCookieMapping>();
+            Profiles = new List<AiProfile>();
         }
 
         public bool Enabled { get; set; }
@@ -58,18 +60,57 @@ namespace AiCleanVolume.Core.Models
         public int MaxSuggestions { get; set; }
         public string SystemPrompt { get; set; }
         public IList<AiModelCookieMapping> ModelCookieMappings { get; set; }
+        public IList<AiProfile> Profiles { get; set; }
 
         public void EnsureDefaults()
         {
             AccessMode = NormalizeAccessMode(AccessMode);
             if (string.IsNullOrWhiteSpace(Endpoint)) Endpoint = "https://api.openai.com";
-            if (string.IsNullOrWhiteSpace(Model)) Model = "gpt-4o-mini";
+            if (string.IsNullOrWhiteSpace(Model)) Model = DefaultModel;
             if (MaxSuggestions <= 0) MaxSuggestions = 30;
             if (string.IsNullOrWhiteSpace(SystemPrompt) || string.Equals(SystemPrompt, LegacySystemPrompt, StringComparison.Ordinal))
             {
                 SystemPrompt = DefaultSystemPrompt;
             }
             ModelCookieMappings = NormalizeModelCookieMappings(ModelCookieMappings);
+            Profiles = NormalizeProfiles(Profiles);
+        }
+
+        public static IList<AiProfile> NormalizeProfiles(IEnumerable<AiProfile> profiles)
+        {
+            List<AiProfile> result = new List<AiProfile>();
+            HashSet<string> keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (profiles == null) return result;
+
+            foreach (AiProfile profile in profiles)
+            {
+                if (profile == null) continue;
+                AiProfile normalized = profile.Clone();
+                normalized.Name = NormalizeValue(normalized.Name);
+                normalized.AccessMode = NormalizeAccessMode(normalized.AccessMode);
+                normalized.Endpoint = NormalizeValue(normalized.Endpoint);
+                normalized.ApiKey = NormalizeValue(normalized.ApiKey);
+                normalized.Model = NormalizeValue(normalized.Model);
+                normalized.SystemPrompt = NormalizeValue(normalized.SystemPrompt);
+                normalized.ModelCookieMappings = NormalizeModelCookieMappings(normalized.ModelCookieMappings);
+                if (string.IsNullOrWhiteSpace(normalized.Name)) normalized.Name = BuildProfileAutoName(normalized.Model, normalized.SavedAt);
+                if (string.IsNullOrWhiteSpace(normalized.Endpoint)) normalized.Endpoint = "https://api.openai.com";
+                if (string.IsNullOrWhiteSpace(normalized.Model)) normalized.Model = DefaultModel;
+                if (normalized.MaxSuggestions <= 0) normalized.MaxSuggestions = 30;
+                if (string.IsNullOrWhiteSpace(normalized.SystemPrompt)) normalized.SystemPrompt = DefaultSystemPrompt;
+
+                string fingerprint = normalized.BuildFingerprint();
+                if (keys.Add(fingerprint)) result.Add(normalized);
+            }
+
+            return result;
+        }
+
+        public static string BuildProfileAutoName(string model, DateTime savedAt)
+        {
+            string normalizedModel = NormalizeValue(model);
+            if (string.IsNullOrWhiteSpace(normalizedModel)) normalizedModel = "未填写模型";
+            return normalizedModel + " · " + savedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
         }
 
         public static string NormalizeAccessMode(string value)
@@ -123,6 +164,77 @@ namespace AiCleanVolume.Core.Models
     {
         public string Model { get; set; }
         public string Cookie { get; set; }
+    }
+
+    public sealed class AiProfile
+    {
+        public AiProfile()
+        {
+            SavedAt = DateTime.Now;
+            ModelCookieMappings = new List<AiModelCookieMapping>();
+        }
+
+        public string Name { get; set; }
+        public DateTime SavedAt { get; set; }
+        public string AccessMode { get; set; }
+        public string Endpoint { get; set; }
+        public string ApiKey { get; set; }
+        public string Model { get; set; }
+        public int MaxSuggestions { get; set; }
+        public string SystemPrompt { get; set; }
+        public IList<AiModelCookieMapping> ModelCookieMappings { get; set; }
+
+        public AiProfile Clone()
+        {
+            AiProfile clone = new AiProfile
+            {
+                Name = Name,
+                SavedAt = SavedAt,
+                AccessMode = AccessMode,
+                Endpoint = Endpoint,
+                ApiKey = ApiKey,
+                Model = Model,
+                MaxSuggestions = MaxSuggestions,
+                SystemPrompt = SystemPrompt,
+                ModelCookieMappings = new List<AiModelCookieMapping>()
+            };
+
+            IList<AiModelCookieMapping> mappings = AiSettings.NormalizeModelCookieMappings(ModelCookieMappings);
+            for (int i = 0; i < mappings.Count; i++)
+            {
+                clone.ModelCookieMappings.Add(new AiModelCookieMapping
+                {
+                    Model = mappings[i].Model,
+                    Cookie = mappings[i].Cookie
+                });
+            }
+
+            return clone;
+        }
+
+        public string BuildFingerprint()
+        {
+            List<string> parts = new List<string>();
+            parts.Add(AiSettings.NormalizeAccessMode(AccessMode));
+            parts.Add(NormalizeValue(Endpoint));
+            parts.Add(NormalizeValue(ApiKey));
+            parts.Add(NormalizeValue(Model));
+            parts.Add(MaxSuggestions.ToString());
+            parts.Add(NormalizeValue(SystemPrompt));
+
+            IList<AiModelCookieMapping> mappings = AiSettings.NormalizeModelCookieMappings(ModelCookieMappings);
+            for (int i = 0; i < mappings.Count; i++)
+            {
+                parts.Add(NormalizeValue(mappings[i].Model) + "=" + NormalizeValue(mappings[i].Cookie));
+            }
+
+            return string.Join("\n", parts.ToArray());
+        }
+
+        private static string NormalizeValue(string value)
+        {
+            return (value ?? string.Empty).Trim();
+        }
     }
 
     public sealed class SandboxSettings
