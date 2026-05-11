@@ -14,12 +14,13 @@ namespace AiCleanVolume.Desktop
 {
     public sealed class MainWindow : AntdUI.Window
     {
-        private static readonly Color PageBackground = Color.FromArgb(245, 245, 245);
+        private static readonly Color PageBackground = Color.FromArgb(250, 250, 250);
         private static readonly Color SurfaceColor = Color.White;
-        private static readonly Color FillSecondary = Color.FromArgb(250, 250, 250);
-        private static readonly Color BorderDefaultColor = Color.FromArgb(217, 217, 217);
-        private static readonly Color BorderLightColor = Color.FromArgb(240, 240, 240);
+        private static readonly Color FillSecondary = Color.FromArgb(247, 249, 252);
+        private static readonly Color BorderDefaultColor = Color.FromArgb(217, 224, 236);
+        private static readonly Color BorderLightColor = Color.FromArgb(235, 238, 245);
         private static readonly Color PrimaryColor = Color.FromArgb(22, 119, 255);
+        private static readonly Color PrimarySoftColor = Color.FromArgb(230, 244, 255);
         private static readonly Color TextPrimaryColor = Color.FromArgb(31, 31, 31);
         private static readonly Color TextSecondaryColor = Color.FromArgb(89, 89, 89);
         private static readonly Color TextTertiaryColor = Color.FromArgb(140, 140, 140);
@@ -142,9 +143,7 @@ namespace AiCleanVolume.Desktop
         private Label availableSpaceValueLabel;
         private Label reservedSpaceValueLabel;
         private Label scanStatusLabel;
-        private Panel scanProgressTrack;
-        private Panel scanProgressFill;
-        private float scanProgressValue;
+        private AntdUI.Progress scanProgress;
 
         private readonly string defaultDescription = "选择磁盘或目录，扫描空间占用，生成可确认的安全清理建议";
         private FormWindowState lastWindowState;
@@ -201,23 +200,30 @@ namespace AiCleanVolume.Desktop
             appBar.Dock = DockStyle.Top;
             appBar.BackColor = SurfaceColor;
             appBar.ShowButton = true;
-            appBar.ShowIcon = false;
+            appBar.ShowIcon = true;
+            appBar.IconSvg = "RobotFilled";
+            appBar.IconRatio = 0.62F;
             appBar.UseTitleFont = false;
+            appBar.DividerShow = true;
+            appBar.DividerMargin = 3;
+            appBar.DividerColor = BorderLightColor;
             appBar.Padding = new Padding(12, 0, 0, 0);
             appBar.Text = AppDisplayName;
+            appBar.SubText = "扫描界面";
             appBar.Description = string.Empty;
             appBar.Height = 40;
 
             titleBar = new AntdUI.PageHeader();
             titleBar.Dock = DockStyle.Top;
-            titleBar.BackColor = SurfaceColor;
+            titleBar.BackColor = PageBackground;
             titleBar.ShowButton = false;
             titleBar.ShowIcon = false;
             titleBar.UseTitleFont = true;
-            titleBar.Padding = new Padding(12, 0, 0, 8);
+            titleBar.DividerShow = false;
+            titleBar.Padding = new Padding(24, 6, 0, 10);
             titleBar.Text = AppDisplayName;
             titleBar.Description = defaultDescription;
-            titleBar.Height = 72;
+            titleBar.Height = 78;
 
             saveSettingsButton = CreateHeaderButton("保存配置", AntdUI.TTypeMini.Default);
             saveSettingsButton.Click += delegate { SaveSettings(); };
@@ -256,7 +262,7 @@ namespace AiCleanVolume.Desktop
             Panel pageHost = new Panel();
             pageHost.Dock = DockStyle.Fill;
             pageHost.BackColor = PageBackground;
-            pageHost.Padding = new Padding(24, 16, 24, 24);
+            pageHost.Padding = new Padding(24, 12, 24, 24);
 
             scanPage = CreatePageContainer();
             scanPage.Controls.Add(CreateStoragePanel());
@@ -322,7 +328,7 @@ namespace AiCleanVolume.Desktop
             sidebarPanel.BorderColor = BorderLightColor;
             sidebarPanel.Radius = 0;
             sidebarPanel.Shadow = 0;
-            sidebarPanel.Padding = new Padding(12, 10, 12, 12);
+            sidebarPanel.Padding = new Padding(14, 12, 14, 14);
 
             Panel footerPanel = CreateSidebarFooterPanel();
             Panel dividerPanel = new Panel();
@@ -370,15 +376,16 @@ namespace AiCleanVolume.Desktop
             menu.Dock = DockStyle.Fill;
             menu.Mode = AntdUI.TMenuMode.Inline;
             menu.Unique = true;
-            menu.Radius = 12;
+            menu.Radius = 9;
             menu.Indent = false;
             menu.Gap = 12;
             menu.IconGap = 10;
             menu.itemMargin = 5;
             menu.IconRatio = 1.08F;
             menu.Padding = new Padding(2, 6, 2, 6);
-            menu.BackHover = Color.FromArgb(242, 247, 255);
-            menu.BackActive = Color.FromArgb(230, 240, 255);
+            menu.ForeColor = TextSecondaryColor;
+            menu.BackHover = Color.FromArgb(245, 248, 255);
+            menu.BackActive = PrimarySoftColor;
             menu.ForeActive = PrimaryColor;
             menu.ScrollBarBlock = true;
             menu.SelectChanged += NavigationMenu_SelectChanged;
@@ -409,6 +416,8 @@ namespace AiCleanVolume.Desktop
             settingsNavButton.Radius = 12;
             settingsNavButton.Type = AntdUI.TTypeMini.Default;
             settingsNavButton.BorderWidth = 1F;
+            settingsNavButton.Ghost = true;
+            settingsNavButton.WaveSize = 2;
             settingsNavButton.DefaultBorderColor = BorderLightColor;
             settingsNavButton.Click += SettingsNavButton_Click;
 
@@ -426,8 +435,8 @@ namespace AiCleanVolume.Desktop
 
             AntdUI.Panel toolbarCard = CreateCardPanel(16);
             toolbarCard.Dock = DockStyle.Fill;
-            toolbarCard.Shadow = 3;
-            toolbarCard.ShadowOpacity = 0.04F;
+            toolbarCard.Shadow = 14;
+            toolbarCard.ShadowOpacity = 0.07F;
 
             TableLayoutPanel toolbarLayout = new TableLayoutPanel();
             toolbarLayout.Dock = DockStyle.Fill;
@@ -494,6 +503,7 @@ namespace AiCleanVolume.Desktop
             scanButton.Margin = new Padding(10, 0, 0, 0);
 
             pathInput = CreateInput("C:\\ 或目录路径");
+            pathInput.PrefixSvg = "FolderOpenOutlined";
             pathInput.TextChanged += PathInput_TextChanged;
 
             topRow.Controls.Add(CreateToolbarCaption("选择:"), 0, 0);
@@ -600,21 +610,16 @@ namespace AiCleanVolume.Desktop
             scanStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
             scanStatusLabel.Text = "等待开始扫描";
 
-            scanProgressTrack = new Panel();
-            scanProgressTrack.Dock = DockStyle.Top;
-            scanProgressTrack.Height = 14;
-            scanProgressTrack.Padding = new Padding(1);
-            scanProgressTrack.BackColor = Color.FromArgb(232, 242, 225);
-            scanProgressTrack.Resize += ScanProgressTrack_Resize;
+            scanProgress = new AntdUI.Progress();
+            scanProgress.Dock = DockStyle.Top;
+            scanProgress.Height = 16;
+            scanProgress.Shape = AntdUI.TShapeProgress.Round;
+            scanProgress.Radius = 8;
+            scanProgress.Value = 0F;
+            scanProgress.State = AntdUI.TType.Success;
+            scanProgress.UseSystemText = false;
 
-            scanProgressFill = new Panel();
-            scanProgressFill.Dock = DockStyle.Left;
-            scanProgressFill.Width = 0;
-            scanProgressFill.BackColor = Color.FromArgb(82, 196, 26);
-
-            scanProgressTrack.Controls.Add(scanProgressFill);
-
-            panel.Controls.Add(scanProgressTrack);
+            panel.Controls.Add(scanProgress);
             panel.Controls.Add(scanStatusLabel);
             return panel;
         }
@@ -933,7 +938,7 @@ namespace AiCleanVolume.Desktop
             if (sidebarHost != null) sidebarHost.Width = sidebarWidth + SidebarRailWidth;
             if (sidebarBrandPanel != null) sidebarBrandPanel.Height = 70;
             if (sidebarBrandPanel != null) sidebarBrandPanel.Padding = new Padding(6, 10, 6, 14);
-            if (sidebarPanel != null) sidebarPanel.Padding = new Padding(12, 10, 12, 12);
+            if (sidebarPanel != null) sidebarPanel.Padding = new Padding(14, 12, 14, 14);
             if (settingsNavButton != null) settingsNavButton.Width = 42;
             if (settingsNavButton != null) settingsNavButton.Dock = DockStyle.Left;
             if (settingsNavButton != null && settingsNavButton.Parent != null)
@@ -974,7 +979,7 @@ namespace AiCleanVolume.Desktop
         {
             if (settingsNavButton == null) return;
             bool selected = activePageId == PageSettings;
-            settingsNavButton.BackColor = selected ? Color.FromArgb(230, 240, 255) : SurfaceColor;
+            settingsNavButton.BackColor = selected ? PrimarySoftColor : SurfaceColor;
             settingsNavButton.DefaultBorderColor = selected ? Color.FromArgb(145, 202, 255) : BorderLightColor;
             settingsNavButton.ForeColor = selected ? PrimaryColor : TextSecondaryColor;
         }
@@ -994,6 +999,7 @@ namespace AiCleanVolume.Desktop
 
             titleBar.Text = GetPageTitle(pageId);
             titleBar.Description = GetPageDescription(pageId);
+            appBar.SubText = GetPageTitle(pageId);
 
             scanButton.Visible = pageId == PageScan;
             analyzeButton.Visible = pageId == PageSuggestions;
@@ -1010,13 +1016,13 @@ namespace AiCleanVolume.Desktop
             switch (pageId)
             {
                 case PageSuggestions:
-                    return AppDisplayName + " · 清理建议";
+                    return "清理建议";
                 case PageLog:
-                    return AppDisplayName + " · 日志管理";
+                    return "日志管理";
                 case PageSettings:
-                    return AppDisplayName + " · 设置界面";
+                    return "设置界面";
                 default:
-                    return AppDisplayName + " · 扫描界面";
+                    return "扫描界面";
             }
         }
 
@@ -2786,10 +2792,13 @@ namespace AiCleanVolume.Desktop
         {
             this.busy = busy;
             UseWaitCursor = busy;
+            if (appBar != null) appBar.Loading = busy;
+            if (titleBar != null) titleBar.Loading = busy;
             if (navigationMenu != null) navigationMenu.Enabled = !busy;
             if (settingsNavButton != null) settingsNavButton.Enabled = !busy;
             if (sidebarResizeRail != null) sidebarResizeRail.Enabled = !busy;
             scanButton.Enabled = !busy;
+            scanButton.Loading = busy && activePageId == PageScan;
             if (driveSelect != null) driveSelect.Enabled = !busy;
             if (pathInput != null) pathInput.Enabled = !busy;
             if (minSizeInput != null) minSizeInput.Enabled = !busy;
@@ -2800,6 +2809,10 @@ namespace AiCleanVolume.Desktop
             if (sortSelect != null) sortSelect.Enabled = !busy;
             analyzeButton.Enabled = !busy;
             regularCleanButton.Enabled = !busy;
+            superCleanButton.Enabled = !busy;
+            analyzeButton.Loading = busy && activePageId == PageSuggestions;
+            regularCleanButton.Loading = busy && activePageId == PageSuggestions;
+            superCleanButton.Loading = busy && activePageId == PageSuggestions;
             deleteButton.Enabled = !busy;
             saveSettingsButton.Enabled = !busy;
             if (testAiSettingsButton != null) testAiSettingsButton.Enabled = !busy;
@@ -2888,44 +2901,10 @@ namespace AiCleanVolume.Desktop
             if (scanStatusLabel != null) scanStatusLabel.Text = text;
             if (value < 0F) value = 0F;
             if (value > 1F) value = 1F;
-            scanProgressValue = value;
-
-            if (scanProgressTrack == null || scanProgressFill == null) return;
-
-            if (state == AntdUI.TType.Error)
-            {
-                scanProgressTrack.BackColor = Color.FromArgb(255, 232, 232);
-                scanProgressFill.BackColor = Color.FromArgb(255, 77, 79);
-            }
-            else if (loading)
-            {
-                scanProgressTrack.BackColor = Color.FromArgb(232, 243, 255);
-                scanProgressFill.BackColor = Color.FromArgb(22, 119, 255);
-            }
-            else
-            {
-                scanProgressTrack.BackColor = Color.FromArgb(232, 242, 225);
-                scanProgressFill.BackColor = Color.FromArgb(82, 196, 26);
-            }
-
-            RefreshScanProgressFill();
-        }
-
-        private void ScanProgressTrack_Resize(object sender, EventArgs e)
-        {
-            RefreshScanProgressFill();
-        }
-
-        private void RefreshScanProgressFill()
-        {
-            if (scanProgressTrack == null || scanProgressFill == null) return;
-            int innerWidth = Math.Max(0, scanProgressTrack.ClientSize.Width - scanProgressTrack.Padding.Horizontal);
-            int innerHeight = Math.Max(0, scanProgressTrack.ClientSize.Height - scanProgressTrack.Padding.Vertical);
-            int fillWidth = (int)Math.Round(innerWidth * scanProgressValue);
-            if (fillWidth < 0) fillWidth = 0;
-            if (fillWidth > innerWidth) fillWidth = innerWidth;
-            scanProgressFill.Width = fillWidth;
-            scanProgressFill.Height = innerHeight;
+            if (scanProgress == null) return;
+            scanProgress.Value = value;
+            scanProgress.State = state == AntdUI.TType.None && loading ? AntdUI.TType.Info : state;
+            scanProgress.Loading = loading;
         }
 
         private static string FormatBytesWithPercent(long bytes, long totalBytes)
@@ -3205,13 +3184,15 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Padding = new Padding(padding);
-            panel.Radius = 12;
+            panel.Radius = 14;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
             panel.BorderColor = BorderLightColor;
-            panel.Shadow = 6;
-            panel.ShadowOpacity = 0.06F;
-            panel.ShadowOffsetY = 2;
+            panel.Shadow = 18;
+            panel.ShadowOpacity = 0.08F;
+            panel.ShadowOpacityHover = 0.14F;
+            panel.ShadowOpacityAnimation = true;
+            panel.ShadowOffsetY = 5;
             return panel;
         }
 
@@ -3221,7 +3202,7 @@ namespace AiCleanVolume.Desktop
             heading.Dock = DockStyle.Top;
             heading.Height = 34;
             heading.Text = text;
-            heading.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold);
+            heading.Font = new Font("Microsoft YaHei UI", 13.5F, FontStyle.Bold);
             heading.ForeColor = TextPrimaryColor;
             heading.BackColor = Color.Transparent;
             return heading;
@@ -3234,6 +3215,7 @@ namespace AiCleanVolume.Desktop
             desc.Height = 26;
             desc.Text = text;
             desc.ForeColor = TextSecondaryColor;
+            desc.Font = new Font("Microsoft YaHei UI", 9.5F);
             desc.BackColor = Color.Transparent;
             return desc;
         }
@@ -3241,14 +3223,14 @@ namespace AiCleanVolume.Desktop
         private static void ConfigureTableSurface(AntdUI.Table table)
         {
             table.Bordered = true;
-            table.Radius = 8;
+            table.Radius = 10;
             table.BorderWidth = 1F;
             table.BorderCellWidth = 1F;
             table.BorderColor = BorderLightColor;
             table.ColumnBack = FillSecondary;
             table.ColumnFore = TextSecondaryColor;
-            table.RowHoverBg = Color.FromArgb(230, 244, 255);
-            table.RowSelectedBg = Color.FromArgb(240, 247, 255);
+            table.RowHoverBg = Color.FromArgb(245, 248, 255);
+            table.RowSelectedBg = PrimarySoftColor;
         }
 
         private AntdUI.Button CreateHeaderButton(string text, AntdUI.TTypeMini type)
@@ -3260,8 +3242,11 @@ namespace AiCleanVolume.Desktop
             button.Type = type;
             button.Width = 120;
             button.Height = 36;
-            button.Radius = 6;
+            button.Radius = 9;
             button.BorderWidth = 1F;
+            button.Ghost = true;
+            button.IconSvg = GetHeaderButtonIconSvg(text);
+            button.WaveSize = 2;
             button.Margin = new Padding(8, 12, 0, 12);
             return button;
         }
@@ -3273,9 +3258,10 @@ namespace AiCleanVolume.Desktop
             button.Text = text;
             button.Type = type;
             button.Width = 92;
-            button.Height = 36;
-            button.Radius = 6;
-            button.BorderWidth = 1F;
+            button.Height = 40;
+            button.Radius = 9;
+            button.BorderWidth = 0F;
+            button.IconSvg = text == "扫描" ? "SearchOutlined" : null;
             button.Margin = Padding.Empty;
             return button;
         }
@@ -3288,8 +3274,9 @@ namespace AiCleanVolume.Desktop
             button.Type = type;
             button.Width = 78;
             button.Height = 28;
-            button.Radius = 6;
+            button.Radius = 8;
             button.BorderWidth = 1F;
+            button.Ghost = type == AntdUI.TTypeMini.Default;
             button.Margin = new Padding(8, 0, 0, 0);
             return button;
         }
@@ -3302,10 +3289,30 @@ namespace AiCleanVolume.Desktop
             button.Text = text;
             button.Type = type;
             button.Height = 34;
-            button.Radius = 6;
+            button.Radius = 8;
             button.BorderWidth = 1F;
+            button.Ghost = type == AntdUI.TTypeMini.Default;
             button.Margin = new Padding(0, 4, 8, 4);
             return button;
+        }
+
+        private static string GetHeaderButtonIconSvg(string text)
+        {
+            switch (text)
+            {
+                case "保存配置":
+                    return "SaveFilled";
+                case "删除勾选":
+                    return "DeleteFilled";
+                case "AI 识别":
+                    return "RobotFilled";
+                case "常规清理":
+                    return "SearchOutlined";
+                case "超级清理":
+                    return "RocketFilled";
+                default:
+                    return null;
+            }
         }
 
         private Control CreateAiSettingsHeaderControls()
@@ -3329,7 +3336,7 @@ namespace AiCleanVolume.Desktop
             input.Dock = DockStyle.Fill;
             input.PlaceholderText = placeholder;
             input.Font = new Font("Microsoft YaHei UI", 10.5F);
-            input.Radius = 6;
+            input.Radius = 8;
             input.BorderWidth = 1F;
             input.BorderColor = BorderDefaultColor;
             input.BorderHover = PrimaryColor;
@@ -3355,6 +3362,13 @@ namespace AiCleanVolume.Desktop
             select.Dock = DockStyle.Fill;
             select.DropDownArrow = true;
             select.ListAutoWidth = true;
+            select.DropDownRadius = 8;
+            select.Radius = 8;
+            select.BorderWidth = 1F;
+            select.BorderColor = BorderDefaultColor;
+            select.BorderHover = PrimaryColor;
+            select.BorderActive = PrimaryColor;
+            select.BackColor = SurfaceColor;
             select.Font = Font;
             return select;
         }
