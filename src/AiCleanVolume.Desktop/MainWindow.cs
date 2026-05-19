@@ -3258,6 +3258,11 @@ namespace AiCleanVolume.Desktop
 
         private static AntdUI.Panel CreateCardPanel(int padding)
         {
+            return CreateCardPanel(padding, false);
+        }
+
+        private static AntdUI.Panel CreateCardPanel(int padding, bool animateShadowOnHover)
+        {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Padding = new Padding(padding);
             panel.Radius = 14;
@@ -3266,8 +3271,8 @@ namespace AiCleanVolume.Desktop
             panel.BorderColor = BorderLightColor;
             panel.Shadow = 18;
             panel.ShadowOpacity = 0.08F;
-            panel.ShadowOpacityHover = 0.14F;
-            panel.ShadowOpacityAnimation = true;
+            panel.ShadowOpacityHover = animateShadowOnHover ? 0.14F : 0.08F;
+            panel.ShadowOpacityAnimation = animateShadowOnHover;
             panel.ShadowOffsetY = 5;
             return panel;
         }
