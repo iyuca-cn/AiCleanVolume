@@ -29,8 +29,12 @@ namespace AiCleanVolume.Desktop
         private const string PageLog = "log";
         private const string PageSettings = "settings";
         private const string AppDisplayName = "AI智能清盘";
+        private const int WmSize = 0x0005;
+        private const int WmEraseBackground = 0x0014;
         private const int WmGetMinMaxInfo = 0x0024;
         private const int WmSetRedraw = 0x000B;
+        private static readonly IntPtr SizeRestored = IntPtr.Zero;
+        private static readonly IntPtr SizeMaximized = new IntPtr(2);
         private static readonly Size DefaultClientArea = new Size(1540, 920);
         private static readonly Size BaseMinimumWindowSize = new Size(1120, 720);
         private const int SidebarMinWidth = 180;
@@ -163,6 +167,8 @@ namespace AiCleanVolume.Desktop
         private readonly string defaultDescription = "选择磁盘或目录，扫描空间占用，生成可确认的安全清理建议";
         private FormWindowState lastWindowState;
         private bool applyingNormalBounds;
+        private bool restoreRedrawSuspended;
+        private bool restoreBoundsQueued;
         private bool busy;
         private bool sidebarResizing;
         private bool syncingAiPromptPreset;
@@ -818,15 +824,15 @@ namespace AiCleanVolume.Desktop
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
 
-            Panel scrollHost = new DoubleBufferedPanel();
+            Panel scrollHost = new SmoothScrollPanel();
             scrollHost.Dock = DockStyle.Fill;
             scrollHost.AutoScroll = true;
-            scrollHost.BackColor = Color.Transparent;
+            scrollHost.BackColor = PageBackground;
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Top;
             layout.Height = 722;
-            layout.BackColor = Color.Transparent;
+            layout.BackColor = PageBackground;
             layout.ColumnCount = 2;
             layout.RowCount = 3;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
@@ -915,9 +921,9 @@ namespace AiCleanVolume.Desktop
             layout.Controls.Add(applyAiProfileButton, 1, 0);
             layout.Controls.Add(addAiProfileButton, 2, 0);
 
-            aiProfileListPanel = new FlowLayoutPanel();
+            aiProfileListPanel = new DoubleBufferedFlowLayoutPanel();
             aiProfileListPanel.Dock = DockStyle.Fill;
-            aiProfileListPanel.BackColor = Color.Transparent;
+            aiProfileListPanel.BackColor = SurfaceColor;
             aiProfileListPanel.FlowDirection = FlowDirection.TopDown;
             aiProfileListPanel.WrapContents = false;
             aiProfileListPanel.AutoScroll = true;
@@ -1849,9 +1855,9 @@ namespace AiCleanVolume.Desktop
 
         private Panel CreateAiProfileDrawerForm()
         {
-            Panel scrollHost = new DoubleBufferedPanel();
+            Panel scrollHost = new SmoothScrollPanel();
             scrollHost.Dock = DockStyle.Fill;
-            scrollHost.BackColor = Color.Transparent;
+            scrollHost.BackColor = SurfaceColor;
             scrollHost.AutoScroll = true;
             scrollHost.Padding = new Padding(0, 4, 4, 12);
 
@@ -1859,7 +1865,7 @@ namespace AiCleanVolume.Desktop
             form.Dock = DockStyle.Top;
             form.Width = 500;
             form.Height = 606;
-            form.BackColor = Color.Transparent;
+            form.BackColor = SurfaceColor;
             form.ColumnCount = 2;
             form.RowCount = 11;
             form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88F));
@@ -3599,10 +3605,15 @@ namespace AiCleanVolume.Desktop
 
         private static void ResumeControlRedraw(Control control)
         {
+            ResumeControlRedraw(control, true, true);
+        }
+
+        private static void ResumeControlRedraw(Control control, bool invalidateChildren, bool updateImmediately)
+        {
             if (control == null || !control.IsHandleCreated) return;
             SendMessage(control.Handle, WmSetRedraw, new IntPtr(1), IntPtr.Zero);
-            control.Invalidate(true);
-            control.Update();
+            control.Invalidate(invalidateChildren);
+            if (updateImmediately) control.Update();
         }
 
         [DllImport("user32.dll")]
@@ -3614,7 +3625,14 @@ namespace AiCleanVolume.Desktop
             base.OnSizeChanged(e);
             if (!applyingNormalBounds && WindowState == FormWindowState.Normal && previousState != FormWindowState.Normal && IsHandleCreated)
             {
-                BeginInvoke((MethodInvoker)delegate { ApplyNormalWindowBounds(false); });
+                if (previousState == FormWindowState.Minimized)
+                {
+                    QueueWindowRestoreCompletion();
+                }
+                else
+                {
+                    BeginInvoke((MethodInvoker)delegate { ApplyNormalWindowBounds(false); });
+                }
             }
             lastWindowState = WindowState;
         }
@@ -3628,7 +3646,53 @@ namespace AiCleanVolume.Desktop
                 return;
             }
 
+            bool restoreFromMinimized = IsRestoreFromMinimizedSizeMessage(m);
+            if (restoreFromMinimized) SuspendWindowRestoreRedraw();
+
             base.WndProc(ref m);
+
+            if (restoreFromMinimized && restoreRedrawSuspended && !restoreBoundsQueued)
+            {
+                QueueWindowRestoreCompletion();
+            }
+        }
+
+        private bool IsRestoreFromMinimizedSizeMessage(Message message)
+        {
+            if (message.Msg != WmSize || lastWindowState != FormWindowState.Minimized) return false;
+            return message.WParam == SizeRestored || message.WParam == SizeMaximized;
+        }
+
+        private void SuspendWindowRestoreRedraw()
+        {
+            if (restoreRedrawSuspended || !IsHandleCreated) return;
+            SuspendControlRedraw(this);
+            restoreRedrawSuspended = true;
+        }
+
+        private void QueueWindowRestoreCompletion()
+        {
+            if (restoreBoundsQueued) return;
+            restoreBoundsQueued = true;
+            BeginInvoke((MethodInvoker)delegate
+            {
+                try
+                {
+                    if (WindowState == FormWindowState.Normal) ApplyNormalWindowBounds(false);
+                }
+                finally
+                {
+                    restoreBoundsQueued = false;
+                    ResumeWindowRestoreRedraw();
+                }
+            });
+        }
+
+        private void ResumeWindowRestoreRedraw()
+        {
+            if (!restoreRedrawSuspended) return;
+            restoreRedrawSuspended = false;
+            ResumeControlRedraw(this, true, false);
         }
 
         private void UpdateMaximizedBounds(IntPtr lParam)
@@ -4487,6 +4551,52 @@ namespace AiCleanVolume.Desktop
             {
                 SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
                 UpdateStyles();
+            }
+        }
+
+        private sealed class SmoothScrollPanel : Panel
+        {
+            public SmoothScrollPanel()
+            {
+                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
+                UpdateStyles();
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WmEraseBackground)
+                {
+                    m.Result = new IntPtr(1);
+                    return;
+                }
+
+                base.WndProc(ref m);
+            }
+
+            protected override void OnScroll(ScrollEventArgs se)
+            {
+                base.OnScroll(se);
+                Invalidate(false);
+            }
+        }
+
+        private sealed class DoubleBufferedFlowLayoutPanel : FlowLayoutPanel
+        {
+            public DoubleBufferedFlowLayoutPanel()
+            {
+                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
+                UpdateStyles();
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WmEraseBackground)
+                {
+                    m.Result = new IntPtr(1);
+                    return;
+                }
+
+                base.WndProc(ref m);
             }
         }
     }
