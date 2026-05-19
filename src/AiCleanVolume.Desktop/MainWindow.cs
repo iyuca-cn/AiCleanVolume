@@ -787,10 +787,11 @@ namespace AiCleanVolume.Desktop
             Label heading = CreateSectionTitle("设置");
             Label desc = CreateSectionDescription("管理 AI 接入、提示词、沙盒白名单和删除策略。");
 
-            aiEnabledSwitch = new AntdUI.Switch();
-            testAiSettingsButton = CreateSettingsActionButton("测试 AI", AntdUI.TTypeMini.Primary);
+            aiEnabledSwitch = CreateSettingsSwitch();
+            testAiSettingsButton = CreateSettingsActionButton("测试 AI", AntdUI.TTypeMini.Default);
+            testAiSettingsButton.IconSvg = "SearchOutlined";
             testAiSettingsButton.Click += delegate { TestAiSettings(); };
-            recycleSwitch = new AntdUI.Switch();
+            recycleSwitch = CreateSettingsSwitch();
             privilegedCheckbox = CreateCheckbox("启用完全权限（管理员）");
             privilegedCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
             aiAccessModeSelect = CreateSelect();
@@ -802,6 +803,7 @@ namespace AiCleanVolume.Desktop
             maxSuggestionsInput = CreateInput("30");
             aiProfileSelect = CreateSelect();
             applyAiProfileButton = CreateSettingsActionButton("应用选中", AntdUI.TTypeMini.Primary);
+            applyAiProfileButton.IconSvg = "CheckOutlined";
             applyAiProfileButton.Click += delegate { ApplySelectedAiProfile(); };
             addAiProfileButton = CreateAddAiProfileButton();
             addAiProfileButton.Click += delegate { OpenAiProfileCreateDrawer(); };
@@ -831,14 +833,14 @@ namespace AiCleanVolume.Desktop
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Top;
-            layout.Height = 722;
+            layout.Height = 718;
             layout.BackColor = PageBackground;
             layout.ColumnCount = 2;
             layout.RowCount = 3;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 360F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 370F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 266F));
             scrollHost.Resize += delegate
             {
@@ -875,26 +877,25 @@ namespace AiCleanVolume.Desktop
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 6;
-            layout.RowCount = 2;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 126F));
+            layout.ColumnCount = 7;
+            layout.RowCount = 1;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            maxSuggestionsInput.Margin = new Padding(0, 8, 0, 8);
 
             layout.Controls.Add(CreateCaption("AI"), 0, 0);
             layout.Controls.Add(aiEnabledSwitch, 1, 0);
-            layout.Controls.Add(testAiSettingsButton, 2, 0);
-            layout.Controls.Add(CreateCaption("回收站"), 4, 0);
-            layout.Controls.Add(recycleSwitch, 5, 0);
-            layout.Controls.Add(privilegedCheckbox, 0, 1);
-            layout.SetColumnSpan(privilegedCheckbox, 4);
-            layout.Controls.Add(CreateCaption("建议条数"), 4, 1);
-            layout.Controls.Add(maxSuggestionsInput, 5, 1);
+            layout.Controls.Add(CreateCaption("回收站"), 2, 0);
+            layout.Controls.Add(recycleSwitch, 3, 0);
+            layout.Controls.Add(CreateCaption("建议条数"), 4, 0);
+            layout.Controls.Add(maxSuggestionsInput, 5, 0);
 
             section.Controls.Add(layout);
             return section;
@@ -908,18 +909,23 @@ namespace AiCleanVolume.Desktop
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 3;
+            layout.ColumnCount = 5;
             layout.RowCount = 2;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 230F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 52F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             Label hint = CreateSmallMutedLabel("点击卡片选择配置，右侧按钮可直接应用到当前设置。");
+            privilegedCheckbox.Margin = new Padding(0, 4, 8, 4);
             layout.Controls.Add(hint, 0, 0);
-            layout.Controls.Add(applyAiProfileButton, 1, 0);
-            layout.Controls.Add(addAiProfileButton, 2, 0);
+            layout.Controls.Add(privilegedCheckbox, 1, 0);
+            layout.Controls.Add(testAiSettingsButton, 2, 0);
+            layout.Controls.Add(applyAiProfileButton, 3, 0);
+            layout.Controls.Add(addAiProfileButton, 4, 0);
 
             aiProfileListPanel = new DoubleBufferedFlowLayoutPanel();
             aiProfileListPanel.Dock = DockStyle.Fill;
@@ -932,7 +938,7 @@ namespace AiCleanVolume.Desktop
             aiProfileListPanel.Resize += delegate { ResizeAiProfileCards(); };
 
             layout.Controls.Add(aiProfileListPanel, 0, 1);
-            layout.SetColumnSpan(aiProfileListPanel, 3);
+            layout.SetColumnSpan(aiProfileListPanel, 5);
             body.Controls.Add(layout);
             return section;
         }
@@ -4339,6 +4345,17 @@ namespace AiCleanVolume.Desktop
             return button;
         }
 
+        private static AntdUI.Switch CreateSettingsSwitch()
+        {
+            AntdUI.Switch control = new AntdUI.Switch();
+            control.Width = 60;
+            control.Height = 34;
+            control.Anchor = AnchorStyles.Left;
+            control.Margin = new Padding(0, 8, 16, 8);
+            control.WaveSize = 2;
+            return control;
+        }
+
         private static string GetHeaderButtonIconSvg(string text)
         {
             switch (text)
@@ -4356,21 +4373,6 @@ namespace AiCleanVolume.Desktop
                 default:
                     return null;
             }
-        }
-
-        private Control CreateAiSettingsHeaderControls()
-        {
-            TableLayoutPanel panel = new TableLayoutPanel();
-            panel.Dock = DockStyle.Fill;
-            panel.BackColor = Color.Transparent;
-            panel.ColumnCount = 2;
-            panel.RowCount = 1;
-            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74F));
-            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
-            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            panel.Controls.Add(aiEnabledSwitch, 0, 0);
-            panel.Controls.Add(testAiSettingsButton, 1, 0);
-            return panel;
         }
 
         private static AntdUI.Input CreateInput(string placeholder)
