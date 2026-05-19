@@ -130,6 +130,7 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Input modelInput;
         private AntdUI.Input maxSuggestionsInput;
         private AntdUI.Select aiProfileSelect;
+        private FlowLayoutPanel aiProfileListPanel;
         private AntdUI.Button applyAiProfileButton;
         private AntdUI.Button saveAiProfileButton;
         private AntdUI.Select aiProviderPresetSelect;
@@ -758,25 +759,13 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateSettingsPanel()
         {
-            AntdUI.Panel panel = CreateCardPanel(20);
+            Panel panel = new DoubleBufferedPanel();
             panel.Dock = DockStyle.Fill;
+            panel.BackColor = PageBackground;
+            panel.Padding = new Padding(20);
 
-            Label heading = CreateSectionTitle("AI 与沙盒配置");
-
-            TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
-            layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 4;
-            layout.RowCount = 11;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
-            for (int i = 0; i < 7; i++) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 86F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 122F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            Label heading = CreateSectionTitle("设置");
+            Label desc = CreateSectionDescription("管理 AI 接入、提示词、沙盒白名单和删除策略。");
 
             aiEnabledSwitch = new AntdUI.Switch();
             testAiSettingsButton = CreateSettingsActionButton("测试 AI", AntdUI.TTypeMini.Primary);
@@ -792,7 +781,7 @@ namespace AiCleanVolume.Desktop
             modelInput = CreateInput(AiSettings.DefaultModel);
             maxSuggestionsInput = CreateInput("30");
             aiProfileSelect = CreateSelect();
-            applyAiProfileButton = CreateSettingsActionButton("应用", AntdUI.TTypeMini.Primary);
+            applyAiProfileButton = CreateSettingsActionButton("应用选中", AntdUI.TTypeMini.Primary);
             applyAiProfileButton.Click += delegate { ApplySelectedAiProfile(); };
             saveAiProfileButton = CreateSettingsActionButton("保存为配置", AntdUI.TTypeMini.Default);
             saveAiProfileButton.Click += delegate { SaveCurrentAiProfileWithPrompt(); };
@@ -815,57 +804,277 @@ namespace AiCleanVolume.Desktop
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
 
-            layout.Controls.Add(CreateCaption("AI"), 0, 0);
-            layout.Controls.Add(CreateAiSettingsHeaderControls(), 1, 0);
-            layout.Controls.Add(CreateCaption("回收站"), 2, 0);
-            layout.Controls.Add(recycleSwitch, 3, 0);
+            Panel scrollHost = new DoubleBufferedPanel();
+            scrollHost.Dock = DockStyle.Fill;
+            scrollHost.AutoScroll = true;
+            scrollHost.BackColor = Color.Transparent;
 
-            layout.Controls.Add(CreateCaption("完全权限"), 0, 1);
-            layout.Controls.Add(privilegedCheckbox, 1, 1);
-            layout.Controls.Add(CreateCaption("建议条数"), 2, 1);
-            layout.Controls.Add(maxSuggestionsInput, 3, 1);
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Top;
+            layout.Height = 842;
+            layout.BackColor = Color.Transparent;
+            layout.ColumnCount = 2;
+            layout.RowCount = 4;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 230F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 250F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 266F));
+            scrollHost.Resize += delegate
+            {
+                layout.Width = Math.Max(320, scrollHost.ClientSize.Width - 4);
+                ResizeAiProfileCards();
+            };
+            layout.Width = Math.Max(320, scrollHost.ClientSize.Width - 4);
 
-            layout.Controls.Add(CreateCaption("接入类型"), 0, 2);
-            layout.Controls.Add(aiAccessModeSelect, 1, 2);
-            layout.SetColumnSpan(aiAccessModeSelect, 3);
+            Control overviewSection = CreateSettingsOverviewSection();
+            Control profilesSection = CreateAiProfileSection();
+            Control connectionSection = CreateAiConnectionSection();
+            Control promptSection = CreateAiPromptSection();
+            Control sandboxSection = CreateSandboxSection();
+            overviewSection.Margin = new Padding(0, 0, 0, 12);
+            profilesSection.Margin = new Padding(0, 0, 0, 12);
+            connectionSection.Margin = new Padding(0, 0, 0, 12);
+            promptSection.Margin = new Padding(0, 0, 6, 0);
+            sandboxSection.Margin = new Padding(6, 0, 0, 0);
 
-            layout.Controls.Add(CreateCaption("历史配置"), 0, 3);
-            layout.Controls.Add(aiProfileSelect, 1, 3);
-            layout.Controls.Add(applyAiProfileButton, 2, 3);
-            layout.Controls.Add(saveAiProfileButton, 3, 3);
+            layout.Controls.Add(overviewSection, 0, 0);
+            layout.SetColumnSpan(overviewSection, 2);
+            layout.Controls.Add(profilesSection, 0, 1);
+            layout.SetColumnSpan(profilesSection, 2);
+            layout.Controls.Add(connectionSection, 0, 2);
+            layout.SetColumnSpan(connectionSection, 2);
+            layout.Controls.Add(promptSection, 0, 3);
+            layout.Controls.Add(sandboxSection, 1, 3);
 
-            layout.Controls.Add(CreateCaption("接口地址"), 0, 4);
-            layout.Controls.Add(endpointInput, 1, 4);
-            layout.SetColumnSpan(endpointInput, 3);
-
-            layout.Controls.Add(CreateCaption("模型"), 0, 5);
-            layout.Controls.Add(modelInput, 1, 5);
-            layout.Controls.Add(CreateCaption("API Key"), 2, 5);
-            layout.Controls.Add(apiKeyInput, 3, 5);
-
-            layout.Controls.Add(CreateCaption("接口预设"), 0, 6);
-            layout.Controls.Add(aiProviderPresetSelect, 1, 6);
-            layout.SetColumnSpan(aiProviderPresetSelect, 3);
-
-            layout.Controls.Add(CreateCaption("模型 Cookie"), 0, 7);
-            layout.Controls.Add(modelCookieMappingsInput, 1, 7);
-            layout.SetColumnSpan(modelCookieMappingsInput, 3);
-
-            layout.Controls.Add(CreateCaption("AI 预设"), 0, 8);
-            layout.Controls.Add(aiPromptPresetSelect, 1, 8);
-            layout.SetColumnSpan(aiPromptPresetSelect, 3);
-
-            layout.Controls.Add(CreateCaption("系统提示"), 0, 9);
-            layout.Controls.Add(systemPromptInput, 1, 9);
-            layout.SetColumnSpan(systemPromptInput, 3);
-
-            layout.Controls.Add(CreateCaption("允许位置"), 0, 10);
-            layout.Controls.Add(allowRootsInput, 1, 10);
-            layout.SetColumnSpan(allowRootsInput, 3);
-
-            panel.Controls.Add(layout);
+            scrollHost.Controls.Add(layout);
+            panel.Controls.Add(scrollHost);
+            panel.Controls.Add(desc);
             panel.Controls.Add(heading);
             return panel;
+        }
+
+        private Control CreateSettingsOverviewSection()
+        {
+            AntdUI.Panel section = CreateSettingsSurfacePanel(12);
+
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+            layout.ColumnCount = 6;
+            layout.RowCount = 2;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 126F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 112F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+
+            layout.Controls.Add(CreateCaption("AI"), 0, 0);
+            layout.Controls.Add(aiEnabledSwitch, 1, 0);
+            layout.Controls.Add(testAiSettingsButton, 2, 0);
+            layout.Controls.Add(CreateCaption("回收站"), 4, 0);
+            layout.Controls.Add(recycleSwitch, 5, 0);
+            layout.Controls.Add(privilegedCheckbox, 0, 1);
+            layout.SetColumnSpan(privilegedCheckbox, 4);
+            layout.Controls.Add(CreateCaption("建议条数"), 4, 1);
+            layout.Controls.Add(maxSuggestionsInput, 5, 1);
+
+            section.Controls.Add(layout);
+            return section;
+        }
+
+        private Control CreateAiProfileSection()
+        {
+            Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("AI 配置", "最近保存的接口、模型和访问方式会显示在这里。", out body);
+
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+            layout.ColumnCount = 3;
+            layout.RowCount = 2;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            Label hint = CreateSmallMutedLabel("点击卡片选择配置，右侧按钮可直接应用到当前设置。");
+            layout.Controls.Add(hint, 0, 0);
+            layout.Controls.Add(applyAiProfileButton, 1, 0);
+            layout.Controls.Add(saveAiProfileButton, 2, 0);
+
+            aiProfileListPanel = new FlowLayoutPanel();
+            aiProfileListPanel.Dock = DockStyle.Fill;
+            aiProfileListPanel.BackColor = Color.Transparent;
+            aiProfileListPanel.FlowDirection = FlowDirection.TopDown;
+            aiProfileListPanel.WrapContents = false;
+            aiProfileListPanel.AutoScroll = true;
+            aiProfileListPanel.Padding = new Padding(0);
+            aiProfileListPanel.Margin = new Padding(0);
+            aiProfileListPanel.Resize += delegate { ResizeAiProfileCards(); };
+
+            layout.Controls.Add(aiProfileListPanel, 0, 1);
+            layout.SetColumnSpan(aiProfileListPanel, 3);
+            body.Controls.Add(layout);
+            return section;
+        }
+
+        private Control CreateAiConnectionSection()
+        {
+            Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("接入参数", "配置标准 API 或 2API 网关，接口地址支持根地址、/v1 或完整 chat/completions。", out body);
+
+            TableLayoutPanel layout = CreateSettingsFieldGrid(5);
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            AddSettingsField(layout, "接入类型", aiAccessModeSelect, 0, 0);
+            AddSettingsField(layout, "接口预设", aiProviderPresetSelect, 2, 0);
+
+            layout.Controls.Add(CreateCaption("接口地址"), 0, 1);
+            layout.Controls.Add(endpointInput, 1, 1);
+            layout.SetColumnSpan(endpointInput, 3);
+
+            AddSettingsField(layout, "模型", modelInput, 0, 2);
+            AddSettingsField(layout, "API Key", apiKeyInput, 2, 2);
+
+            layout.Controls.Add(CreateCaption("模型 Cookie"), 0, 3);
+            layout.Controls.Add(modelCookieMappingsInput, 1, 3);
+            layout.SetColumnSpan(modelCookieMappingsInput, 3);
+
+            body.Controls.Add(layout);
+            return section;
+        }
+
+        private Control CreateAiPromptSection()
+        {
+            Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("提示词", "选择预设后仍可继续微调系统提示。", out body);
+
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+            layout.ColumnCount = 2;
+            layout.RowCount = 2;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 82F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            layout.Controls.Add(CreateCaption("AI 预设"), 0, 0);
+            layout.Controls.Add(aiPromptPresetSelect, 1, 0);
+            layout.Controls.Add(systemPromptInput, 0, 1);
+            layout.SetColumnSpan(systemPromptInput, 2);
+
+            body.Controls.Add(layout);
+            return section;
+        }
+
+        private Control CreateSandboxSection()
+        {
+            Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("沙盒范围", "允许位置内的路径可直接执行删除，其他位置会继续确认。", out body);
+
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+            layout.ColumnCount = 1;
+            layout.RowCount = 2;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            layout.Controls.Add(CreateSmallMutedLabel("允许位置"), 0, 0);
+            layout.Controls.Add(allowRootsInput, 0, 1);
+
+            body.Controls.Add(layout);
+            return section;
+        }
+
+        private static AntdUI.Panel CreateSettingsSurfacePanel(int padding)
+        {
+            AntdUI.Panel panel = new AntdUI.Panel();
+            panel.Dock = DockStyle.Fill;
+            panel.Padding = new Padding(padding);
+            panel.Radius = 14;
+            panel.Back = SurfaceColor;
+            panel.BorderWidth = 1F;
+            panel.BorderColor = BorderLightColor;
+            panel.Shadow = 0;
+            return panel;
+        }
+
+        private static AntdUI.Panel CreateSettingsGroupPanel(string title, string description, out Panel body)
+        {
+            AntdUI.Panel panel = CreateSettingsSurfacePanel(16);
+
+            Label titleLabel = CreateSettingsGroupTitle(title);
+            Label descLabel = CreateSmallMutedLabel(description);
+            descLabel.Dock = DockStyle.Top;
+            descLabel.Height = 22;
+
+            body = new DoubleBufferedPanel();
+            body.Dock = DockStyle.Fill;
+            body.BackColor = Color.Transparent;
+            body.Padding = new Padding(0, 8, 0, 0);
+
+            panel.Controls.Add(body);
+            panel.Controls.Add(descLabel);
+            panel.Controls.Add(titleLabel);
+            return panel;
+        }
+
+        private static TableLayoutPanel CreateSettingsFieldGrid(int rows)
+        {
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+            layout.ColumnCount = 4;
+            layout.RowCount = rows;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            return layout;
+        }
+
+        private static void AddSettingsField(TableLayoutPanel layout, string caption, Control control, int column, int row)
+        {
+            layout.Controls.Add(CreateCaption(caption), column, row);
+            layout.Controls.Add(control, column + 1, row);
+        }
+
+        private static Label CreateSettingsGroupTitle(string text)
+        {
+            Label label = new Label();
+            label.Dock = DockStyle.Top;
+            label.Height = 26;
+            label.Text = text;
+            label.TextAlign = ContentAlignment.MiddleLeft;
+            label.Font = new Font("Microsoft YaHei UI", 11.5F, FontStyle.Bold);
+            label.ForeColor = TextPrimaryColor;
+            label.BackColor = Color.Transparent;
+            return label;
+        }
+
+        private static Label CreateSmallMutedLabel(string text)
+        {
+            Label label = new Label();
+            label.Dock = DockStyle.Fill;
+            label.Text = text;
+            label.TextAlign = ContentAlignment.MiddleLeft;
+            label.Font = new Font("Microsoft YaHei UI", 9F);
+            label.ForeColor = TextTertiaryColor;
+            label.BackColor = Color.Transparent;
+            return label;
         }
 
         private Control CreateLogPanel()
@@ -1418,14 +1627,20 @@ namespace AiCleanVolume.Desktop
 
         private void PopulateAiProfiles()
         {
-            if (aiProfileSelect == null) return;
+            if (aiProfileSelect == null)
+            {
+                RefreshAiProfileCards();
+                return;
+            }
 
+            string selectedValue = aiProfileSelect.SelectedValue == null ? null : aiProfileSelect.SelectedValue.ToString();
             aiProfileSelect.Items.Clear();
             settings.Ai.Profiles = AiSettings.NormalizeProfiles(settings.Ai.Profiles);
             if (settings.Ai.Profiles.Count == 0)
             {
                 aiProfileSelect.Items.Add(new AntdUI.SelectItem("暂无历史配置", string.Empty));
                 aiProfileSelect.SelectedValue = string.Empty;
+                RefreshAiProfileCards();
                 return;
             }
 
@@ -1434,7 +1649,13 @@ namespace AiCleanVolume.Desktop
                 AiProfile profile = settings.Ai.Profiles[index];
                 aiProfileSelect.Items.Add(new AntdUI.SelectItem(BuildAiProfileDisplayName(profile), index.ToString()));
             }
-            aiProfileSelect.SelectedValue = "0";
+            int selectedIndex;
+            if (!int.TryParse(selectedValue, out selectedIndex) || selectedIndex < 0 || selectedIndex >= settings.Ai.Profiles.Count)
+            {
+                selectedValue = "0";
+            }
+            aiProfileSelect.SelectedValue = selectedValue;
+            RefreshAiProfileCards();
         }
 
         private void TestAiSettings()
@@ -1537,6 +1758,310 @@ namespace AiCleanVolume.Desktop
             if (!int.TryParse(aiProfileSelect.SelectedValue.ToString(), out index)) return null;
             if (index < 0 || index >= settings.Ai.Profiles.Count) return null;
             return settings.Ai.Profiles[index];
+        }
+
+        private void RefreshAiProfileCards()
+        {
+            if (aiProfileListPanel == null) return;
+
+            aiProfileListPanel.SuspendLayout();
+            try
+            {
+                aiProfileListPanel.Controls.Clear();
+                if (settings == null || settings.Ai == null || settings.Ai.Profiles == null || settings.Ai.Profiles.Count == 0)
+                {
+                    aiProfileListPanel.Controls.Add(CreateEmptyAiProfileCard());
+                    return;
+                }
+
+                int selectedIndex = GetSelectedAiProfileIndex();
+                for (int index = 0; index < settings.Ai.Profiles.Count; index++)
+                {
+                    aiProfileListPanel.Controls.Add(CreateAiProfileCard(settings.Ai.Profiles[index], index, index == selectedIndex));
+                }
+            }
+            finally
+            {
+                aiProfileListPanel.ResumeLayout();
+                ResizeAiProfileCards();
+            }
+        }
+
+        private Control CreateEmptyAiProfileCard()
+        {
+            AntdUI.Panel card = CreateAiProfileCardSurface(false);
+            card.Height = 88;
+
+            Label label = CreateSmallMutedLabel("还没有保存过 AI 配置。填写接入参数后点击“保存为配置”，这里会生成类似接口列表的配置卡片。");
+            label.Dock = DockStyle.Fill;
+            label.TextAlign = ContentAlignment.MiddleCenter;
+            card.Controls.Add(label);
+            return card;
+        }
+
+        private Control CreateAiProfileCard(AiProfile profile, int index, bool selected)
+        {
+            AntdUI.Panel card = CreateAiProfileCardSurface(selected);
+
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+            layout.ColumnCount = 3;
+            layout.RowCount = 1;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 54F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 122F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            Panel avatarCell = new DoubleBufferedPanel();
+            avatarCell.Dock = DockStyle.Fill;
+            avatarCell.BackColor = Color.Transparent;
+            AntdUI.Avatar avatar = new AntdUI.Avatar();
+            avatar.Width = 40;
+            avatar.Height = 40;
+            avatar.Left = 3;
+            avatar.Top = 20;
+            avatar.Text = BuildAiProfileAvatarText(profile);
+            avatar.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+            avatar.ForeColor = TextSecondaryColor;
+            avatar.BackColor = Color.FromArgb(248, 250, 252);
+            avatar.BorderWidth = 1F;
+            avatar.BorderColor = BorderLightColor;
+            avatar.Radius = 18;
+            avatarCell.Controls.Add(avatar);
+
+            TableLayoutPanel content = new TableLayoutPanel();
+            content.Dock = DockStyle.Fill;
+            content.BackColor = Color.Transparent;
+            content.ColumnCount = 1;
+            content.RowCount = 3;
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+            content.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            TableLayoutPanel titleRow = new TableLayoutPanel();
+            titleRow.Dock = DockStyle.Fill;
+            titleRow.BackColor = Color.Transparent;
+            titleRow.Margin = Padding.Empty;
+            titleRow.Padding = Padding.Empty;
+            titleRow.ColumnCount = 2;
+            titleRow.RowCount = 1;
+            titleRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            titleRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 182F));
+            titleRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            Label title = new Label();
+            title.Dock = DockStyle.Fill;
+            title.AutoEllipsis = true;
+            title.Text = BuildAiProfileDisplayName(profile);
+            title.Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold);
+            title.ForeColor = TextPrimaryColor;
+            title.BackColor = Color.Transparent;
+            title.TextAlign = ContentAlignment.MiddleLeft;
+            title.Margin = new Padding(0, 3, 8, 0);
+
+            FlowLayoutPanel tagRow = new FlowLayoutPanel();
+            tagRow.Dock = DockStyle.Fill;
+            tagRow.BackColor = Color.Transparent;
+            tagRow.FlowDirection = FlowDirection.LeftToRight;
+            tagRow.WrapContents = false;
+            tagRow.Margin = Padding.Empty;
+            tagRow.Padding = Padding.Empty;
+
+            titleRow.Controls.Add(title, 0, 0);
+            tagRow.Controls.Add(CreateAiProfileTag(IsAiProfileConfigured(profile) ? "正常" : "待补全", IsAiProfileConfigured(profile) ? AntdUI.TTypeMini.Success : AntdUI.TTypeMini.Warn));
+            tagRow.Controls.Add(CreateAiProfileTag(FormatAiAccessModeLabel(profile.AccessMode), AntdUI.TTypeMini.Info));
+            tagRow.Controls.Add(CreateAiProfileTag("P" + (index + 1).ToString(), AntdUI.TTypeMini.Primary));
+            titleRow.Controls.Add(tagRow, 1, 0);
+
+            Label endpoint = new Label();
+            endpoint.Dock = DockStyle.Fill;
+            endpoint.Text = NormalizeEndpoint(profile.Endpoint);
+            endpoint.Font = new Font("Microsoft YaHei UI", 10F);
+            endpoint.ForeColor = PrimaryColor;
+            endpoint.BackColor = Color.Transparent;
+            endpoint.TextAlign = ContentAlignment.MiddleLeft;
+            endpoint.AutoEllipsis = true;
+
+            Label meta = CreateSmallMutedLabel(BuildAiProfileMeta(profile));
+
+            content.Controls.Add(titleRow, 0, 0);
+            content.Controls.Add(endpoint, 0, 1);
+            content.Controls.Add(meta, 0, 2);
+
+            TableLayoutPanel actions = new TableLayoutPanel();
+            actions.Dock = DockStyle.Fill;
+            actions.BackColor = Color.Transparent;
+            actions.ColumnCount = 1;
+            actions.RowCount = 3;
+            actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            actions.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+            actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+
+            AntdUI.Button applyButton = CreateAiProfileCardActionButton(selected ? "已选中" : "应用", "CheckOutlined", selected);
+            applyButton.Click += delegate
+            {
+                SelectAiProfile(index);
+                ApplySelectedAiProfile();
+            };
+            actions.Controls.Add(applyButton, 0, 1);
+
+            layout.Controls.Add(avatarCell, 0, 0);
+            layout.Controls.Add(content, 1, 0);
+            layout.Controls.Add(actions, 2, 0);
+            card.Controls.Add(layout);
+
+            BindAiProfileCardSelection(card, index);
+            return card;
+        }
+
+        private AntdUI.Panel CreateAiProfileCardSurface(bool selected)
+        {
+            AntdUI.Panel card = new AntdUI.Panel();
+            card.Width = ResolveAiProfileCardWidth();
+            card.Height = 102;
+            card.Margin = new Padding(0, 0, 0, 10);
+            card.Padding = new Padding(14, 10, 14, 10);
+            card.Radius = 14;
+            card.Back = selected ? Color.FromArgb(247, 255, 252) : SurfaceColor;
+            card.BorderWidth = 1F;
+            card.BorderColor = selected ? Color.FromArgb(91, 213, 163) : BorderDefaultColor;
+            card.Shadow = selected ? 10 : 0;
+            card.ShadowOpacity = selected ? 0.07F : 0F;
+            card.ShadowOffsetY = 3;
+            return card;
+        }
+
+        private AntdUI.Button CreateAiProfileCardActionButton(string text, string iconSvg, bool selected)
+        {
+            AntdUI.Button button = new AntdUI.Button();
+            button.Dock = DockStyle.Fill;
+            button.AutoSizeMode = AntdUI.TAutoSize.None;
+            button.Text = text;
+            button.IconSvg = iconSvg;
+            button.Type = selected ? AntdUI.TTypeMini.Default : AntdUI.TTypeMini.Primary;
+            button.Ghost = selected;
+            button.Height = 32;
+            button.Radius = 8;
+            button.BorderWidth = 1F;
+            button.WaveSize = 2;
+            button.Margin = new Padding(8, 0, 0, 0);
+            if (selected)
+            {
+                button.DefaultBorderColor = Color.FromArgb(186, 231, 204);
+                button.ForeColor = Color.FromArgb(0, 120, 75);
+                button.BackColor = Color.FromArgb(240, 253, 244);
+            }
+            return button;
+        }
+
+        private static AntdUI.Tag CreateAiProfileTag(string text, AntdUI.TTypeMini type)
+        {
+            AntdUI.Tag tag = new AntdUI.Tag();
+            tag.AutoSizeMode = AntdUI.TAutoSize.Auto;
+            tag.Text = text;
+            tag.Type = type;
+            tag.BorderWidth = 0F;
+            tag.Radius = 8;
+            tag.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+            tag.Margin = new Padding(0, 3, 6, 0);
+            return tag;
+        }
+
+        private void BindAiProfileCardSelection(Control control, int index)
+        {
+            if (!(control is AntdUI.Button))
+            {
+                control.Cursor = Cursors.Hand;
+                control.Click += delegate { SelectAiProfile(index); };
+            }
+
+            foreach (Control child in control.Controls)
+            {
+                BindAiProfileCardSelection(child, index);
+            }
+        }
+
+        private void SelectAiProfile(int index)
+        {
+            if (aiProfileSelect == null || settings == null || settings.Ai == null || settings.Ai.Profiles == null) return;
+            if (index < 0 || index >= settings.Ai.Profiles.Count) return;
+            string selectedValue = index.ToString();
+            bool selectionChanged = aiProfileSelect.SelectedValue == null || !string.Equals(aiProfileSelect.SelectedValue.ToString(), selectedValue, StringComparison.Ordinal);
+            if (selectionChanged)
+            {
+                aiProfileSelect.SelectedValue = selectedValue;
+            }
+            if (selectionChanged) RefreshAiProfileCards();
+        }
+
+        private int GetSelectedAiProfileIndex()
+        {
+            if (aiProfileSelect == null || aiProfileSelect.SelectedValue == null) return 0;
+            int index;
+            if (!int.TryParse(aiProfileSelect.SelectedValue.ToString(), out index)) return 0;
+            return index;
+        }
+
+        private void ResizeAiProfileCards()
+        {
+            if (aiProfileListPanel == null) return;
+            int width = ResolveAiProfileCardWidth();
+            foreach (Control control in aiProfileListPanel.Controls)
+            {
+                control.Width = width;
+            }
+        }
+
+        private int ResolveAiProfileCardWidth()
+        {
+            if (aiProfileListPanel == null) return 640;
+            int scrollBarOffset = aiProfileListPanel.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0;
+            return Math.Max(420, aiProfileListPanel.ClientSize.Width - scrollBarOffset - 8);
+        }
+
+        private static bool IsAiProfileConfigured(AiProfile profile)
+        {
+            return profile != null && !string.IsNullOrWhiteSpace(profile.Endpoint) && !string.IsNullOrWhiteSpace(profile.Model);
+        }
+
+        private static string FormatAiAccessModeLabel(string accessMode)
+        {
+            return string.Equals(AiSettings.NormalizeAccessMode(accessMode), AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase) ? "2API" : "标准 API";
+        }
+
+        private static string BuildAiProfileMeta(AiProfile profile)
+        {
+            if (profile == null) return string.Empty;
+            string model = string.IsNullOrWhiteSpace(profile.Model) ? "未填写模型" : profile.Model.Trim();
+            int maxSuggestions = profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions;
+            return "模型：" + model + "    建议：" + maxSuggestions.ToString() + " 条    保存：" + profile.SavedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        }
+
+        private static string BuildAiProfileAvatarText(AiProfile profile)
+        {
+            string source = profile == null ? null : (string.IsNullOrWhiteSpace(profile.Name) ? profile.Model : profile.Name);
+            source = NormalizeValue(source);
+            if (string.IsNullOrWhiteSpace(source)) return "AI";
+
+            string[] parts = Regex.Split(source, "[^A-Za-z0-9]+");
+            string result = string.Empty;
+            for (int i = 0; i < parts.Length && result.Length < 2; i++)
+            {
+                if (string.IsNullOrWhiteSpace(parts[i])) continue;
+                result += char.ToUpperInvariant(parts[i][0]).ToString();
+            }
+
+            if (result.Length == 0)
+            {
+                result = source.Substring(0, Math.Min(2, source.Length)).ToUpperInvariant();
+            }
+            else if (result.Length == 1 && source.Length > 1)
+            {
+                result += char.ToUpperInvariant(source[1]).ToString();
+            }
+
+            return result.Length > 2 ? result.Substring(0, 2) : result;
         }
 
         private AiProfile CreateCurrentAiProfile(string name)
@@ -2894,6 +3419,7 @@ namespace AiCleanVolume.Desktop
             if (testAiSettingsButton != null) testAiSettingsButton.Enabled = !busy;
             if (applyAiProfileButton != null) applyAiProfileButton.Enabled = !busy;
             if (saveAiProfileButton != null) saveAiProfileButton.Enabled = !busy;
+            if (aiProfileListPanel != null) aiProfileListPanel.Enabled = !busy;
             if (selectAllSuggestionsButton != null) selectAllSuggestionsButton.Enabled = !busy;
             if (clearAllSuggestionsButton != null) clearAllSuggestionsButton.Enabled = !busy;
             if (invertSuggestionsButton != null) invertSuggestionsButton.Enabled = !busy;
