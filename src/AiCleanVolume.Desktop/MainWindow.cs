@@ -30,6 +30,7 @@ namespace AiCleanVolume.Desktop
         private const string PageSettings = "settings";
         private const string AppDisplayName = "AI智能清盘";
         private const int WmGetMinMaxInfo = 0x0024;
+        private const int WmSetRedraw = 0x000B;
         private static readonly Size DefaultClientArea = new Size(1540, 920);
         private static readonly Size BaseMinimumWindowSize = new Size(1120, 720);
         private const int SidebarMinWidth = 180;
@@ -80,6 +81,7 @@ namespace AiCleanVolume.Desktop
         private AntdUI.PageHeader appBar;
         private AntdUI.PageHeader titleBar;
         private AntdUI.Menu navigationMenu;
+        private Panel pageHost;
         private Panel sidebarHost;
         private AntdUI.Panel sidebarPanel;
         private Panel sidebarBrandPanel;
@@ -249,17 +251,17 @@ namespace AiCleanVolume.Desktop
             titleBar.Controls.Add(superCleanButton);
             titleBar.Controls.Add(regularCleanButton);
 
-            Panel shell = new Panel();
+            DoubleBufferedPanel shell = new DoubleBufferedPanel();
             shell.Dock = DockStyle.Fill;
             shell.BackColor = SurfaceColor;
             shell.Padding = Padding.Empty;
 
-            Panel contentHost = new Panel();
+            DoubleBufferedPanel contentHost = new DoubleBufferedPanel();
             contentHost.Dock = DockStyle.Fill;
             contentHost.BackColor = SurfaceColor;
             contentHost.Padding = Padding.Empty;
 
-            Panel pageHost = new Panel();
+            pageHost = new DoubleBufferedPanel();
             pageHost.Dock = DockStyle.Fill;
             pageHost.BackColor = PageBackground;
             pageHost.Padding = new Padding(24, 12, 24, 24);
@@ -298,7 +300,7 @@ namespace AiCleanVolume.Desktop
 
         private Panel CreatePageContainer()
         {
-            Panel page = new Panel();
+            Panel page = new DoubleBufferedPanel();
             page.Dock = DockStyle.Fill;
             page.BackColor = PageBackground;
             return page;
@@ -987,31 +989,48 @@ namespace AiCleanVolume.Desktop
         private void SetActivePage(string pageId)
         {
             string previousPageId = activePageId;
-            if (previousPageId == PageScan && pageId != PageScan) CompactStorageTreeRowsForNavigation();
+            if (previousPageId == pageId) return;
+            bool compactStorageTree = previousPageId == PageScan && pageId != PageScan;
 
-            activePageId = pageId;
-            scanPage.Visible = pageId == PageScan;
-            suggestionsPage.Visible = pageId == PageSuggestions;
-            logPage.Visible = pageId == PageLog;
-            settingsPage.Visible = pageId == PageSettings;
+            SuspendControlRedraw(this);
+            SuspendPageSwitchLayout();
+            try
+            {
+                activePageId = pageId;
 
-            if (scanPage.Visible) scanPage.BringToFront();
-            if (suggestionsPage.Visible) suggestionsPage.BringToFront();
-            if (logPage.Visible) logPage.BringToFront();
-            if (settingsPage.Visible) settingsPage.BringToFront();
+                Control activePage = GetPageControl(pageId);
+                if (activePage != null)
+                {
+                    activePage.Visible = true;
+                    activePage.BringToFront();
+                }
 
-            titleBar.Text = GetPageTitle(pageId);
-            titleBar.Description = GetPageDescription(pageId);
-            appBar.SubText = GetPageTitle(pageId);
+                scanPage.Visible = pageId == PageScan;
+                suggestionsPage.Visible = pageId == PageSuggestions;
+                logPage.Visible = pageId == PageLog;
+                settingsPage.Visible = pageId == PageSettings;
 
-            scanButton.Visible = pageId == PageScan;
-            analyzeButton.Visible = pageId == PageSuggestions;
-            regularCleanButton.Visible = pageId == PageSuggestions;
-            superCleanButton.Visible = pageId == PageSuggestions;
-            deleteButton.Visible = pageId == PageSuggestions;
-            saveSettingsButton.Visible = pageId == PageSettings;
-            SyncNavigationSelection(pageId);
-            UpdateSettingsNavigationState();
+                if (compactStorageTree) CompactStorageTreeRowsForNavigation();
+
+                string title = GetPageTitle(pageId);
+                titleBar.Text = title;
+                titleBar.Description = GetPageDescription(pageId);
+                appBar.SubText = title;
+
+                scanButton.Visible = pageId == PageScan;
+                analyzeButton.Visible = pageId == PageSuggestions;
+                regularCleanButton.Visible = pageId == PageSuggestions;
+                superCleanButton.Visible = pageId == PageSuggestions;
+                deleteButton.Visible = pageId == PageSuggestions;
+                saveSettingsButton.Visible = pageId == PageSettings;
+                SyncNavigationSelection(pageId);
+                UpdateSettingsNavigationState();
+            }
+            finally
+            {
+                ResumePageSwitchLayout();
+                ResumeControlRedraw(this);
+            }
         }
 
         private void CompactStorageTreeRowsForNavigation()
@@ -1020,6 +1039,35 @@ namespace AiCleanVolume.Desktop
 
             expandedStoragePaths.Clear();
             RebindStorageTree();
+        }
+
+        private Control GetPageControl(string pageId)
+        {
+            switch (pageId)
+            {
+                case PageSuggestions:
+                    return suggestionsPage;
+                case PageLog:
+                    return logPage;
+                case PageSettings:
+                    return settingsPage;
+                default:
+                    return scanPage;
+            }
+        }
+
+        private void SuspendPageSwitchLayout()
+        {
+            SuspendLayout();
+            if (pageHost != null) pageHost.SuspendLayout();
+            if (titleBar != null) titleBar.SuspendLayout();
+        }
+
+        private void ResumePageSwitchLayout()
+        {
+            if (titleBar != null) titleBar.ResumeLayout(true);
+            if (pageHost != null) pageHost.ResumeLayout(true);
+            ResumeLayout(true);
         }
 
         private static string GetPageTitle(string pageId)
@@ -2664,6 +2712,23 @@ namespace AiCleanVolume.Desktop
             base.Dispose(disposing);
         }
 
+        private static void SuspendControlRedraw(Control control)
+        {
+            if (control == null || !control.IsHandleCreated) return;
+            SendMessage(control.Handle, WmSetRedraw, IntPtr.Zero, IntPtr.Zero);
+        }
+
+        private static void ResumeControlRedraw(Control control)
+        {
+            if (control == null || !control.IsHandleCreated) return;
+            SendMessage(control.Handle, WmSetRedraw, new IntPtr(1), IntPtr.Zero);
+            control.Invalidate(true);
+            control.Update();
+        }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
         protected override void OnSizeChanged(EventArgs e)
         {
             FormWindowState previousState = lastWindowState;
@@ -3511,6 +3576,15 @@ namespace AiCleanVolume.Desktop
             public string Name { get; private set; }
             public string Endpoint { get; private set; }
             public string Model { get; private set; }
+        }
+
+        private sealed class DoubleBufferedPanel : Panel
+        {
+            public DoubleBufferedPanel()
+            {
+                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
+                UpdateStyles();
+            }
         }
     }
 }
