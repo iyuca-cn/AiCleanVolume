@@ -8,22 +8,32 @@ namespace AiCleanVolume.Desktop.ViewModels
     public sealed class StorageEntryRow : AntdUI.NotifyProperty
     {
         public StorageEntryRow(StorageItem item)
-            : this(item, 0)
+            : this(item, 0, false)
+        {
+        }
+
+        public StorageEntryRow(StorageItem item, bool materializeLoadedChildren)
+            : this(item, 0, materializeLoadedChildren)
         {
         }
 
         public StorageEntryRow(StorageItem item, int depth)
-            : this(item, depth, null)
+            : this(item, depth, false)
         {
         }
 
-        private StorageEntryRow(StorageItem item, int depth, StorageEntryRow parent)
+        public StorageEntryRow(StorageItem item, int depth, bool materializeLoadedChildren)
+            : this(item, depth, null, materializeLoadedChildren)
+        {
+        }
+
+        private StorageEntryRow(StorageItem item, int depth, StorageEntryRow parent, bool materializeLoadedChildren)
         {
             Children = new List<object>();
             Item = item;
             Depth = depth;
             Parent = parent;
-            RefreshFromItem();
+            RefreshFromItem(materializeLoadedChildren);
         }
 
         public StorageItem Item { get; private set; }
@@ -35,10 +45,15 @@ namespace AiCleanVolume.Desktop.ViewModels
 
         public void RefreshFromItem()
         {
+            RefreshFromItem(false);
+        }
+
+        public void RefreshFromItem(bool materializeLoadedChildren)
+        {
             if (Item == null) return;
 
             RefreshDisplayValues();
-            ReloadChildren();
+            ReloadChildren(materializeLoadedChildren);
         }
 
         public void RefreshDisplayValues()
@@ -56,18 +71,23 @@ namespace AiCleanVolume.Desktop.ViewModels
 
         public void ReloadChildren()
         {
+            ReloadChildren(false);
+        }
+
+        private void ReloadChildren(bool materializeLoadedChildren)
+        {
             Children.Clear();
             IsLoadingChildren = false;
             AreChildRowsMaterialized = false;
             if (Item == null || !Item.IsDirectory) return;
 
-            if (Item.ChildrenLoaded)
+            if (Item.ChildrenLoaded && materializeLoadedChildren)
             {
                 MaterializeLoadedChildren();
                 return;
             }
 
-            if (Item.HasChildren) Children.Add(ExpandMarker.Instance);
+            if (Item.HasChildren || Item.Children.Count > 0) Children.Add(ExpandMarker.Instance);
         }
 
         public bool MaterializeLoadedChildren()
@@ -78,7 +98,7 @@ namespace AiCleanVolume.Desktop.ViewModels
             Children.Clear();
             for (int i = 0; i < Item.Children.Count; i++)
             {
-                Children.Add(new StorageEntryRow(Item.Children[i], Depth + 1, this));
+                Children.Add(new StorageEntryRow(Item.Children[i], Depth + 1, this, false));
             }
 
             if (Children.Count > 1) Children.Sort(CompareChildRowsByDisplayOrder);

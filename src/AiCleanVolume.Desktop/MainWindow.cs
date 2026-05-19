@@ -986,6 +986,9 @@ namespace AiCleanVolume.Desktop
 
         private void SetActivePage(string pageId)
         {
+            string previousPageId = activePageId;
+            if (previousPageId == PageScan && pageId != PageScan) CompactStorageTreeRowsForNavigation();
+
             activePageId = pageId;
             scanPage.Visible = pageId == PageScan;
             suggestionsPage.Visible = pageId == PageSuggestions;
@@ -1009,6 +1012,14 @@ namespace AiCleanVolume.Desktop
             saveSettingsButton.Visible = pageId == PageSettings;
             SyncNavigationSelection(pageId);
             UpdateSettingsNavigationState();
+        }
+
+        private void CompactStorageTreeRowsForNavigation()
+        {
+            if (storageTable == null || currentRoot == null) return;
+
+            expandedStoragePaths.Clear();
+            RebindStorageTree();
         }
 
         private static string GetPageTitle(string pageId)
@@ -1713,7 +1724,7 @@ namespace AiCleanVolume.Desktop
                 currentTreeRequest = CreateScanRequest(result.Path, 1, request);
                 currentTreeRequest.SessionIdentity = result.SessionIdentity;
                 currentTreeRequest.SessionNodeId = result.SessionNodeId;
-                List<StorageEntryRow> rows = new List<StorageEntryRow> { new StorageEntryRow(result) };
+                List<StorageEntryRow> rows = new List<StorageEntryRow> { new StorageEntryRow(result, true) };
                 storageTable.DataSource = rows;
                 UpdateDriveSummaryForLocation(result.Path);
                 UpdateScanProgressState("扫描完成 " + elapsed.TotalSeconds.ToString("0.00") + " 秒", 1F, false, AntdUI.TType.Success);
@@ -2023,7 +2034,7 @@ namespace AiCleanVolume.Desktop
                     }
 
                     ApplyScannedNode(row.Item, loaded);
-                    row.RefreshFromItem();
+                    row.RefreshFromItem(true);
                     storageTable.Refresh();
                 });
             });
