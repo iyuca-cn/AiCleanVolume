@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
@@ -80,8 +81,24 @@ namespace AiCleanVolume.Desktop.ViewModels
                 Children.Add(new StorageEntryRow(Item.Children[i], Depth + 1, this));
             }
 
+            if (Children.Count > 1) Children.Sort(CompareChildRowsByDisplayOrder);
+
             AreChildRowsMaterialized = true;
             return true;
+        }
+
+        private static int CompareChildRowsByDisplayOrder(object leftValue, object rightValue)
+        {
+            StorageEntryRow left = (StorageEntryRow)leftValue;
+            StorageEntryRow right = (StorageEntryRow)rightValue;
+
+            int result = right.Item.Bytes.CompareTo(left.Item.Bytes);
+            if (result != 0) return result;
+
+            result = string.Compare(left.Item.Name, right.Item.Name, StringComparison.OrdinalIgnoreCase);
+            if (result != 0) return result;
+
+            return string.Compare(left.Item.Path, right.Item.Path, StringComparison.OrdinalIgnoreCase);
         }
 
         public bool ReleaseChildRows()
