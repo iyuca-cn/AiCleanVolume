@@ -825,14 +825,14 @@ namespace AiCleanVolume.Desktop
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Top;
-            layout.Height = 604;
+            layout.Height = 722;
             layout.BackColor = Color.Transparent;
             layout.ColumnCount = 2;
             layout.RowCount = 3;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 242F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 360F));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 266F));
             scrollHost.Resize += delegate
             {
