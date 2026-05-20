@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
+using AiCleanVolume.Desktop.Controls;
 using AiCleanVolume.Desktop.Services;
 using AiCleanVolume.Desktop.ViewModels;
 
@@ -4194,7 +4195,7 @@ namespace AiCleanVolume.Desktop
 
         private static AntdUI.StackPanel CreateVerticalScrollPanel()
         {
-            AntdUI.StackPanel panel = new AntdUI.StackPanel();
+            AntdUI.StackPanel panel = new SmoothScrollStackPanel();
             panel.Vertical = true;
             panel.Radius = 0;
             panel.Gap = 0;
