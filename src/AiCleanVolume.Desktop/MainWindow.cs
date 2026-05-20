@@ -28,6 +28,7 @@ namespace AiCleanVolume.Desktop
         private const string PageSuggestions = "suggestions";
         private const string PageLog = "log";
         private const string PageSettings = "settings";
+        private const string PageAiProfileCreate = "ai_profile_create";
         private const string AppDisplayName = "AI智能清盘";
         private const int WmSize = 0x0005;
         private const int WmEraseBackground = 0x0014;
@@ -96,6 +97,7 @@ namespace AiCleanVolume.Desktop
         private Panel suggestionsPage;
         private Panel logPage;
         private Panel settingsPage;
+        private Panel aiProfileCreatePage;
         private AntdUI.Button scanButton;
         private AntdUI.Button analyzeButton;
         private AntdUI.Button regularCleanButton;
@@ -137,9 +139,10 @@ namespace AiCleanVolume.Desktop
         private FlowLayoutPanel aiProfileListPanel;
         private AntdUI.Button applyAiProfileButton;
         private AntdUI.Button addAiProfileButton;
-        private AntdUI.Button saveAiProfileDrawerButton;
+        private AntdUI.Button saveAiProfilePageButton;
+        private AntdUI.Button cancelAiProfilePageButton;
+        private AntdUI.Button backAiProfilePageButton;
         private AntdUI.Input aiProfileNameInput;
-        private Panel aiProfileCreateDrawerBody;
         private AntdUI.Select aiProfileAccessModeSelect;
         private AntdUI.Select aiProfileProviderPresetSelect;
         private AntdUI.Input aiProfileEndpointInput;
@@ -300,6 +303,10 @@ namespace AiCleanVolume.Desktop
             settingsPage = CreatePageContainer();
             settingsPage.Controls.Add(CreateSettingsPanel());
 
+            aiProfileCreatePage = CreatePageContainer();
+            aiProfileCreatePage.Controls.Add(CreateAiProfileCreatePage());
+
+            pageHost.Controls.Add(aiProfileCreatePage);
             pageHost.Controls.Add(settingsPage);
             pageHost.Controls.Add(logPage);
             pageHost.Controls.Add(suggestionsPage);
@@ -806,7 +813,7 @@ namespace AiCleanVolume.Desktop
             applyAiProfileButton.IconSvg = "CheckOutlined";
             applyAiProfileButton.Click += delegate { ApplySelectedAiProfile(); };
             addAiProfileButton = CreateAddAiProfileButton();
-            addAiProfileButton.Click += delegate { OpenAiProfileCreateDrawer(); };
+            addAiProfileButton.Click += delegate { OpenAiProfileCreatePage(); };
             aiProviderPresetSelect = CreateSelect();
             PopulateAiProviderPresets();
             aiProviderPresetSelect.SelectedValueChanged += AiProviderPresetSelect_SelectedValueChanged;
@@ -1183,6 +1190,7 @@ namespace AiCleanVolume.Desktop
                 suggestionsPage.Visible = pageId == PageSuggestions;
                 logPage.Visible = pageId == PageLog;
                 settingsPage.Visible = pageId == PageSettings;
+                aiProfileCreatePage.Visible = pageId == PageAiProfileCreate;
 
                 if (compactStorageTree) CompactStorageTreeRowsForNavigation();
 
@@ -1225,6 +1233,8 @@ namespace AiCleanVolume.Desktop
                     return logPage;
                 case PageSettings:
                     return settingsPage;
+                case PageAiProfileCreate:
+                    return aiProfileCreatePage;
                 default:
                     return scanPage;
             }
@@ -1254,6 +1264,8 @@ namespace AiCleanVolume.Desktop
                     return "日志管理";
                 case PageSettings:
                     return "设置界面";
+                case PageAiProfileCreate:
+                    return "新增 AI 配置";
                 default:
                     return "扫描界面";
             }
@@ -1269,6 +1281,8 @@ namespace AiCleanVolume.Desktop
                     return "查看扫描、建议与删除流程的执行日志。";
                 case PageSettings:
                     return "配置标准 API / 2API、建议数量、沙盒白名单和删除策略。";
+                case PageAiProfileCreate:
+                    return "创建一套新的 AI 接入配置，保存后回到设置页配置列表。";
                 default:
                     return "选择磁盘或目录，扫描空间占用，并快速进入空间树分析。";
             }
@@ -1780,124 +1794,177 @@ namespace AiCleanVolume.Desktop
             PopulateAiProfiles();
         }
 
-        private void OpenAiProfileCreateDrawer()
+        private void OpenAiProfileCreatePage()
         {
-            if (aiProfileCreateDrawerBody != null) return;
-
-            Panel drawerBody = CreateAiProfileCreateDrawerBody();
-            aiProfileCreateDrawerBody = drawerBody;
-
-            AntdUI.Drawer.Config config = AntdUI.Drawer.config(this, drawerBody, AntdUI.TAlignMini.Right);
-            config.SetPadding(0);
-            config.SetMask(true);
-            config.SetMaskClosable(true);
-            config.SetManualActivateParent(true);
-            config.SetDispose(true);
-            config.SetDisplayDelay(0);
-            AntdUI.Drawer.open(config);
+            InitializeAiProfilePageValues();
+            SetActivePage(PageAiProfileCreate);
         }
 
-        private Panel CreateAiProfileCreateDrawerBody()
+        private Control CreateAiProfileCreatePage()
         {
-            Panel host = new DoubleBufferedPanel();
-            host.Dock = DockStyle.Fill;
-            host.BackColor = PageBackground;
-            host.Padding = new Padding(20);
-            host.Size = new Size(560, 760);
-            host.Disposed += AiProfileCreateDrawerBody_Disposed;
+            Panel panel = new DoubleBufferedPanel();
+            panel.Dock = DockStyle.Fill;
+            panel.BackColor = PageBackground;
+            panel.Padding = new Padding(20);
 
-            AntdUI.Panel card = CreateSettingsSurfacePanel(16);
-            card.Dock = DockStyle.Fill;
+            TableLayoutPanel pageLayout = new TableLayoutPanel();
+            pageLayout.Dock = DockStyle.Fill;
+            pageLayout.BackColor = Color.Transparent;
+            pageLayout.ColumnCount = 1;
+            pageLayout.RowCount = 2;
+            pageLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            pageLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            pageLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
+
+            Panel scrollHost = new SmoothScrollPanel();
+            scrollHost.Dock = DockStyle.Fill;
+            scrollHost.AutoScroll = true;
+            scrollHost.BackColor = PageBackground;
+            scrollHost.Padding = new Padding(0, 0, 4, 12);
+
+            TableLayoutPanel content = new TableLayoutPanel();
+            content.Dock = DockStyle.Top;
+            content.BackColor = PageBackground;
+            content.ColumnCount = 1;
+            content.RowCount = 4;
+            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 154F));
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 154F));
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 372F));
+            content.Height = 756;
+            content.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
+            scrollHost.Resize += delegate { content.Width = Math.Max(720, scrollHost.ClientSize.Width - 8); };
+
+            Panel header = CreateAiProfileCreateHeader();
+            Control basicSection = CreateAiProfileBasicSection();
+            Control endpointSection = CreateAiProfileEndpointSection();
+            Control promptSection = CreateAiProfilePromptSection();
+            header.Margin = new Padding(0, 0, 0, 12);
+            basicSection.Margin = new Padding(0, 0, 0, 12);
+            endpointSection.Margin = new Padding(0, 0, 0, 12);
+            promptSection.Margin = new Padding(0);
+
+            content.Controls.Add(header, 0, 0);
+            content.Controls.Add(basicSection, 0, 1);
+            content.Controls.Add(endpointSection, 0, 2);
+            content.Controls.Add(promptSection, 0, 3);
+            scrollHost.Controls.Add(content);
+
+            Panel footer = CreateAiProfileCreateFooter();
+            pageLayout.Controls.Add(scrollHost, 0, 0);
+            pageLayout.Controls.Add(footer, 0, 1);
+            panel.Controls.Add(pageLayout);
+            return panel;
+        }
+
+        private Panel CreateAiProfileCreateHeader()
+        {
+            Panel header = new DoubleBufferedPanel();
+            header.Dock = DockStyle.Fill;
+            header.BackColor = PageBackground;
 
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 1;
-            layout.RowCount = 4;
+            layout.ColumnCount = 2;
+            layout.RowCount = 2;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
 
-            Label title = CreateSettingsGroupTitle("新增 AI 配置");
+            backAiProfilePageButton = new AntdUI.Button();
+            backAiProfilePageButton.Dock = DockStyle.Fill;
+            backAiProfilePageButton.AutoSizeMode = AntdUI.TAutoSize.None;
+            backAiProfilePageButton.DisplayStyle = AntdUI.TButtonDisplayStyle.Image;
+            backAiProfilePageButton.Shape = AntdUI.TShape.Circle;
+            backAiProfilePageButton.IconSvg = "ArrowLeftOutlined";
+            backAiProfilePageButton.Type = AntdUI.TTypeMini.Default;
+            backAiProfilePageButton.Ghost = true;
+            backAiProfilePageButton.BorderWidth = 1F;
+            backAiProfilePageButton.DefaultBorderColor = BorderLightColor;
+            backAiProfilePageButton.Margin = new Padding(0, 0, 10, 0);
+            backAiProfilePageButton.WaveSize = 2;
+            backAiProfilePageButton.Click += delegate { CancelAiProfileCreatePage(); };
+
+            Label title = CreateSectionTitle("新增 AI 配置");
             title.Dock = DockStyle.Fill;
-            title.TextAlign = ContentAlignment.MiddleLeft;
-
-            Label desc = CreateSmallMutedLabel("在这里填写接入参数，保存后会进入 AI 配置列表。");
+            Label desc = CreateSectionDescription("填写接入参数并保存为配置卡片。");
             desc.Dock = DockStyle.Fill;
 
-            Panel formHost = CreateAiProfileDrawerForm();
-
-            TableLayoutPanel footer = new TableLayoutPanel();
-            footer.Dock = DockStyle.Fill;
-            footer.BackColor = Color.Transparent;
-            footer.ColumnCount = 2;
-            footer.RowCount = 1;
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
-            footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-
-            AntdUI.Button cancelButton = CreateSettingsActionButton("取消", AntdUI.TTypeMini.Default);
-            cancelButton.Dock = DockStyle.Fill;
-            cancelButton.Margin = Padding.Empty;
-            cancelButton.Click += delegate { CloseAiProfileCreateDrawer(); };
-
-            saveAiProfileDrawerButton = CreateSettingsActionButton("保存", AntdUI.TTypeMini.Primary);
-            saveAiProfileDrawerButton.Dock = DockStyle.Fill;
-            saveAiProfileDrawerButton.Margin = Padding.Empty;
-            saveAiProfileDrawerButton.Click += delegate { SaveAiProfileFromDrawer(); };
-
-            layout.Controls.Add(title, 0, 0);
-            layout.Controls.Add(desc, 0, 1);
-            layout.Controls.Add(formHost, 0, 2);
-            footer.Controls.Add(cancelButton, 0, 0);
-            footer.Controls.Add(saveAiProfileDrawerButton, 1, 0);
-            layout.Controls.Add(footer, 0, 3);
-            card.Controls.Add(layout);
-            host.Controls.Add(card);
-            return host;
+            layout.Controls.Add(backAiProfilePageButton, 0, 0);
+            layout.SetRowSpan(backAiProfilePageButton, 2);
+            layout.Controls.Add(title, 1, 0);
+            layout.Controls.Add(desc, 1, 1);
+            header.Controls.Add(layout);
+            return header;
         }
 
-        private Panel CreateAiProfileDrawerForm()
+        private Control CreateAiProfileBasicSection()
         {
-            Panel scrollHost = new SmoothScrollPanel();
-            scrollHost.Dock = DockStyle.Fill;
-            scrollHost.BackColor = SurfaceColor;
-            scrollHost.AutoScroll = true;
-            scrollHost.Padding = new Padding(0, 4, 4, 12);
+            Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("基础信息", "命名这套配置，并选择访问方式。", out body);
 
-            TableLayoutPanel form = new TableLayoutPanel();
-            form.Dock = DockStyle.Top;
-            form.Width = 500;
-            form.Height = 606;
-            form.BackColor = SurfaceColor;
-            form.ColumnCount = 2;
-            form.RowCount = 11;
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88F));
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 96F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 114F));
-            form.Resize += delegate { form.Width = Math.Max(360, scrollHost.ClientSize.Width - 8); };
-
+            TableLayoutPanel form = CreateTwoColumnProfileForm(2);
             aiProfileNameInput = CreateInput("例如：开发环境");
             aiProfileAccessModeSelect = CreateSelect();
             PopulateAiAccessModes(aiProfileAccessModeSelect);
+            aiProfileMaxSuggestionsInput = CreateInput("30");
+
+            aiProfileAccessModeSelect.SelectedValueChanged += AiProfileAccessModeSelect_SelectedValueChanged;
+
+            AddProfileField(form, "配置名称", aiProfileNameInput, 0, 0);
+            AddProfileField(form, "接入类型", aiProfileAccessModeSelect, 2, 0);
+            AddProfileField(form, "建议条数", aiProfileMaxSuggestionsInput, 0, 1);
+
+            body.Controls.Add(form);
+            return section;
+        }
+
+        private Control CreateAiProfileEndpointSection()
+        {
+            Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("接口参数", "配置 OpenAI 兼容接口地址、密钥和模型。", out body);
+
+            TableLayoutPanel form = CreateTwoColumnProfileForm(2);
             aiProfileProviderPresetSelect = CreateSelect();
             PopulateAiProviderPresets(aiProfileProviderPresetSelect);
             aiProfileEndpointInput = CreateInput("https://api.openai.com");
             aiProfileApiKeyInput = CreateInput("sk-...");
             aiProfileModelInput = CreateInput(AiSettings.DefaultModel);
-            aiProfileMaxSuggestionsInput = CreateInput("30");
+
+            aiProfileProviderPresetSelect.SelectedValueChanged += AiProfileProviderPresetSelect_SelectedValueChanged;
+            aiProfileEndpointInput.TextChanged += AiProfileEndpointOrModelInput_TextChanged;
+            aiProfileModelInput.TextChanged += AiProfileEndpointOrModelInput_TextChanged;
+
+            AddProfileField(form, "接口预设", aiProfileProviderPresetSelect, 0, 0);
+            AddProfileField(form, "接口地址", aiProfileEndpointInput, 2, 0);
+            AddProfileField(form, "API Key", aiProfileApiKeyInput, 0, 1);
+            AddProfileField(form, "模型", aiProfileModelInput, 2, 1);
+
+            body.Controls.Add(form);
+            return section;
+        }
+
+        private Control CreateAiProfilePromptSection()
+        {
+            Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("提示词与 Cookie", "多行内容使用完整宽度，避免长文本挤压。", out body);
+
+            TableLayoutPanel form = new TableLayoutPanel();
+            form.Dock = DockStyle.Fill;
+            form.BackColor = Color.Transparent;
+            form.ColumnCount = 2;
+            form.RowCount = 5;
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
+            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+            form.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
             aiProfilePromptPresetSelect = CreateSelect();
             PopulateAiPromptPresets(aiProfilePromptPresetSelect);
             aiProfileCookieMappingsInput = CreateInput("直接粘贴当前模型的一整行 Cookie；也兼容 model=Cookie");
@@ -1907,42 +1974,89 @@ namespace AiCleanVolume.Desktop
             aiProfileSystemPromptInput.Multiline = true;
             aiProfileSystemPromptInput.AutoScroll = true;
 
-            aiProfileAccessModeSelect.SelectedValueChanged += AiProfileAccessModeSelect_SelectedValueChanged;
-            aiProfileProviderPresetSelect.SelectedValueChanged += AiProfileProviderPresetSelect_SelectedValueChanged;
-            aiProfileEndpointInput.TextChanged += AiProfileEndpointOrModelInput_TextChanged;
-            aiProfileModelInput.TextChanged += AiProfileEndpointOrModelInput_TextChanged;
             aiProfilePromptPresetSelect.SelectedValueChanged += AiProfilePromptPresetSelect_SelectedValueChanged;
             aiProfileSystemPromptInput.TextChanged += AiProfileSystemPromptInput_TextChanged;
 
-            InitializeAiProfileDrawerValues();
+            AddProfileField(form, "AI 预设", aiProfilePromptPresetSelect, 0, 0);
+            AddFullWidthProfileField(form, "模型 Cookie", aiProfileCookieMappingsInput, 1, 2);
+            AddFullWidthProfileField(form, "系统提示词", aiProfileSystemPromptInput, 3, 4);
 
-            AddDrawerField(form, "配置名称", aiProfileNameInput, 0);
-            AddDrawerField(form, "接入类型", aiProfileAccessModeSelect, 1);
-            AddDrawerField(form, "接口预设", aiProfileProviderPresetSelect, 2);
-            AddDrawerField(form, "接口地址", aiProfileEndpointInput, 3);
-            AddDrawerField(form, "API Key", aiProfileApiKeyInput, 4);
-            AddDrawerField(form, "模型", aiProfileModelInput, 5);
-            AddDrawerField(form, "建议条数", aiProfileMaxSuggestionsInput, 6);
-            AddDrawerField(form, "AI 预设", aiProfilePromptPresetSelect, 7);
-            AddDrawerField(form, "模型 Cookie", aiProfileCookieMappingsInput, 8);
-            form.SetRowSpan(aiProfileCookieMappingsInput, 2);
-            AddDrawerField(form, "系统提示词", aiProfileSystemPromptInput, 10);
-
-            scrollHost.Resize += delegate { form.Width = Math.Max(360, scrollHost.ClientSize.Width - 8); };
-            scrollHost.Controls.Add(form);
-            return scrollHost;
+            body.Controls.Add(form);
+            return section;
         }
 
-        private static void AddDrawerField(TableLayoutPanel form, string caption, Control control, int row)
+        private Panel CreateAiProfileCreateFooter()
+        {
+            Panel footer = new DoubleBufferedPanel();
+            footer.Dock = DockStyle.Fill;
+            footer.BackColor = PageBackground;
+            footer.Padding = new Padding(0, 10, 0, 0);
+
+            TableLayoutPanel layout = new TableLayoutPanel();
+            layout.Dock = DockStyle.Right;
+            layout.BackColor = Color.Transparent;
+            layout.Width = 236;
+            layout.ColumnCount = 2;
+            layout.RowCount = 1;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108F));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116F));
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+            cancelAiProfilePageButton = CreateSettingsActionButton("取消", AntdUI.TTypeMini.Default);
+            cancelAiProfilePageButton.Dock = DockStyle.Fill;
+            cancelAiProfilePageButton.Margin = new Padding(0, 4, 8, 4);
+            cancelAiProfilePageButton.Click += delegate { CancelAiProfileCreatePage(); };
+
+            saveAiProfilePageButton = CreateSettingsActionButton("保存", AntdUI.TTypeMini.Primary);
+            saveAiProfilePageButton.Dock = DockStyle.Fill;
+            saveAiProfilePageButton.Margin = new Padding(0, 4, 0, 4);
+            saveAiProfilePageButton.Click += delegate { SaveAiProfileFromPage(); };
+
+            layout.Controls.Add(cancelAiProfilePageButton, 0, 0);
+            layout.Controls.Add(saveAiProfilePageButton, 1, 0);
+            footer.Controls.Add(layout);
+            return footer;
+        }
+
+        private static TableLayoutPanel CreateTwoColumnProfileForm(int rows)
+        {
+            TableLayoutPanel form = new TableLayoutPanel();
+            form.Dock = DockStyle.Fill;
+            form.BackColor = Color.Transparent;
+            form.ColumnCount = 4;
+            form.RowCount = rows;
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            for (int row = 0; row < rows; row++)
+            {
+                form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+            }
+            return form;
+        }
+
+        private static void AddProfileField(TableLayoutPanel form, string caption, Control control, int column, int row)
         {
             Label label = CreateCaption(caption);
             label.Margin = new Padding(0, 0, 8, 8);
             control.Margin = new Padding(0, 0, 0, 8);
-            form.Controls.Add(label, 0, row);
-            form.Controls.Add(control, 1, row);
+            form.Controls.Add(label, column, row);
+            form.Controls.Add(control, column + 1, row);
         }
 
-        private void InitializeAiProfileDrawerValues()
+        private static void AddFullWidthProfileField(TableLayoutPanel form, string caption, Control control, int labelRow, int controlRow)
+        {
+            Label label = CreateCaption(caption);
+            label.Margin = new Padding(0, 0, 8, 0);
+            control.Margin = new Padding(0, 0, 0, 8);
+            form.Controls.Add(label, 0, labelRow);
+            form.SetColumnSpan(label, 2);
+            form.Controls.Add(control, 0, controlRow);
+            form.SetColumnSpan(control, 2);
+        }
+
+        private void InitializeAiProfilePageValues()
         {
             string model = settings == null || settings.Ai == null ? AiSettings.DefaultModel : settings.Ai.Model;
             aiProfileNameInput.Text = AiSettings.BuildProfileAutoName(model, DateTime.Now);
@@ -1956,23 +2070,6 @@ namespace AiCleanVolume.Desktop
             UpdateAiProfileAccessModeUi();
             SelectAiProfileProviderPresetForValues(aiProfileEndpointInput.Text, aiProfileModelInput.Text);
             SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
-        }
-
-        private void AiProfileCreateDrawerBody_Disposed(object sender, EventArgs e)
-        {
-            if (!ReferenceEquals(aiProfileCreateDrawerBody, sender)) return;
-            aiProfileCreateDrawerBody = null;
-            aiProfileNameInput = null;
-            saveAiProfileDrawerButton = null;
-            aiProfileAccessModeSelect = null;
-            aiProfileProviderPresetSelect = null;
-            aiProfileEndpointInput = null;
-            aiProfileApiKeyInput = null;
-            aiProfileModelInput = null;
-            aiProfileMaxSuggestionsInput = null;
-            aiProfilePromptPresetSelect = null;
-            aiProfileCookieMappingsInput = null;
-            aiProfileSystemPromptInput = null;
         }
 
         private void SaveCurrentAiProfileWithPrompt()
@@ -1998,16 +2095,16 @@ namespace AiCleanVolume.Desktop
             }
         }
 
-        private void SaveAiProfileFromDrawer()
+        private void SaveAiProfileFromPage()
         {
             try
             {
-                AiProfile profile = CreateAiProfileFromDrawer();
+                AiProfile profile = CreateAiProfileFromPage();
                 UpsertAiProfile(profile, true);
                 settingsStore.Save(settings);
                 PopulateAiProfiles();
                 SelectAiProfile(0);
-                CloseAiProfileCreateDrawer();
+                SetActivePage(PageSettings);
                 Log("AI 配置方案已新增：" + profile.Name + "。");
                 MessageBox.Show(this, "AI 配置方案已新增。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -2018,7 +2115,7 @@ namespace AiCleanVolume.Desktop
             }
         }
 
-        private AiProfile CreateAiProfileFromDrawer()
+        private AiProfile CreateAiProfileFromPage()
         {
             DateTime savedAt = DateTime.Now;
             string name = aiProfileNameInput == null ? null : NormalizeValue(aiProfileNameInput.Text);
@@ -2054,27 +2151,9 @@ namespace AiCleanVolume.Desktop
             return profile;
         }
 
-        private void CloseAiProfileCreateDrawer()
+        private void CancelAiProfileCreatePage()
         {
-            if (aiProfileCreateDrawerBody != null && !aiProfileCreateDrawerBody.IsDisposed)
-            {
-                aiProfileCreateDrawerBody.Dispose();
-            }
-            else
-            {
-                aiProfileCreateDrawerBody = null;
-                aiProfileNameInput = null;
-                saveAiProfileDrawerButton = null;
-                aiProfileAccessModeSelect = null;
-                aiProfileProviderPresetSelect = null;
-                aiProfileEndpointInput = null;
-                aiProfileApiKeyInput = null;
-                aiProfileModelInput = null;
-                aiProfileMaxSuggestionsInput = null;
-                aiProfilePromptPresetSelect = null;
-                aiProfileCookieMappingsInput = null;
-                aiProfileSystemPromptInput = null;
-            }
+            SetActivePage(PageSettings);
         }
 
         private void ApplySelectedAiProfile()
@@ -3843,7 +3922,9 @@ namespace AiCleanVolume.Desktop
             if (testAiSettingsButton != null) testAiSettingsButton.Enabled = !busy;
             if (applyAiProfileButton != null) applyAiProfileButton.Enabled = !busy;
             if (addAiProfileButton != null) addAiProfileButton.Enabled = !busy;
-            if (saveAiProfileDrawerButton != null) saveAiProfileDrawerButton.Enabled = !busy;
+            if (saveAiProfilePageButton != null) saveAiProfilePageButton.Enabled = !busy;
+            if (cancelAiProfilePageButton != null) cancelAiProfilePageButton.Enabled = !busy;
+            if (backAiProfilePageButton != null) backAiProfilePageButton.Enabled = !busy;
             if (aiProfileListPanel != null) aiProfileListPanel.Enabled = !busy;
             if (selectAllSuggestionsButton != null) selectAllSuggestionsButton.Enabled = !busy;
             if (clearAllSuggestionsButton != null) clearAllSuggestionsButton.Enabled = !busy;
