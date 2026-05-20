@@ -756,11 +756,20 @@ namespace AiCleanVolume.Desktop
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
 
-            AntdUI.GridPanel layout = CreateGridPanel("82:fill;fill:fill;190:fill");
-            layout.Dock = DockStyle.Fill;
+            AntdUI.StackPanel scrollHost = CreateVerticalScrollPanel();
+            scrollHost.Dock = DockStyle.Fill;
+            scrollHost.AutoScroll = true;
+            scrollHost.BackColor = PageBackground;
+            scrollHost.Padding = new Padding(0, 0, 4, 12);
+
+            AntdUI.GridPanel layout = CreateGridPanel("82:fill;520:fill;266:fill");
+            layout.Dock = DockStyle.Top;
+            layout.Height = 868;
             layout.BackColor = PageBackground;
-            layout.Resize += delegate
+            layout.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
+            scrollHost.Resize += delegate
             {
+                layout.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
                 ResizeAiProfileCards();
             };
 
@@ -775,7 +784,9 @@ namespace AiCleanVolume.Desktop
             AddGridControl(layout, profilesSection, 1);
             AddGridControl(layout, sandboxSection, 2);
 
-            panel.Controls.Add(layout);
+            scrollHost.Controls.Add(layout);
+
+            panel.Controls.Add(scrollHost);
             panel.Controls.Add(desc);
             panel.Controls.Add(heading);
             return panel;
