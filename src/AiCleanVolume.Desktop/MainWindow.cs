@@ -1828,11 +1828,11 @@ namespace AiCleanVolume.Desktop
             content.ColumnCount = 1;
             content.RowCount = 4;
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 154F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 154F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 372F));
-            content.Height = 756;
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88F));
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 196F));
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 196F));
+            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 390F));
+            content.Height = 870;
             content.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
             scrollHost.Resize += delegate { content.Width = Math.Max(720, scrollHost.ClientSize.Width - 8); };
 
@@ -1940,7 +1940,7 @@ namespace AiCleanVolume.Desktop
 
             AddProfileField(form, "接口预设", aiProfileProviderPresetSelect, 0, 0);
             AddProfileField(form, "接口地址", aiProfileEndpointInput, 2, 0);
-            AddProfileField(form, "API Key", aiProfileApiKeyInput, 0, 1);
+            AddProfileField(form, "SK / API Key", aiProfileApiKeyInput, 0, 1);
             AddProfileField(form, "模型", aiProfileModelInput, 2, 1);
 
             body.Controls.Add(form);
