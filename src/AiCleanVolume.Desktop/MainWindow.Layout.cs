@@ -1,0 +1,652 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using System.Windows.Forms;
+using AiCleanVolume.Core.Models;
+using AiCleanVolume.Core.Services;
+using AiCleanVolume.Desktop.Controls;
+using AiCleanVolume.Desktop.Services;
+using AiCleanVolume.Desktop.ViewModels;
+
+
+namespace AiCleanVolume.Desktop
+{
+    public sealed partial class MainWindow : AntdUI.Window
+    {
+        private AntdUI.Panel CreatePageContainer()
+        {
+            AntdUI.Panel page = CreateFlatPanel();
+            page.Dock = DockStyle.Fill;
+            page.BackColor = PageBackground;
+            return page;
+        }
+
+        private AntdUI.Panel CreateSidebarHost()
+        {
+            AntdUI.Panel host = CreateFlatPanel();
+            host.Dock = DockStyle.Left;
+            host.Width = SidebarMinWidth + SidebarRailWidth;
+            host.BackColor = SurfaceColor;
+
+            sidebarResizeRail = CreateFlatPanel();
+            sidebarResizeRail.Dock = DockStyle.Right;
+            sidebarResizeRail.Width = SidebarRailWidth;
+            sidebarResizeRail.BackColor = PageBackground;
+            sidebarResizeRail.Cursor = Cursors.VSplit;
+            sidebarResizeRail.MouseDown += SidebarResizeRail_MouseDown;
+            sidebarResizeRail.MouseMove += SidebarResizeRail_MouseMove;
+            sidebarResizeRail.MouseUp += SidebarResizeRail_MouseUp;
+            sidebarResizeRail.MouseCaptureChanged += SidebarResizeRail_MouseCaptureChanged;
+
+            sidebarPanel = new AntdUI.Panel();
+            sidebarPanel.Dock = DockStyle.Fill;
+            sidebarPanel.Back = SurfaceColor;
+            sidebarPanel.BorderWidth = 1F;
+            sidebarPanel.BorderColor = BorderLightColor;
+            sidebarPanel.Radius = 0;
+            sidebarPanel.Shadow = 0;
+            sidebarPanel.Padding = new Padding(14, 12, 14, 14);
+
+            sidebarCollapseButton = CreateSidebarCollapseButton();
+
+            AntdUI.Panel footerPanel = CreateSidebarFooterPanel();
+            AntdUI.Panel dividerPanel = CreateFlatPanel();
+            dividerPanel.Dock = DockStyle.Bottom;
+            dividerPanel.Height = 1;
+            dividerPanel.BackColor = BorderLightColor;
+
+            navigationMenu = CreateSidebarMenu();
+            sidebarBrandPanel = CreateSidebarBrandPanel();
+
+            sidebarPanel.Controls.Add(navigationMenu);
+            sidebarPanel.Controls.Add(dividerPanel);
+            sidebarPanel.Controls.Add(footerPanel);
+            sidebarPanel.Controls.Add(sidebarBrandPanel);
+
+            host.Controls.Add(sidebarPanel);
+            host.Controls.Add(sidebarResizeRail);
+            host.Controls.Add(sidebarCollapseButton);
+            sidebarCollapseButton.BringToFront();
+            return host;
+        }
+
+        private AntdUI.Panel CreateSidebarBrandPanel()
+        {
+            AntdUI.Panel brandPanel = CreateFlatPanel();
+            brandPanel.Dock = DockStyle.Top;
+            brandPanel.Height = 70;
+            brandPanel.Padding = new Padding(6, 10, 6, 14);
+            brandPanel.BackColor = Color.Transparent;
+
+            sidebarBrandIconLabel = new AntdUI.Label();
+            sidebarBrandIconLabel.Dock = DockStyle.Left;
+            sidebarBrandIconLabel.Width = 32;
+            sidebarBrandIconLabel.Text = "T";
+            sidebarBrandIconLabel.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
+            sidebarBrandIconLabel.ForeColor = PrimaryColor;
+            sidebarBrandIconLabel.BackColor = Color.Transparent;
+            sidebarBrandIconLabel.TextAlign = ContentAlignment.MiddleCenter;
+
+            sidebarBrandTextLabel = new AntdUI.Label();
+            sidebarBrandTextLabel.Dock = DockStyle.Fill;
+            sidebarBrandTextLabel.Width = 156;
+            sidebarBrandTextLabel.Text = AppDisplayName;
+            sidebarBrandTextLabel.Font = new Font("Microsoft YaHei UI", 14F, FontStyle.Bold);
+            sidebarBrandTextLabel.ForeColor = TextPrimaryColor;
+            sidebarBrandTextLabel.BackColor = Color.Transparent;
+            sidebarBrandTextLabel.AutoEllipsis = true;
+            sidebarBrandTextLabel.TextAlign = ContentAlignment.MiddleLeft;
+
+            brandPanel.Controls.Add(sidebarBrandTextLabel);
+            brandPanel.Controls.Add(sidebarBrandIconLabel);
+            return brandPanel;
+        }
+
+        private AntdUI.Button CreateSidebarCollapseButton()
+        {
+            AntdUI.Button button = new AntdUI.Button();
+            button.AutoSizeMode = AntdUI.TAutoSize.None;
+            button.DisplayStyle = AntdUI.TButtonDisplayStyle.Image;
+            button.Shape = AntdUI.TShape.Round;
+            button.Radius = 10;
+            button.IconSvg = "ArrowLeftOutlined";
+            button.Type = AntdUI.TTypeMini.Default;
+            button.Ghost = true;
+            button.BorderWidth = 1F;
+            button.DefaultBorderColor = BorderLightColor;
+            button.BackColor = SurfaceColor;
+            button.Width = 20;
+            button.Height = 30;
+            button.IconRatio = 0.58F;
+            button.WaveSize = 1;
+            button.Click += delegate { ToggleSidebarCollapsed(); };
+            return button;
+        }
+
+        private AntdUI.Menu CreateSidebarMenu()
+        {
+            AntdUI.Menu menu = new AntdUI.Menu();
+            menu.Dock = DockStyle.Fill;
+            menu.Mode = AntdUI.TMenuMode.Inline;
+            menu.Unique = true;
+            menu.Radius = 9;
+            menu.Indent = false;
+            menu.Gap = 12;
+            menu.IconGap = 10;
+            menu.itemMargin = 5;
+            menu.IconRatio = 1.08F;
+            menu.Padding = new Padding(2, 6, 2, 6);
+            menu.ForeColor = TextSecondaryColor;
+            menu.BackHover = Color.FromArgb(245, 248, 255);
+            menu.BackActive = PrimarySoftColor;
+            menu.ForeActive = PrimaryColor;
+            menu.ScrollBarBlock = true;
+            menu.SelectChanged += NavigationMenu_SelectChanged;
+
+            AntdUI.MenuItem scanItem = CreateNavigationItem(PageScan, "扫描", "FolderOpenOutlined");
+            scanItem.Select = true;
+            menu.Items.Add(scanItem);
+            menu.Items.Add(CreateNavigationItem(PageSuggestions, "清理建议", "RobotFilled"));
+            menu.Items.Add(new AntdUI.MenuDividerItem());
+            menu.Items.Add(CreateNavigationItem(PageLog, "日志管理", "FileTextOutlined"));
+            return menu;
+        }
+
+        private AntdUI.Panel CreateSidebarFooterPanel()
+        {
+            AntdUI.Panel footerPanel = CreateFlatPanel();
+            footerPanel.Dock = DockStyle.Bottom;
+            footerPanel.Height = 64;
+            footerPanel.Padding = new Padding(10, 10, 10, 10);
+            footerPanel.BackColor = Color.Transparent;
+
+            settingsNavButton = new AntdUI.Button();
+            settingsNavButton.Dock = DockStyle.Fill;
+            settingsNavButton.Width = 42;
+            settingsNavButton.Height = 42;
+            settingsNavButton.IconSvg = "SettingOutlined";
+            settingsNavButton.Text = null;
+            settingsNavButton.DisplayStyle = AntdUI.TButtonDisplayStyle.Image;
+            settingsNavButton.IconRatio = 0.86F;
+            settingsNavButton.Radius = 12;
+            settingsNavButton.Type = AntdUI.TTypeMini.Default;
+            settingsNavButton.BorderWidth = 1F;
+            settingsNavButton.Ghost = true;
+            settingsNavButton.WaveSize = 2;
+            settingsNavButton.DefaultBorderColor = BorderLightColor;
+            settingsNavButton.Click += SettingsNavButton_Click;
+
+            footerPanel.Controls.Add(settingsNavButton);
+            return footerPanel;
+        }
+
+        private Control CreateScanToolbarPanel()
+        {
+            AntdUI.Panel toolbarHost = CreateFlatPanel();
+            toolbarHost.Dock = DockStyle.Top;
+            toolbarHost.BackColor = PageBackground;
+            toolbarHost.Height = 118;
+            toolbarHost.Padding = new Padding(0, 0, 0, 6);
+
+            AntdUI.Panel toolbarCard = CreateCompactSurfacePanel(8);
+            toolbarCard.Dock = DockStyle.Fill;
+
+            AntdUI.GridPanel toolbarLayout = CreateGridPanel("fill 1 420");
+            toolbarLayout.Dock = DockStyle.Fill;
+            toolbarLayout.BackColor = Color.Transparent;
+
+            Control filtersPanel = CreateScanFiltersPanel();
+            AntdUI.Divider divider = new AntdUI.Divider();
+            divider.Dock = DockStyle.Fill;
+            divider.Vertical = true;
+            divider.ColorSplit = BorderLightColor;
+            divider.Margin = new Padding(12, 4, 12, 8);
+
+            Control statusPanel = CreateScanStatusPanel();
+            Control summaryPanel = CreateDriveSummaryPanel();
+            AntdUI.GridPanel leftLayout = CreateGridPanel("44:fill;34:fill");
+            leftLayout.Dock = DockStyle.Fill;
+            AddGridControl(leftLayout, filtersPanel, 0);
+            AddGridControl(leftLayout, statusPanel, 1);
+
+            AddGridControl(toolbarLayout, leftLayout, 0);
+            AddGridControl(toolbarLayout, divider, 1);
+            AddGridControl(toolbarLayout, summaryPanel, 2);
+
+            toolbarCard.Controls.Add(toolbarLayout);
+            toolbarHost.Controls.Add(toolbarCard);
+            return toolbarHost;
+        }
+
+        private Control CreateScanFiltersPanel()
+        {
+            AntdUI.GridPanel host = CreateGridPanel("42:fill;32:fill");
+            host.Dock = DockStyle.Fill;
+            host.BackColor = Color.Transparent;
+
+            AntdUI.GridPanel topRow = CreateGridPanel("42 192 86 42 fill");
+            topRow.Dock = DockStyle.Fill;
+            topRow.BackColor = Color.Transparent;
+
+            driveSelect = new AntdUI.Select();
+            driveSelect.Dock = DockStyle.Fill;
+            driveSelect.DropDownArrow = true;
+            driveSelect.ListAutoWidth = true;
+            driveSelect.Font = Font;
+            driveSelect.SelectedValueChanged += DriveSelect_SelectedValueChanged;
+
+            scanButton.Dock = DockStyle.Fill;
+            scanButton.Margin = new Padding(10, 0, 0, 0);
+
+            pathInput = CreateInput("C:\\ 或目录路径");
+            pathInput.PrefixSvg = "FolderOpenOutlined";
+            pathInput.TextChanged += PathInput_TextChanged;
+
+            AddGridControl(topRow, CreateToolbarCaption("选择:"), 0);
+            AddGridControl(topRow, driveSelect, 1);
+            AddGridControl(topRow, scanButton, 2);
+            AddGridControl(topRow, CreateToolbarCaption("位置:"), 3);
+            AddGridControl(topRow, pathInput, 4);
+
+            minSizeInput = CreateInput("-1 表示不限");
+            limitInput = CreateInput("-1 表示不限");
+
+            sortSelect = new AntdUI.Select();
+            sortSelect.Dock = DockStyle.Fill;
+            sortSelect.DropDownArrow = true;
+            sortSelect.ListAutoWidth = true;
+            sortSelect.Font = Font;
+            string[] sortOptionTexts = { "分配大小", "逻辑大小" };
+            sortSelect.Items.Add(new AntdUI.SelectItem(sortOptionTexts[0], ScanSortMode.Allocated));
+            sortSelect.Items.Add(new AntdUI.SelectItem(sortOptionTexts[1], ScanSortMode.Logical));
+            int sortSelectWidth = MeasureSelectWidth(sortSelect.Font, sortOptionTexts);
+            sortSelect.Width = sortSelectWidth;
+            AntdUI.GridPanel bottomRow = CreateGridPanel("42 58 42 58 48 " + sortSelectWidth.ToString() + " fill");
+            bottomRow.Dock = DockStyle.Fill;
+            bottomRow.BackColor = Color.Transparent;
+
+            AddGridControl(bottomRow, CreateToolbarCaption("最小:"), 0);
+            AddGridControl(bottomRow, minSizeInput, 1);
+            AddGridControl(bottomRow, CreateToolbarCaption("限制:"), 2);
+            AddGridControl(bottomRow, limitInput, 3);
+            AddGridControl(bottomRow, CreateToolbarCaption("排序:"), 4);
+            AddGridControl(bottomRow, sortSelect, 5);
+            AddGridControl(bottomRow, CreateGridSpacer(), 6);
+
+            AddGridControl(host, topRow, 0);
+            AddGridControl(host, bottomRow, 1);
+            return host;
+        }
+
+        private Control CreateDriveSummaryPanel()
+        {
+            AntdUI.GridPanel layout = CreateGridPanel("fill 190");
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+            layout.Padding = new Padding(0, 0, 0, 0);
+
+            AntdUI.GridPanel leftLayout = CreateGridPanel("24:48 fill;24:48 fill;24:48 fill");
+            leftLayout.Dock = DockStyle.Fill;
+            leftLayout.BackColor = Color.Transparent;
+
+            AntdUI.GridPanel rightLayout = CreateGridPanel("24:64 fill;24:64 fill;fill");
+            rightLayout.Dock = DockStyle.Fill;
+            rightLayout.BackColor = Color.Transparent;
+
+            selectedDriveValueLabel = CreateSummaryValueLabel(true);
+            selectedDriveValueLabel.AutoEllipsis = true;
+            totalSpaceValueLabel = CreateSummaryValueLabel(true);
+            usedSpaceValueLabel = CreateSummaryValueLabel(true);
+            availableSpaceValueLabel = CreateSummaryValueLabel(true);
+            reservedSpaceValueLabel = CreateSummaryValueLabel(true);
+            totalSpaceValueLabel.AutoEllipsis = true;
+            usedSpaceValueLabel.AutoEllipsis = true;
+            availableSpaceValueLabel.AutoEllipsis = true;
+            reservedSpaceValueLabel.AutoEllipsis = true;
+
+            AddGridControl(leftLayout, CreateSummaryCaption("选择:"), 0);
+            AddGridControl(leftLayout, selectedDriveValueLabel, 1);
+            AddGridControl(leftLayout, CreateSummaryCaption("已用:"), 2);
+            AddGridControl(leftLayout, usedSpaceValueLabel, 3);
+            AddGridControl(leftLayout, CreateSummaryCaption("可用:"), 4);
+            AddGridControl(leftLayout, availableSpaceValueLabel, 5);
+
+            AddGridControl(rightLayout, CreateSummaryCaption("总空间:"), 0);
+            AddGridControl(rightLayout, totalSpaceValueLabel, 1);
+            AddGridControl(rightLayout, CreateSummaryCaption("预留:"), 2);
+            AddGridControl(rightLayout, reservedSpaceValueLabel, 3);
+
+            AddGridControl(layout, leftLayout, 0);
+            AddGridControl(layout, rightLayout, 1);
+            return layout;
+        }
+
+        private Control CreateScanStatusPanel()
+        {
+            AntdUI.GridPanel panel = CreateGridPanel("126 fill");
+            panel.Dock = DockStyle.Fill;
+            panel.BackColor = Color.Transparent;
+            panel.Padding = new Padding(0, 4, 0, 0);
+
+            scanStatusLabel = new AntdUI.Label();
+            scanStatusLabel.Dock = DockStyle.Fill;
+            scanStatusLabel.Font = new Font("Microsoft YaHei UI", 9F);
+            scanStatusLabel.ForeColor = TextSecondaryColor;
+            scanStatusLabel.BackColor = Color.Transparent;
+            scanStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
+            scanStatusLabel.Text = "等待开始扫描";
+
+            scanProgress = new AntdUI.Progress();
+            scanProgress.Dock = DockStyle.Fill;
+            scanProgress.Margin = new Padding(8, 8, 4, 10);
+            scanProgress.Shape = AntdUI.TShapeProgress.Round;
+            scanProgress.Radius = 8;
+            scanProgress.Value = 0F;
+            scanProgress.State = AntdUI.TType.Success;
+            scanProgress.UseSystemText = false;
+
+            AddGridControl(panel, scanStatusLabel, 0);
+            AddGridControl(panel, scanProgress, 1);
+            return panel;
+        }
+
+        private Control CreateStoragePanel()
+        {
+            AntdUI.Panel panel = CreateCompactSurfacePanel(0);
+            panel.Dock = DockStyle.Fill;
+
+            storageTable = new AntdUI.Table();
+            storageTable.Dock = DockStyle.Fill;
+            storageTable.TabStop = true;
+            ConfigureTableSurface(storageTable);
+            storageTable.FixedHeader = true;
+            storageTable.ScrollBarAvoidHeader = true;
+            storageTable.ExpandChanged += StorageTable_ExpandChanged;
+            storageTable.CellClick += StorageTable_CellClick;
+            storageTable.CellDoubleClick += StorageTable_CellDoubleClick;
+            storageTable.KeyDown += StorageTable_KeyDown;
+
+            panel.Controls.Add(storageTable);
+            return panel;
+        }
+
+        private Control CreateSuggestionPanel()
+        {
+            AntdUI.Panel panel = CreateCompactSurfacePanel(0);
+            panel.Dock = DockStyle.Fill;
+
+            AntdUI.Panel toolbarHost = CreateFlatPanel();
+            toolbarHost.Dock = DockStyle.Top;
+            toolbarHost.Height = 94;
+            toolbarHost.Padding = new Padding(8, 8, 8, 6);
+            toolbarHost.BackColor = Color.Transparent;
+
+            invertSuggestionsButton = CreateSuggestionActionButton("反选", AntdUI.TTypeMini.Default);
+            invertSuggestionsButton.Click += delegate { InvertSuggestionSelection(); };
+
+            clearAllSuggestionsButton = CreateSuggestionActionButton("全不选", AntdUI.TTypeMini.Default);
+            clearAllSuggestionsButton.Click += delegate { SetSuggestionSelection(false); };
+
+            selectAllSuggestionsButton = CreateSuggestionActionButton("全选", AntdUI.TTypeMini.Primary);
+            selectAllSuggestionsButton.Click += delegate { SetSuggestionSelection(true); };
+
+            privilegedQuickCheckbox = CreateCheckbox("完全权限模式（仅管理员运行时生效）");
+            privilegedQuickCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
+
+            AntdUI.GridPanel topRow = CreateGridPanel("42 160 120 78 76 78 fill");
+            topRow.Dock = DockStyle.Fill;
+            topRow.BackColor = Color.Transparent;
+
+            suggestionDriveSelect = CreateSelect();
+            suggestionDriveSelect.ListAutoWidth = true;
+            suggestionDriveSelect.SelectedValueChanged += SuggestionDriveSelect_SelectedValueChanged;
+            suggestionMinSizeInput = CreateInput("最小值（单位MB）");
+            suggestionMinSizeInput.Text = "128";
+            suggestionLimitInput = CreateInput("数量限制，-1 不限");
+            suggestionLimitInput.Text = "-1";
+
+            AddGridControl(topRow, CreateToolbarCaption("盘符:"), 0);
+            AddGridControl(topRow, suggestionDriveSelect, 1);
+            AddGridControl(topRow, CreateToolbarCaption("最小 MB:"), 2);
+            AddGridControl(topRow, suggestionMinSizeInput, 3);
+            AddGridControl(topRow, CreateToolbarCaption("数量:"), 4);
+            AddGridControl(topRow, suggestionLimitInput, 5);
+            AddGridControl(topRow, privilegedQuickCheckbox, 6);
+
+            AntdUI.GridPanel actionRow = CreateGridPanel("92 92 92 96 fill 74 74 74");
+            actionRow.Dock = DockStyle.Fill;
+            actionRow.BackColor = Color.Transparent;
+            regularCleanButton.Margin = new Padding(0, 2, 8, 2);
+            superCleanButton.Margin = new Padding(0, 2, 8, 2);
+            analyzeButton.Margin = new Padding(0, 2, 8, 2);
+            deleteButton.Margin = new Padding(0, 2, 8, 2);
+            selectAllSuggestionsButton.Margin = new Padding(0, 4, 8, 4);
+            clearAllSuggestionsButton.Margin = new Padding(0, 4, 8, 4);
+            invertSuggestionsButton.Margin = new Padding(0, 4, 0, 4);
+            AddGridControl(actionRow, regularCleanButton, 0);
+            AddGridControl(actionRow, superCleanButton, 1);
+            AddGridControl(actionRow, analyzeButton, 2);
+            AddGridControl(actionRow, deleteButton, 3);
+            AddGridControl(actionRow, CreateGridSpacer(), 4);
+            AddGridControl(actionRow, selectAllSuggestionsButton, 5);
+            AddGridControl(actionRow, clearAllSuggestionsButton, 6);
+            AddGridControl(actionRow, invertSuggestionsButton, 7);
+
+            AntdUI.GridPanel toolbarLayout = CreateGridPanel("40:fill;40:fill");
+            toolbarLayout.Dock = DockStyle.Fill;
+            toolbarLayout.BackColor = Color.Transparent;
+            AddGridControl(toolbarLayout, topRow, 0);
+            AddGridControl(toolbarLayout, actionRow, 1);
+            toolbarHost.Controls.Add(toolbarLayout);
+
+            suggestionTable = new AntdUI.Table();
+            suggestionTable.Dock = DockStyle.Fill;
+            ConfigureCleanupListSurface(suggestionTable);
+            suggestionTable.FixedHeader = true;
+            suggestionTable.ScrollBarAvoidHeader = true;
+            suggestionTable.CellDoubleClick += SuggestionTable_CellDoubleClick;
+            suggestionTable.CellButtonClick += SuggestionTable_CellButtonClick;
+
+            panel.Controls.Add(suggestionTable);
+            panel.Controls.Add(toolbarHost);
+            return panel;
+        }
+
+        private Control CreateSettingsPanel()
+        {
+            AntdUI.Panel panel = CreateFlatPanel();
+            panel.Dock = DockStyle.Fill;
+            panel.BackColor = PageBackground;
+            panel.Padding = new Padding(0);
+
+            aiEnabledSwitch = CreateSettingsSwitch();
+            testAiSettingsButton = CreateSettingsActionButton("测试 AI", AntdUI.TTypeMini.Default);
+            testAiSettingsButton.IconSvg = "SearchOutlined";
+            testAiSettingsButton.Click += delegate { TestAiSettings(); };
+            recycleSwitch = CreateSettingsSwitch();
+            privilegedCheckbox = CreateCheckbox("启用完全权限（管理员）");
+            privilegedCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
+            aiAccessModeSelect = CreateSettingsSelect();
+            PopulateAiAccessModes();
+            aiAccessModeSelect.SelectedValueChanged += AiAccessModeSelect_SelectedValueChanged;
+            endpointInput = CreateInput("https://api.openai.com");
+            apiKeyInput = CreateInput("sk-...");
+            modelInput = CreateInput(AiSettings.DefaultModel);
+            maxSuggestionsInput = CreateInput("30");
+            aiProfileSelect = CreateSettingsSelect();
+            applyAiProfileButton = CreateSettingsActionButton("应用选中", AntdUI.TTypeMini.Primary);
+            applyAiProfileButton.IconSvg = "CheckOutlined";
+            applyAiProfileButton.Click += delegate { ApplySelectedAiProfile(); };
+            addAiProfileButton = CreateAddAiProfileButton();
+            addAiProfileButton.Click += delegate { OpenAiProfileCreatePage(); };
+            aiProviderPresetSelect = CreateSettingsSelect();
+            PopulateAiProviderPresets();
+            aiProviderPresetSelect.SelectedValueChanged += AiProviderPresetSelect_SelectedValueChanged;
+            endpointInput.TextChanged += AiEndpointOrModelInput_TextChanged;
+            modelInput.TextChanged += AiEndpointOrModelInput_TextChanged;
+            aiPromptPresetSelect = CreateSettingsSelect();
+            PopulateAiPromptPresets();
+            aiPromptPresetSelect.SelectedValueChanged += AiPromptPresetSelect_SelectedValueChanged;
+            systemPromptInput = CreateInput("系统提示词");
+            systemPromptInput.Multiline = true;
+            systemPromptInput.AutoScroll = true;
+            systemPromptInput.TextChanged += SystemPromptInput_TextChanged;
+            modelCookieMappingsInput = CreateInput("直接粘贴当前模型的一整行 Cookie；也兼容 model=Cookie");
+            modelCookieMappingsInput.Multiline = false;
+            modelCookieMappingsInput.AutoScroll = false;
+            allowRootsInput = CreateInput("每行一个允许位置");
+            allowRootsInput.Multiline = true;
+            allowRootsInput.AutoScroll = true;
+
+            AntdUI.StackPanel scrollHost = CreateVerticalScrollPanel();
+            scrollHost.Dock = DockStyle.Fill;
+            scrollHost.AutoScroll = true;
+            scrollHost.BackColor = PageBackground;
+            scrollHost.Padding = new Padding(0, 0, 4, 8);
+
+            AntdUI.GridPanel layout = CreateGridPanel("46:fill;82:fill;520:fill;266:fill");
+            layout.Dock = DockStyle.Top;
+            layout.Height = 914;
+            layout.BackColor = PageBackground;
+            layout.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
+            scrollHost.Resize += delegate
+            {
+                layout.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
+                ResizeAiProfileCards();
+            };
+
+            Control overviewSection = CreateSettingsOverviewSection();
+            Control profilesSection = CreateAiProfileSection();
+            Control sandboxSection = CreateSandboxSection();
+            Control actionBar = CreateSettingsActionBar();
+            actionBar.Margin = new Padding(0, 0, 0, 8);
+            overviewSection.Margin = new Padding(0, 0, 0, 12);
+            profilesSection.Margin = new Padding(0, 0, 0, 12);
+            sandboxSection.Margin = new Padding(0);
+
+            AddGridControl(layout, actionBar, 0);
+            AddGridControl(layout, overviewSection, 1);
+            AddGridControl(layout, profilesSection, 2);
+            AddGridControl(layout, sandboxSection, 3);
+
+            scrollHost.Controls.Add(layout);
+
+            panel.Controls.Add(scrollHost);
+            return panel;
+        }
+
+        private Control CreateSettingsActionBar()
+        {
+            AntdUI.Panel panel = CreateCompactSurfacePanel(6);
+            panel.Dock = DockStyle.Fill;
+
+            AntdUI.GridPanel layout = CreateGridPanel("fill 112");
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+
+            AntdUI.Label hint = CreateSmallMutedLabel("AI 接入、清理策略和沙盒范围");
+            saveSettingsButton.Margin = new Padding(0, 0, 0, 0);
+            saveSettingsButton.Dock = DockStyle.Fill;
+
+            AddGridControl(layout, hint, 0);
+            AddGridControl(layout, saveSettingsButton, 1);
+            panel.Controls.Add(layout);
+            return panel;
+        }
+
+        private Control CreateSettingsOverviewSection()
+        {
+            AntdUI.Panel section = CreateSettingsSurfacePanel(12);
+
+            AntdUI.GridPanel layout = CreateGridPanel("48 78 84 78 86 104 fill");
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+
+            maxSuggestionsInput.Margin = new Padding(0, 8, 0, 8);
+
+            AddGridControl(layout, CreateCaption("AI"), 0);
+            AddGridControl(layout, aiEnabledSwitch, 1);
+            AddGridControl(layout, CreateCaption("回收站"), 2);
+            AddGridControl(layout, recycleSwitch, 3);
+            AddGridControl(layout, CreateCaption("建议条数"), 4);
+            AddGridControl(layout, maxSuggestionsInput, 5);
+            AddGridControl(layout, CreateGridSpacer(), 6);
+
+            section.Controls.Add(layout);
+            return section;
+        }
+
+        private Control CreateAiProfileSection()
+        {
+            AntdUI.Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("AI 配置", "最近保存的接口、模型和访问方式会显示在这里。", out body);
+
+            AntdUI.GridPanel layout = CreateGridPanel("fill 230 108 116 46;fill-44 fill");
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+
+            AntdUI.Label hint = CreateSmallMutedLabel("点击卡片选择配置，右侧按钮可直接应用到当前设置。");
+            privilegedCheckbox.Margin = new Padding(0, 4, 8, 4);
+            AddGridControl(layout, hint, 0);
+            AddGridControl(layout, privilegedCheckbox, 1);
+            AddGridControl(layout, testAiSettingsButton, 2);
+            AddGridControl(layout, applyAiProfileButton, 3);
+            AddGridControl(layout, addAiProfileButton, 4);
+
+            aiProfileListPanel = CreateVerticalScrollPanel();
+            aiProfileListPanel.Dock = DockStyle.Fill;
+            aiProfileListPanel.BackColor = SurfaceColor;
+            aiProfileListPanel.AutoScroll = true;
+            aiProfileListPanel.Padding = new Padding(0);
+            aiProfileListPanel.Margin = new Padding(0);
+            aiProfileListPanel.Resize += delegate { ResizeAiProfileCards(); };
+
+            AddGridControl(layout, aiProfileListPanel, 5);
+            body.Controls.Add(layout);
+            return section;
+        }
+
+        private Control CreateSandboxSection()
+        {
+            AntdUI.Panel body;
+            AntdUI.Panel section = CreateSettingsGroupPanel("沙盒范围", "允许位置内的路径可直接执行删除，其他位置会继续确认。", out body);
+
+            AntdUI.GridPanel layout = CreateGridPanel("fill;fill-26 fill");
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+
+            AddGridControl(layout, CreateSmallMutedLabel("允许位置"), 0);
+            AddGridControl(layout, allowRootsInput, 1);
+
+            body.Controls.Add(layout);
+            return section;
+        }
+
+        private Control CreateLogPanel()
+        {
+            AntdUI.Panel panel = CreateCompactSurfacePanel(8);
+            panel.Dock = DockStyle.Fill;
+
+            logInput = CreateInput(string.Empty);
+            logInput.Dock = DockStyle.Fill;
+            logInput.Multiline = true;
+            logInput.ReadOnly = true;
+            logInput.AutoScroll = true;
+            logInput.MaxLength = int.MaxValue;
+
+            panel.Controls.Add(logInput);
+            return panel;
+        }
+
+        private static AntdUI.MenuItem CreateNavigationItem(string id, string text, string iconSvg)
+        {
+            AntdUI.MenuItem item = new AntdUI.MenuItem(text);
+            item.ID = id;
+            item.IconSvg = iconSvg;
+            return item;
+        }
+    }
+}

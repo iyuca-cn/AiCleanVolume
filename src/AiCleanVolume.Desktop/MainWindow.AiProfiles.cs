@@ -1,0 +1,696 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using System.Windows.Forms;
+using AiCleanVolume.Core.Models;
+using AiCleanVolume.Core.Services;
+using AiCleanVolume.Desktop.Controls;
+using AiCleanVolume.Desktop.Services;
+using AiCleanVolume.Desktop.ViewModels;
+
+
+namespace AiCleanVolume.Desktop
+{
+    public sealed partial class MainWindow : AntdUI.Window
+    {
+        private void SelectAiProfileProviderPresetForValues(string endpoint, string model)
+        {
+            if (aiProfileProviderPresetSelect == null) return;
+
+            AiProviderPreset preset = FindAiProviderPreset(endpoint, model);
+            syncingAiProfileProviderPreset = true;
+            try
+            {
+                aiProfileProviderPresetSelect.SelectedValue = preset == null ? CustomAiProviderPresetKey : preset.Key;
+            }
+            finally
+            {
+                syncingAiProfileProviderPreset = false;
+            }
+        }
+
+        private void SelectAiProfilePromptPresetForPrompt(string prompt)
+        {
+            if (aiProfilePromptPresetSelect == null) return;
+
+            AiPromptPreset preset = FindAiPromptPresetByPrompt(prompt);
+            syncingAiProfilePromptPreset = true;
+            try
+            {
+                aiProfilePromptPresetSelect.SelectedValue = preset == null ? CustomAiPromptPresetKey : preset.Key;
+            }
+            finally
+            {
+                syncingAiProfilePromptPreset = false;
+            }
+        }
+
+        private static string BuildAiProfileDisplayName(AiProfile profile)
+        {
+            if (profile == null) return string.Empty;
+            string name = NormalizeValue(profile.Name);
+            string endpoint = NormalizeEndpoint(profile.Endpoint);
+            if (string.IsNullOrWhiteSpace(endpoint)) return name;
+
+            Uri uri;
+            string host = Uri.TryCreate(endpoint, UriKind.Absolute, out uri) ? uri.Host : endpoint;
+            return string.IsNullOrWhiteSpace(host) ? name : name + " · " + host;
+        }
+
+        private void AiProfileProviderPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        {
+            if (loadingStartupUi) return;
+            if (syncingAiProfileProviderPreset || e.Value == null) return;
+
+            string key = e.Value.ToString();
+            if (string.Equals(key, CustomAiProviderPresetKey, StringComparison.OrdinalIgnoreCase)) return;
+
+            AiProviderPreset preset = FindAiProviderPresetByKey(key);
+            if (preset == null) return;
+
+            syncingAiProfileProviderPreset = true;
+            try
+            {
+                if (aiProfileEndpointInput != null) aiProfileEndpointInput.Text = preset.Endpoint;
+                if (aiProfileModelInput != null) aiProfileModelInput.Text = preset.Model;
+            }
+            finally
+            {
+                syncingAiProfileProviderPreset = false;
+            }
+        }
+
+        private void AiProfileEndpointOrModelInput_TextChanged(object sender, EventArgs e)
+        {
+            if (loadingStartupUi) return;
+            if (syncingAiProfileProviderPreset) return;
+            SelectAiProfileProviderPresetForValues(aiProfileEndpointInput == null ? null : aiProfileEndpointInput.Text, aiProfileModelInput == null ? null : aiProfileModelInput.Text);
+        }
+
+        private void AiProfileAccessModeSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        {
+            UpdateAiProfileAccessModeUi();
+        }
+
+        private string ResolveSelectedAiProfileAccessMode()
+        {
+            if (aiProfileAccessModeSelect == null || aiProfileAccessModeSelect.SelectedValue == null) return AiSettings.StandardApiAccessMode;
+            return AiSettings.NormalizeAccessMode(aiProfileAccessModeSelect.SelectedValue.ToString());
+        }
+
+        private void UpdateAiProfileAccessModeUi()
+        {
+            bool twoApi = string.Equals(ResolveSelectedAiProfileAccessMode(), AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase);
+            if (aiProfileApiKeyInput != null)
+            {
+                aiProfileApiKeyInput.Enabled = !twoApi;
+                aiProfileApiKeyInput.PlaceholderText = twoApi ? "2API 模式不使用 API Key" : "sk-...";
+            }
+            if (aiProfileCookieMappingsInput != null)
+            {
+                aiProfileCookieMappingsInput.Enabled = true;
+            }
+        }
+
+        private void PopulateAiProfiles()
+        {
+            if (aiProfileSelect == null)
+            {
+                RefreshAiProfileCards();
+                return;
+            }
+
+            string selectedValue = aiProfileSelect.SelectedValue == null ? null : aiProfileSelect.SelectedValue.ToString();
+            aiProfileSelect.Items.Clear();
+            settings.Ai.Profiles = AiSettings.NormalizeProfiles(settings.Ai.Profiles);
+            if (settings.Ai.Profiles.Count == 0)
+            {
+                aiProfileSelect.Items.Add(new AntdUI.SelectItem("暂无历史配置", string.Empty));
+                aiProfileSelect.SelectedValue = string.Empty;
+                RefreshAiProfileCards();
+                return;
+            }
+
+            for (int index = 0; index < settings.Ai.Profiles.Count; index++)
+            {
+                AiProfile profile = settings.Ai.Profiles[index];
+                aiProfileSelect.Items.Add(new AntdUI.SelectItem(BuildAiProfileDisplayName(profile), index.ToString()));
+            }
+            int selectedIndex;
+            if (!int.TryParse(selectedValue, out selectedIndex) || selectedIndex < 0 || selectedIndex >= settings.Ai.Profiles.Count)
+            {
+                selectedValue = "0";
+            }
+            aiProfileSelect.SelectedValue = selectedValue;
+            RefreshAiProfileCards();
+        }
+
+        private void SaveCurrentAiProfileAutomatic()
+        {
+            AiProfile profile = CreateCurrentAiProfile(null);
+            profile.Name = AiSettings.BuildProfileAutoName(profile.Model, profile.SavedAt);
+            UpsertAiProfile(profile, false);
+            PopulateAiProfiles();
+        }
+
+        private void OpenAiProfileCreatePage()
+        {
+            InitializeAiProfilePageValues();
+            SetActivePage(PageAiProfileCreate);
+        }
+
+        private void InitializeAiProfilePageValues()
+        {
+            string model = settings == null || settings.Ai == null ? AiSettings.DefaultModel : settings.Ai.Model;
+            aiProfileNameInput.Text = AiSettings.BuildProfileAutoName(model, DateTime.Now);
+            aiProfileAccessModeSelect.SelectedValue = settings == null || settings.Ai == null ? AiSettings.StandardApiAccessMode : settings.Ai.AccessMode;
+            aiProfileEndpointInput.Text = settings == null || settings.Ai == null ? string.Empty : NormalizeValue(settings.Ai.Endpoint);
+            aiProfileApiKeyInput.Text = settings == null || settings.Ai == null ? string.Empty : NormalizeValue(settings.Ai.ApiKey);
+            aiProfileModelInput.Text = string.IsNullOrWhiteSpace(model) ? AiSettings.DefaultModel : NormalizeValue(model);
+            aiProfileMaxSuggestionsInput.Text = settings == null || settings.Ai == null ? "30" : settings.Ai.MaxSuggestions.ToString();
+            aiProfileCookieMappingsInput.Text = settings == null || settings.Ai == null ? string.Empty : FormatModelCookieMappings(settings.Ai.ModelCookieMappings, settings.Ai.Model);
+            aiProfileSystemPromptInput.Text = settings == null || settings.Ai == null ? DefaultAiSystemPrompt : NormalizeValue(settings.Ai.SystemPrompt);
+            UpdateAiProfileAccessModeUi();
+            SelectAiProfileProviderPresetForValues(aiProfileEndpointInput.Text, aiProfileModelInput.Text);
+            SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
+        }
+
+        private void SaveCurrentAiProfileWithPrompt()
+        {
+            try
+            {
+                SaveSettingsFromUi();
+                string defaultName = AiSettings.BuildProfileAutoName(settings.Ai.Model, DateTime.Now);
+                string name = PromptForAiProfileName(defaultName);
+                if (string.IsNullOrWhiteSpace(name)) return;
+
+                AiProfile profile = CreateCurrentAiProfile(name);
+                UpsertAiProfile(profile, true);
+                settingsStore.Save(settings);
+                PopulateAiProfiles();
+                Log("AI 配置方案已保存：" + profile.Name + "。");
+                ShowInfo("完成", "AI 配置方案已保存。");
+            }
+            catch (Exception ex)
+            {
+                Log("保存 AI 配置方案失败：" + ex.Message);
+                ShowError("保存失败", ex.Message);
+            }
+        }
+
+        private void SaveAiProfileFromPage()
+        {
+            try
+            {
+                AiProfile profile = CreateAiProfileFromPage();
+                UpsertAiProfile(profile, true);
+                settingsStore.Save(settings);
+                PopulateAiProfiles();
+                SelectAiProfile(0);
+                SetActivePage(PageSettings);
+                Log("AI 配置方案已新增：" + profile.Name + "。");
+                ShowInfo("完成", "AI 配置方案已新增。");
+            }
+            catch (Exception ex)
+            {
+                Log("新增 AI 配置方案失败：" + ex.Message);
+                ShowError("保存失败", ex.Message);
+            }
+        }
+
+        private AiProfile CreateAiProfileFromPage()
+        {
+            DateTime savedAt = DateTime.Now;
+            string name = aiProfileNameInput == null ? null : NormalizeValue(aiProfileNameInput.Text);
+            string model = aiProfileModelInput == null ? null : NormalizeValue(aiProfileModelInput.Text);
+
+            AiProfile profile = new AiProfile
+            {
+                Name = name,
+                SavedAt = savedAt,
+                AccessMode = ResolveSelectedAiProfileAccessMode(),
+                Endpoint = aiProfileEndpointInput == null ? string.Empty : NormalizeValue(aiProfileEndpointInput.Text),
+                ApiKey = aiProfileApiKeyInput == null ? string.Empty : NormalizeValue(aiProfileApiKeyInput.Text),
+                Model = model,
+                MaxSuggestions = ParsePositiveInt(aiProfileMaxSuggestionsInput == null ? null : aiProfileMaxSuggestionsInput.Text, 30),
+                SystemPrompt = aiProfileSystemPromptInput == null ? string.Empty : NormalizeValue(aiProfileSystemPromptInput.Text),
+                ModelCookieMappings = new List<AiModelCookieMapping>()
+            };
+
+            if (string.IsNullOrWhiteSpace(profile.Endpoint)) throw new InvalidOperationException("请填写接口地址。");
+            if (string.IsNullOrWhiteSpace(profile.Model)) throw new InvalidOperationException("请填写模型。");
+
+            IList<AiModelCookieMapping> mappings = ParseModelCookieMappings(aiProfileCookieMappingsInput == null ? null : aiProfileCookieMappingsInput.Text, profile.Model);
+            for (int index = 0; index < mappings.Count; index++)
+            {
+                profile.ModelCookieMappings.Add(new AiModelCookieMapping
+                {
+                    Model = mappings[index].Model,
+                    Cookie = mappings[index].Cookie
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(profile.Name)) profile.Name = AiSettings.BuildProfileAutoName(profile.Model, profile.SavedAt);
+            return profile;
+        }
+
+        private void CancelAiProfileCreatePage()
+        {
+            SetActivePage(PageSettings);
+        }
+
+        private void ApplySelectedAiProfile()
+        {
+            AiProfile profile = ResolveSelectedAiProfile();
+            if (profile == null)
+            {
+                ShowInfo("提示", "暂无可应用的 AI 历史配置。");
+                return;
+            }
+
+            ApplyAiProfileToUi(profile);
+            Log("已应用 AI 配置方案到界面：" + profile.Name + "。点击保存配置后生效。");
+        }
+
+        private AiProfile ResolveSelectedAiProfile()
+        {
+            if (aiProfileSelect == null || aiProfileSelect.SelectedValue == null || settings == null || settings.Ai == null || settings.Ai.Profiles == null) return null;
+            int index;
+            if (!int.TryParse(aiProfileSelect.SelectedValue.ToString(), out index)) return null;
+            if (index < 0 || index >= settings.Ai.Profiles.Count) return null;
+            return settings.Ai.Profiles[index];
+        }
+
+        private void RefreshAiProfileCards()
+        {
+            if (aiProfileListPanel == null) return;
+
+            aiProfileListPanel.SuspendLayout();
+            try
+            {
+                aiProfileListPanel.Controls.Clear();
+                if (settings == null || settings.Ai == null || settings.Ai.Profiles == null || settings.Ai.Profiles.Count == 0)
+                {
+                    aiProfileListPanel.Controls.Add(CreateEmptyAiProfileCard());
+                    return;
+                }
+
+                int selectedIndex = GetSelectedAiProfileIndex();
+                for (int index = 0; index < settings.Ai.Profiles.Count; index++)
+                {
+                    aiProfileListPanel.Controls.Add(CreateAiProfileCard(settings.Ai.Profiles[index], index, index == selectedIndex));
+                }
+            }
+            finally
+            {
+                aiProfileListPanel.ResumeLayout();
+                ResizeAiProfileCards();
+            }
+        }
+
+        private Control CreateEmptyAiProfileCard()
+        {
+            AntdUI.Panel card = CreateAiProfileCardSurface(false);
+            card.Height = 88;
+
+            AntdUI.Label label = CreateSmallMutedLabel("还没有保存过 AI 配置。填写接入参数后点击“保存为配置”，这里会生成类似接口列表的配置卡片。");
+            label.Dock = DockStyle.Fill;
+            label.TextAlign = ContentAlignment.MiddleCenter;
+            card.Controls.Add(label);
+            return card;
+        }
+
+        private Control CreateAiProfileCard(AiProfile profile, int index, bool selected)
+        {
+            AntdUI.Panel card = CreateAiProfileCardSurface(selected);
+
+            AntdUI.GridPanel layout = CreateGridPanel("54 fill 122");
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+
+            AntdUI.Panel avatarCell = CreateFlatPanel();
+            avatarCell.Dock = DockStyle.Fill;
+            avatarCell.BackColor = Color.Transparent;
+            AntdUI.Avatar avatar = new AntdUI.Avatar();
+            avatar.Width = 40;
+            avatar.Height = 40;
+            avatar.Left = 3;
+            avatar.Top = 20;
+            avatar.Text = BuildAiProfileAvatarText(profile);
+            avatar.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+            avatar.ForeColor = TextSecondaryColor;
+            avatar.BackColor = Color.FromArgb(248, 250, 252);
+            avatar.BorderWidth = 1F;
+            avatar.BorderColor = BorderLightColor;
+            avatar.Radius = 18;
+            avatarCell.Controls.Add(avatar);
+
+            AntdUI.GridPanel content = CreateGridPanel("fill;fill;fill-30 24 fill");
+            content.Dock = DockStyle.Fill;
+            content.BackColor = Color.Transparent;
+
+            AntdUI.GridPanel titleRow = CreateGridPanel("fill 182");
+            titleRow.Dock = DockStyle.Fill;
+            titleRow.BackColor = Color.Transparent;
+            titleRow.Margin = Padding.Empty;
+            titleRow.Padding = Padding.Empty;
+
+            AntdUI.Label title = new AntdUI.Label();
+            title.Dock = DockStyle.Fill;
+            title.AutoEllipsis = true;
+            title.Text = BuildAiProfileDisplayName(profile);
+            title.Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Bold);
+            title.ForeColor = TextPrimaryColor;
+            title.BackColor = Color.Transparent;
+            title.TextAlign = ContentAlignment.MiddleLeft;
+            title.Margin = new Padding(0, 3, 8, 0);
+
+            AntdUI.FlowPanel tagRow = new AntdUI.FlowPanel();
+            tagRow.Dock = DockStyle.Fill;
+            tagRow.BackColor = Color.Transparent;
+            tagRow.Align = AntdUI.TAlignFlow.LeftCenter;
+            tagRow.Margin = Padding.Empty;
+            tagRow.Padding = Padding.Empty;
+
+            AddGridControl(titleRow, title, 0);
+            tagRow.Controls.Add(CreateAiProfileTag(IsAiProfileConfigured(profile) ? "正常" : "待补全", IsAiProfileConfigured(profile) ? AntdUI.TTypeMini.Success : AntdUI.TTypeMini.Warn));
+            tagRow.Controls.Add(CreateAiProfileTag(FormatAiAccessModeLabel(profile.AccessMode), AntdUI.TTypeMini.Info));
+            tagRow.Controls.Add(CreateAiProfileTag("P" + (index + 1).ToString(), AntdUI.TTypeMini.Primary));
+            AddGridControl(titleRow, tagRow, 1);
+
+            AntdUI.Label endpoint = new AntdUI.Label();
+            endpoint.Dock = DockStyle.Fill;
+            endpoint.Text = NormalizeEndpoint(profile.Endpoint);
+            endpoint.Font = new Font("Microsoft YaHei UI", 10F);
+            endpoint.ForeColor = PrimaryColor;
+            endpoint.BackColor = Color.Transparent;
+            endpoint.TextAlign = ContentAlignment.MiddleLeft;
+            endpoint.AutoEllipsis = true;
+
+            AntdUI.Label meta = CreateSmallMutedLabel(BuildAiProfileMeta(profile));
+
+            AddGridControl(content, titleRow, 0);
+            AddGridControl(content, endpoint, 1);
+            AddGridControl(content, meta, 2);
+
+            AntdUI.GridPanel actions = CreateGridPanel("fill;fill;fill-fill 34 fill");
+            actions.Dock = DockStyle.Fill;
+            actions.BackColor = Color.Transparent;
+
+            AntdUI.Button applyButton = CreateAiProfileCardActionButton(selected ? "已选中" : "应用", "CheckOutlined", selected);
+            applyButton.Click += delegate
+            {
+                SelectAiProfile(index);
+                ApplySelectedAiProfile();
+            };
+            AddGridControl(actions, CreateGridSpacer(), 0);
+            AddGridControl(actions, applyButton, 1);
+            AddGridControl(actions, CreateGridSpacer(), 2);
+
+            AddGridControl(layout, avatarCell, 0);
+            AddGridControl(layout, content, 1);
+            AddGridControl(layout, actions, 2);
+            card.Controls.Add(layout);
+
+            BindAiProfileCardSelection(card, index);
+            return card;
+        }
+
+        private AntdUI.Panel CreateAiProfileCardSurface(bool selected)
+        {
+            AntdUI.Panel card = new AntdUI.Panel();
+            card.Width = ResolveAiProfileCardWidth();
+            card.Height = 102;
+            card.Margin = new Padding(0, 0, 0, 10);
+            card.Padding = new Padding(14, 10, 14, 10);
+            card.Radius = 14;
+            card.Back = selected ? Color.FromArgb(247, 255, 252) : SurfaceColor;
+            card.BorderWidth = 1F;
+            card.BorderColor = selected ? Color.FromArgb(91, 213, 163) : BorderDefaultColor;
+            card.Shadow = 0;
+            card.ShadowOpacity = 0F;
+            card.ShadowOffsetY = 0;
+            return card;
+        }
+
+        private AntdUI.Button CreateAiProfileCardActionButton(string text, string iconSvg, bool selected)
+        {
+            AntdUI.Button button = new AntdUI.Button();
+            button.Dock = DockStyle.Fill;
+            button.AutoSizeMode = AntdUI.TAutoSize.None;
+            button.Text = text;
+            button.IconSvg = iconSvg;
+            button.Type = selected ? AntdUI.TTypeMini.Default : AntdUI.TTypeMini.Primary;
+            button.Ghost = selected;
+            button.Height = 32;
+            button.Radius = 8;
+            button.BorderWidth = 1F;
+            button.WaveSize = 2;
+            button.Margin = new Padding(8, 0, 0, 0);
+            if (selected)
+            {
+                button.DefaultBorderColor = Color.FromArgb(186, 231, 204);
+                button.ForeColor = Color.FromArgb(0, 120, 75);
+                button.BackColor = Color.FromArgb(240, 253, 244);
+            }
+            return button;
+        }
+
+        private static AntdUI.Tag CreateAiProfileTag(string text, AntdUI.TTypeMini type)
+        {
+            AntdUI.Tag tag = new AntdUI.Tag();
+            tag.AutoSizeMode = AntdUI.TAutoSize.Auto;
+            tag.Text = text;
+            tag.Type = type;
+            tag.BorderWidth = 0F;
+            tag.Radius = 8;
+            tag.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+            tag.Margin = new Padding(0, 3, 6, 0);
+            return tag;
+        }
+
+        private void BindAiProfileCardSelection(Control control, int index)
+        {
+            if (!(control is AntdUI.Button))
+            {
+                control.Cursor = Cursors.Hand;
+                control.Click += delegate { SelectAiProfile(index); };
+            }
+
+            foreach (Control child in control.Controls)
+            {
+                BindAiProfileCardSelection(child, index);
+            }
+        }
+
+        private void SelectAiProfile(int index)
+        {
+            if (aiProfileSelect == null || settings == null || settings.Ai == null || settings.Ai.Profiles == null) return;
+            if (index < 0 || index >= settings.Ai.Profiles.Count) return;
+            string selectedValue = index.ToString();
+            bool selectionChanged = aiProfileSelect.SelectedValue == null || !string.Equals(aiProfileSelect.SelectedValue.ToString(), selectedValue, StringComparison.Ordinal);
+            if (selectionChanged)
+            {
+                aiProfileSelect.SelectedValue = selectedValue;
+            }
+            if (selectionChanged) RefreshAiProfileCards();
+        }
+
+        private int GetSelectedAiProfileIndex()
+        {
+            if (aiProfileSelect == null || aiProfileSelect.SelectedValue == null) return 0;
+            int index;
+            if (!int.TryParse(aiProfileSelect.SelectedValue.ToString(), out index)) return 0;
+            return index;
+        }
+
+        private void ResizeAiProfileCards()
+        {
+            if (aiProfileListPanel == null) return;
+            int width = ResolveAiProfileCardWidth();
+            foreach (Control control in aiProfileListPanel.Controls)
+            {
+                control.Width = width;
+            }
+        }
+
+        private int ResolveAiProfileCardWidth()
+        {
+            if (aiProfileListPanel == null) return 640;
+            int scrollBarOffset = aiProfileListPanel.ScrollBar != null && aiProfileListPanel.ScrollBar.ShowY ? aiProfileListPanel.ScrollBar.SIZE : 0;
+            return Math.Max(420, aiProfileListPanel.ClientSize.Width - scrollBarOffset - 8);
+        }
+
+        private static bool IsAiProfileConfigured(AiProfile profile)
+        {
+            return profile != null && !string.IsNullOrWhiteSpace(profile.Endpoint) && !string.IsNullOrWhiteSpace(profile.Model);
+        }
+
+        private static string FormatAiAccessModeLabel(string accessMode)
+        {
+            return string.Equals(AiSettings.NormalizeAccessMode(accessMode), AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase) ? "2API" : "标准 API";
+        }
+
+        private static string BuildAiProfileMeta(AiProfile profile)
+        {
+            if (profile == null) return string.Empty;
+            string model = string.IsNullOrWhiteSpace(profile.Model) ? "未填写模型" : profile.Model.Trim();
+            int maxSuggestions = profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions;
+            return "模型：" + model + "    建议：" + maxSuggestions.ToString() + " 条    保存：" + profile.SavedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        }
+
+        private static string BuildAiProfileAvatarText(AiProfile profile)
+        {
+            string source = profile == null ? null : (string.IsNullOrWhiteSpace(profile.Name) ? profile.Model : profile.Name);
+            source = NormalizeValue(source);
+            if (string.IsNullOrWhiteSpace(source)) return "AI";
+
+            string[] parts = Regex.Split(source, "[^A-Za-z0-9]+");
+            string result = string.Empty;
+            for (int i = 0; i < parts.Length && result.Length < 2; i++)
+            {
+                if (string.IsNullOrWhiteSpace(parts[i])) continue;
+                result += char.ToUpperInvariant(parts[i][0]).ToString();
+            }
+
+            if (result.Length == 0)
+            {
+                result = source.Substring(0, Math.Min(2, source.Length)).ToUpperInvariant();
+            }
+            else if (result.Length == 1 && source.Length > 1)
+            {
+                result += char.ToUpperInvariant(source[1]).ToString();
+            }
+
+            return result.Length > 2 ? result.Substring(0, 2) : result;
+        }
+
+        private AiProfile CreateCurrentAiProfile(string name)
+        {
+            AiProfile profile = new AiProfile
+            {
+                Name = NormalizeValue(name),
+                SavedAt = DateTime.Now,
+                AccessMode = settings.Ai.AccessMode,
+                Endpoint = settings.Ai.Endpoint,
+                ApiKey = settings.Ai.ApiKey,
+                Model = settings.Ai.Model,
+                MaxSuggestions = settings.Ai.MaxSuggestions,
+                SystemPrompt = settings.Ai.SystemPrompt,
+                ModelCookieMappings = new List<AiModelCookieMapping>()
+            };
+
+            IList<AiModelCookieMapping> mappings = AiSettings.NormalizeModelCookieMappings(settings.Ai.ModelCookieMappings);
+            for (int i = 0; i < mappings.Count; i++)
+            {
+                profile.ModelCookieMappings.Add(new AiModelCookieMapping
+                {
+                    Model = mappings[i].Model,
+                    Cookie = mappings[i].Cookie
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(profile.Name)) profile.Name = AiSettings.BuildProfileAutoName(profile.Model, profile.SavedAt);
+            return profile;
+        }
+
+        private void UpsertAiProfile(AiProfile profile, bool matchByName)
+        {
+            if (profile == null) return;
+            if (settings.Ai.Profiles == null) settings.Ai.Profiles = new List<AiProfile>();
+
+            List<AiProfile> profiles = new List<AiProfile>(AiSettings.NormalizeProfiles(settings.Ai.Profiles));
+            string fingerprint = profile.BuildFingerprint();
+            int matchIndex = -1;
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                if ((matchByName && string.Equals(NormalizeValue(profiles[i].Name), NormalizeValue(profile.Name), StringComparison.OrdinalIgnoreCase)) ||
+                    string.Equals(profiles[i].BuildFingerprint(), fingerprint, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchIndex = i;
+                    break;
+                }
+            }
+
+            if (matchIndex >= 0) profiles.RemoveAt(matchIndex);
+            profiles.Insert(0, profile.Clone());
+            while (profiles.Count > 10) profiles.RemoveAt(profiles.Count - 1);
+            settings.Ai.Profiles = profiles;
+        }
+
+        private void ApplyAiProfileToUi(AiProfile profile)
+        {
+            if (profile == null) return;
+            aiAccessModeSelect.SelectedValue = AiSettings.NormalizeAccessMode(profile.AccessMode);
+            endpointInput.Text = NormalizeValue(profile.Endpoint);
+            apiKeyInput.Text = NormalizeValue(profile.ApiKey);
+            modelInput.Text = NormalizeValue(profile.Model);
+            maxSuggestionsInput.Text = (profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions).ToString();
+            systemPromptInput.Text = NormalizeValue(profile.SystemPrompt);
+            modelCookieMappingsInput.Text = FormatModelCookieMappings(profile.ModelCookieMappings, profile.Model);
+            UpdateAiAccessModeUi();
+            SelectAiProviderPresetForSettings(endpointInput.Text, modelInput.Text);
+            SelectAiPromptPresetForPrompt(systemPromptInput.Text);
+        }
+
+        private string PromptForAiProfileName(string defaultName)
+        {
+            AntdUI.Panel content = CreateFlatPanel();
+            content.Width = 420;
+            content.Height = 72;
+            content.Padding = new Padding(0, 4, 0, 0);
+            content.BackColor = Color.Transparent;
+
+            AntdUI.GridPanel layout = CreateGridPanel("78 fill");
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
+
+            AntdUI.Label label = CreateCaption("配置名称");
+            AntdUI.Input input = CreateInput("例如：开发环境");
+            input.Text = defaultName ?? string.Empty;
+            AddGridControl(layout, label, 0);
+            AddGridControl(layout, input, 1);
+            content.Controls.Add(layout);
+
+            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "保存 AI 配置方案", content, AntdUI.TType.Info);
+            config.OkText = "保存";
+            config.CancelText = "取消";
+            config.OkType = AntdUI.TTypeMini.Primary;
+            config.Width = 480;
+            config.MaskClosable = false;
+            return AntdUI.Modal.open(config) == DialogResult.OK ? NormalizeValue(input.Text) : null;
+        }
+
+        private void AiProfilePromptPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        {
+            if (loadingStartupUi) return;
+            if (syncingAiProfilePromptPreset || e.Value == null) return;
+
+            string key = e.Value.ToString();
+            if (string.Equals(key, CustomAiPromptPresetKey, StringComparison.OrdinalIgnoreCase)) return;
+
+            AiPromptPreset preset = FindAiPromptPreset(key);
+            if (preset == null || aiProfileSystemPromptInput == null) return;
+
+            syncingAiProfilePromptPreset = true;
+            try
+            {
+                aiProfileSystemPromptInput.Text = preset.BuildPrompt(GetPromptDriveRoot());
+            }
+            finally
+            {
+                syncingAiProfilePromptPreset = false;
+            }
+        }
+
+        private void AiProfileSystemPromptInput_TextChanged(object sender, EventArgs e)
+        {
+            if (loadingStartupUi) return;
+            if (syncingAiProfilePromptPreset || aiProfileSystemPromptInput == null) return;
+            SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
+        }
+    }
+}
