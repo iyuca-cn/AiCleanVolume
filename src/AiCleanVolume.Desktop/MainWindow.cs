@@ -177,6 +177,10 @@ namespace AiCleanVolume.Desktop
         private bool applyingNormalBounds;
         private bool startupRedrawSuspended;
         private bool startupRedrawCompleted;
+        private bool startupRevealQueued;
+        private bool startupUiBindingQueued;
+        private bool startupUiBindingCompleted;
+        private bool loadingStartupUi;
         private bool restoreBoundsQueued;
         private bool busy;
         private bool sidebarResizing;
@@ -214,9 +218,7 @@ namespace AiCleanVolume.Desktop
 
             InitializeComponent();
             ConfigureTables();
-            LoadSettingsToUi();
-            LoadDrives();
-            Log("应用已启动。若 AI 未启用，将自动回退到本地启发式规则。");
+            ApplyInitialUiPlaceholders();
         }
 
         private void InitializeComponent()
@@ -1198,6 +1200,46 @@ namespace AiCleanVolume.Desktop
             };
         }
 
+        private void ApplyInitialUiPlaceholders()
+        {
+            loadingStartupUi = true;
+            try
+            {
+                string defaultDrive = ResolveDefaultDrive();
+                if (driveSelect != null)
+                {
+                    driveSelect.Items.Clear();
+                    driveSelect.Items.Add(new AntdUI.SelectItem(defaultDrive, defaultDrive));
+                    driveSelect.SelectedValue = defaultDrive;
+                }
+
+                if (suggestionDriveSelect != null)
+                {
+                    suggestionDriveSelect.Items.Clear();
+                    suggestionDriveSelect.Items.Add(new AntdUI.SelectItem(defaultDrive, defaultDrive));
+                    suggestionDriveSelect.SelectedValue = defaultDrive;
+                }
+
+                if (pathInput != null) pathInput.Text = defaultDrive;
+                SetDriveSummaryValue(selectedDriveValueLabel, defaultDrive);
+                SetDriveSummaryValue(totalSpaceValueLabel, "-");
+                SetDriveSummaryValue(usedSpaceValueLabel, "-");
+                SetDriveSummaryValue(availableSpaceValueLabel, "-");
+                SetDriveSummaryValue(reservedSpaceValueLabel, "-");
+            }
+            finally
+            {
+                loadingStartupUi = false;
+            }
+        }
+
+        private static string ResolveDefaultDrive()
+        {
+            string defaultDrive = Environment.GetEnvironmentVariable("SystemDrive");
+            if (string.IsNullOrWhiteSpace(defaultDrive)) defaultDrive = "C:";
+            return defaultDrive.TrimEnd('\\') + "\\";
+        }
+
         private void LoadSettingsToUi()
         {
             settings.EnsureDefaults();
@@ -1428,6 +1470,7 @@ namespace AiCleanVolume.Desktop
 
         private void PrivilegedCheckbox_CheckedChanged(object sender, AntdUI.BoolEventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingPrivilegeCheckboxes) return;
             AntdUI.Checkbox source = sender as AntdUI.Checkbox;
             if (source == null) return;
@@ -1461,6 +1504,7 @@ namespace AiCleanVolume.Desktop
 
         private void AiAccessModeSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
+            if (loadingStartupUi) return;
             UpdateAiAccessModeUi();
         }
 
@@ -1486,6 +1530,7 @@ namespace AiCleanVolume.Desktop
 
         private void AiProviderPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingAiProviderPreset || e.Value == null) return;
 
             string key = e.Value.ToString();
@@ -1508,6 +1553,7 @@ namespace AiCleanVolume.Desktop
 
         private void AiProfileProviderPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingAiProfileProviderPreset || e.Value == null) return;
 
             string key = e.Value.ToString();
@@ -1530,12 +1576,14 @@ namespace AiCleanVolume.Desktop
 
         private void AiEndpointOrModelInput_TextChanged(object sender, EventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingAiProviderPreset) return;
             SelectAiProviderPresetForSettings(endpointInput == null ? null : endpointInput.Text, modelInput == null ? null : modelInput.Text);
         }
 
         private void AiProfileEndpointOrModelInput_TextChanged(object sender, EventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingAiProfileProviderPreset) return;
             SelectAiProfileProviderPresetForValues(aiProfileEndpointInput == null ? null : aiProfileEndpointInput.Text, aiProfileModelInput == null ? null : aiProfileModelInput.Text);
         }
@@ -2415,9 +2463,7 @@ namespace AiCleanVolume.Desktop
                 if (suggestionDriveSelect != null) suggestionDriveSelect.Items.Add(new AntdUI.SelectItem(drive.Name, drive.Name));
             }
 
-            string defaultDrive = Environment.GetEnvironmentVariable("SystemDrive");
-            if (string.IsNullOrWhiteSpace(defaultDrive)) defaultDrive = "C:";
-            defaultDrive = defaultDrive.TrimEnd('\\') + "\\";
+            string defaultDrive = ResolveDefaultDrive();
             driveSelect.SelectedValue = defaultDrive;
             if (suggestionDriveSelect != null) suggestionDriveSelect.SelectedValue = defaultDrive;
             pathInput.Text = defaultDrive;
@@ -2427,6 +2473,7 @@ namespace AiCleanVolume.Desktop
 
         private void DriveSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
+            if (loadingStartupUi) return;
             if (e.Value == null) return;
             pathInput.Text = e.Value.ToString();
             UpdateDriveSummaryForLocation(pathInput.Text);
@@ -2435,11 +2482,13 @@ namespace AiCleanVolume.Desktop
 
         private void SuggestionDriveSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
+            if (loadingStartupUi) return;
             RefreshPromptForCurrentLocation();
         }
 
         private void PathInput_TextChanged(object sender, EventArgs e)
         {
+            if (loadingStartupUi) return;
             string location = pathInput.Text;
             if (string.IsNullOrWhiteSpace(location) && driveSelect != null && driveSelect.SelectedValue != null)
             {
@@ -2451,6 +2500,7 @@ namespace AiCleanVolume.Desktop
 
         private void AiPromptPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingAiPromptPreset || e.Value == null) return;
 
             string key = e.Value.ToString();
@@ -2472,12 +2522,14 @@ namespace AiCleanVolume.Desktop
 
         private void SystemPromptInput_TextChanged(object sender, EventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingAiPromptPreset || systemPromptInput == null) return;
             SelectAiPromptPresetForPrompt(systemPromptInput.Text);
         }
 
         private void AiProfilePromptPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingAiProfilePromptPreset || e.Value == null) return;
 
             string key = e.Value.ToString();
@@ -2499,6 +2551,7 @@ namespace AiCleanVolume.Desktop
 
         private void AiProfileSystemPromptInput_TextChanged(object sender, EventArgs e)
         {
+            if (loadingStartupUi) return;
             if (syncingAiProfilePromptPreset || aiProfileSystemPromptInput == null) return;
             SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
         }
@@ -3527,7 +3580,8 @@ namespace AiCleanVolume.Desktop
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
-            ResumeStartupRedraw();
+            QueueStartupReveal();
+            QueueStartupUiBinding();
         }
 
         protected override void Dispose(bool disposing)
@@ -3581,6 +3635,13 @@ namespace AiCleanVolume.Desktop
 
         protected override void WndProc(ref Message m)
         {
+            if (m.Msg == WmEraseBackground)
+            {
+                PaintEraseBackground(m.WParam);
+                m.Result = new IntPtr(1);
+                return;
+            }
+
             if (m.Msg == WmGetMinMaxInfo)
             {
                 UpdateMaximizedBounds(m.LParam);
@@ -3632,12 +3693,89 @@ namespace AiCleanVolume.Desktop
             RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RestoreRedrawFlags);
         }
 
+        private void PaintEraseBackground(IntPtr hdc)
+        {
+            if (hdc == IntPtr.Zero) return;
+            using (Graphics graphics = Graphics.FromHdc(hdc))
+            using (SolidBrush brush = new SolidBrush(PageBackground))
+            {
+                graphics.FillRectangle(brush, ClientRectangle);
+            }
+        }
+
         private void ResumeStartupRedraw()
         {
-            if (!startupRedrawSuspended) return;
+            if (startupRedrawCompleted) return;
+            if (!startupRedrawSuspended)
+            {
+                startupRedrawCompleted = true;
+                return;
+            }
+
             startupRedrawSuspended = false;
             startupRedrawCompleted = true;
             ResumeControlRedraw(this, true, false);
+        }
+
+        private void QueueStartupReveal()
+        {
+            if (startupRedrawCompleted || startupRevealQueued || IsDisposed) return;
+            startupRevealQueued = true;
+            BeginInvoke((MethodInvoker)delegate
+            {
+                startupRevealQueued = false;
+                CompleteStartupReveal();
+            });
+        }
+
+        private void CompleteStartupReveal()
+        {
+            if (startupRedrawCompleted || IsDisposed) return;
+
+            if (IsHandleCreated)
+            {
+                ApplyNormalWindowBounds(true);
+                PerformLayout();
+                ResumeStartupRedraw();
+                RefreshDWM();
+                Update();
+            }
+            else
+            {
+                startupRedrawCompleted = true;
+            }
+        }
+
+        private void QueueStartupUiBinding()
+        {
+            if (startupUiBindingCompleted || startupUiBindingQueued || IsDisposed) return;
+            startupUiBindingQueued = true;
+            BeginInvoke((MethodInvoker)delegate
+            {
+                startupUiBindingQueued = false;
+                CompleteStartupUiBinding();
+            });
+        }
+
+        private void CompleteStartupUiBinding()
+        {
+            if (startupUiBindingCompleted || IsDisposed) return;
+            startupUiBindingCompleted = true;
+
+            loadingStartupUi = true;
+            try
+            {
+                LoadSettingsToUi();
+                LoadDrives();
+            }
+            finally
+            {
+                loadingStartupUi = false;
+            }
+
+            UpdateDriveSummaryForLocation(ResolveSelectedLocation());
+            RefreshPromptForCurrentLocation();
+            Log("应用已启动。若 AI 未启用，将自动回退到本地启发式规则。");
         }
 
         private void UpdateMaximizedBounds(IntPtr lParam)

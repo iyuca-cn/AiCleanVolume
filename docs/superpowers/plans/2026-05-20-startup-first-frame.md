@@ -4,7 +4,7 @@
 
 **Goal:** Prevent the main window from exposing an unpainted shell during startup.
 
-**Architecture:** Keep the AntdUI `MainWindow` and existing UI composition intact. Hide the window during the first-frame preparation phase, complete layout and bounds normalization, then restore redraw and reveal the window after the message queue reaches the shown state.
+**Architecture:** Keep the AntdUI `MainWindow` and existing UI composition intact. Keep construction light so the form and taskbar button can appear quickly, then restore the first frame and bind heavier settings/drive data after `OnShown`. The design is recorded in `docs/plans/2026-05-20-startup-first-frame-design.md`.
 
 **Tech Stack:** .NET Framework 4.0, WinForms, AntdUI v2.3.0.
 
@@ -13,9 +13,10 @@
 ## File Structure
 
 - Modify: `src/AiCleanVolume.Desktop/MainWindow.cs`
-  - Add startup visibility state.
-  - Start the form fully transparent before the first show.
-  - Restore redraw and opacity after the first shown message cycle.
+  - Add startup reveal state.
+  - Defer settings, AI profile cards, drive enumeration, and drive summary binding until after the first show.
+  - Avoid form opacity/layered-window startup hiding so minimized restore repaint remains stable.
+  - Paint erase-background requests with the app page background.
 - Test: `AiCleanVolume.sln`
   - Build the solution with `dotnet build`.
   - Manually launch the desktop app and verify the blank shell is no longer visible.
@@ -25,58 +26,70 @@
 **Files:**
 - Modify: `src/AiCleanVolume.Desktop/MainWindow.cs`
 
-- [ ] **Step 1: Capture current startup code**
+- [x] **Step 1: Capture current startup code**
 
 Read the current `OnLoad`, `OnHandleCreated`, `OnShown`, and redraw helper methods.
 
 Expected: identify the existing `startupRedrawSuspended` and `startupRedrawCompleted` flow.
 
-- [ ] **Step 2: Add startup opacity state**
+- [x] **Step 2: Add startup reveal state**
 
-Add a field to remember the normal opacity and mark startup reveal completion.
+Add a field to guard the startup reveal callback.
 
 Expected: startup state does not interfere with minimized restore redraw.
 
-- [ ] **Step 3: Hide first paint**
+- [x] **Step 3: Keep constructor light**
 
-Set `Opacity = 0D` during initialization before the handle is shown.
+Move settings binding, AI profile card population, drive enumeration, and drive summary loading out of the constructor.
 
-Expected: system and DWM can create the window, but the user does not see the blank shell.
+Expected: system and DWM can create the window and taskbar button sooner.
 
-- [ ] **Step 4: Reveal after shown cycle**
+- [x] **Step 4: Bind startup data after shown**
 
-In `OnShown`, defer the reveal with `BeginInvoke`, apply bounds if needed, resume redraw, update once, and restore opacity to the previous value.
+In `OnShown`, queue first-frame redraw restoration and then queue startup UI binding.
 
-Expected: the first visible frame already contains the completed AntdUI layout.
+Expected: the first visible frame is stable, and heavier UI data appears after the taskbar button is already available.
 
-- [ ] **Step 5: Guard repeated calls**
+- [x] **Step 6: Preserve minimized restore repaint**
+
+Avoid form opacity changes and paint `WM_ERASEBKGND` with the app background color.
+
+Expected: restoring from minimized state does not flash a black client area.
+
+- [x] **Step 5: Guard repeated calls**
 
 Make reveal idempotent so it cannot run twice during normal startup or later window state changes.
 
-Expected: opacity remains correct after startup.
+Expected: startup reveal and startup binding each run once.
+
+- [x] **Step 7: Suppress startup binding event storms**
+
+Use `loadingStartupUi` to prevent placeholder and real startup binding assignments from triggering repeated drive summary, prompt, and preset recalculation.
+
+Expected: startup data binding updates the UI once and does not reintroduce constructor-time blocking.
 
 ## Task 2: Verification
 
 **Files:**
 - Test: `AiCleanVolume.sln`
 
-- [ ] **Step 1: Build solution**
+- [x] **Step 1: Build solution**
 
 Run: `dotnet build AiCleanVolume.sln -c Debug`
 
 Expected: build succeeds.
 
-- [ ] **Step 2: Review working tree**
+- [x] **Step 2: Review working tree**
 
 Run: `git status --short`
 
 Expected: only the plan document and `MainWindow.cs` are changed by this task, plus any pre-existing unrelated user changes.
 
-- [ ] **Step 3: Manual startup check**
+- [x] **Step 3: Manual startup check**
 
 Launch the desktop executable.
 
-Expected: the app appears only after the first useful frame is ready; the blank white shell is not visible.
+Expected: the taskbar button appears quickly, the app starts with stable placeholder values, and startup data fills in after the first show.
 
 ## Commit
 
