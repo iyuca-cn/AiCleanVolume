@@ -5,7 +5,6 @@ using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using RestSharp;
 
 
 namespace AiCleanVolume.Desktop.Services
@@ -42,11 +41,9 @@ namespace AiCleanVolume.Desktop.Services
                 string accessMode = AiSettings.NormalizeAccessMode(settings.Ai.AccessMode);
                 string path = ResolveChatCompletionsPath(endpoint);
                 WriteLog("AI 请求准备：mode=" + accessMode + " endpoint=" + endpoint + " path=" + path + " model=" + settings.Ai.Model + " candidates=" + (candidates == null ? 0 : candidates.Count) + " promptChars=" + prompt.Length + " maxSuggestions=" + settings.Ai.MaxSuggestions);
-                RestClient client = new RestClient(endpoint);
-                RestRequest request = new RestRequest(path, Method.POST);
-                request.AddHeader("Content-Type", "application/json");
+                Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 string authMessage;
-                if (!AddAuthHeaders(request, settings.Ai, accessMode, out authMessage))
+                if (!AddAuthHeaders(headers, settings.Ai, accessMode, out authMessage))
                 {
                     WriteLog(authMessage + "，使用本地规则。");
                     return fallback.Analyze(root, candidates, settings);
@@ -62,13 +59,12 @@ namespace AiCleanVolume.Desktop.Services
                         new { role = "user", content = prompt }
                     }
                 });
-                request.AddParameter("application/json", body, ParameterType.RequestBody);
                 WriteLog("AI 请求发送：POST " + endpoint + path + " bodyChars=" + body.Length + "。");
 
                 DateTime startedAt = DateTime.UtcNow;
-                IRestResponse response = client.Execute(request);
+                AiHttpResponse response = ExecuteJsonPost(endpoint, path, headers, body);
                 TimeSpan elapsed = DateTime.UtcNow - startedAt;
-                if (response == null || response.ResponseStatus != ResponseStatus.Completed || (int)response.StatusCode >= 400)
+                if (response == null || !response.IsCompleted || response.StatusCode >= 400)
                 {
                     WriteLog("AI 请求失败，使用本地规则。responseNull=" + (response == null) + BuildResponseSummary(response, elapsed));
                     return fallback.Analyze(root, candidates, settings);
@@ -111,11 +107,9 @@ namespace AiCleanVolume.Desktop.Services
                 string endpoint = NormalizeEndpoint(settings.Ai.Endpoint);
                 string accessMode = AiSettings.NormalizeAccessMode(settings.Ai.AccessMode);
                 string path = ResolveChatCompletionsPath(endpoint);
-                RestClient client = new RestClient(endpoint);
-                RestRequest request = new RestRequest(path, Method.POST);
-                request.AddHeader("Content-Type", "application/json");
+                Dictionary<string, string> headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 string authMessage;
-                if (!AddAuthHeaders(request, settings.Ai, accessMode, out authMessage))
+                if (!AddAuthHeaders(headers, settings.Ai, accessMode, out authMessage))
                 {
                     return AiConnectionTestResult.Fail(authMessage);
                 }
@@ -131,13 +125,12 @@ namespace AiCleanVolume.Desktop.Services
                         new { role = "user", content = "请只回复 OK，用于连接测试。" }
                     }
                 });
-                request.AddParameter("application/json", body, ParameterType.RequestBody);
                 WriteLog("AI 配置测试请求发送：POST " + endpoint + path + " model=" + settings.Ai.Model + "。");
 
                 DateTime startedAt = DateTime.UtcNow;
-                IRestResponse response = client.Execute(request);
+                AiHttpResponse response = ExecuteJsonPost(endpoint, path, headers, body);
                 TimeSpan elapsed = DateTime.UtcNow - startedAt;
-                if (response == null || response.ResponseStatus != ResponseStatus.Completed || (int)response.StatusCode >= 400)
+                if (response == null || !response.IsCompleted || response.StatusCode >= 400)
                 {
                     return AiConnectionTestResult.Fail("AI 配置测试失败：" + BuildResponseSummary(response, elapsed));
                 }

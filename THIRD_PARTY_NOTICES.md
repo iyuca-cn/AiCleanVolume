@@ -12,13 +12,14 @@
 | folder-size-ranker-cli | vendored executable snapshot | 扫描磁盘目录大小的 CLI，构建后复制到桌面程序输出目录 | https://github.com/iyuca-cn/folder-size-ranker-cli | MIT | `third_party/folder-size-ranker-cli/LICENSE` |
 | yyjson | vendored in `folder-size-ranker-cli` | `folder-size-ranker-cli` 的 JSON 输出依赖 | https://github.com/ibireme/yyjson | MIT | `third_party/folder-size-ranker-cli/YYJSON-LICENSE` |
 | Newtonsoft.Json | 13.0.3 | 运行时 JSON 序列化 / 反序列化 | https://www.newtonsoft.com/json | MIT | `licenses/Newtonsoft.Json-13.0.3-LICENSE.txt` |
-| RestSharp | 105.2.3 | 运行时 HTTP / REST 客户端 | https://github.com/restsharp/RestSharp | Apache License 2.0 | `licenses/RestSharp-105.2.3-LICENSE.txt` |
+| RestSharp | 106.15.0 (`net48`) | 运行时 HTTP / REST 客户端 | https://github.com/restsharp/RestSharp | Apache License 2.0 | `licenses/RestSharp-106.15.0-LICENSE.txt` |
 
 ## 仅构建期依赖
 
 | 组件 | 版本 | 用途 | 来源 | 许可证 | 本仓库中的许可证文件 |
 | --- | --- | --- | --- | --- | --- |
 | Microsoft.NETFramework.ReferenceAssemblies.net40 | 1.0.3 | 仅构建期引用，`PrivateAssets="all"`，不随应用运行时再次分发 | https://www.nuget.org/packages/Microsoft.NETFramework.ReferenceAssemblies.net40/1.0.3 | MIT | `licenses/Microsoft.NETFramework.ReferenceAssemblies.net40-1.0.3-LICENSE.txt` |
+| Microsoft.NETFramework.ReferenceAssemblies.net48 | 1.0.3 | 仅构建期引用，`PrivateAssets="all"`，不随应用运行时再次分发 | https://www.nuget.org/packages/Microsoft.NETFramework.ReferenceAssemblies.net48/1.0.3 | MIT | `licenses/Microsoft.NETFramework.ReferenceAssemblies.net48-1.0.3-LICENSE.txt` |
 
 ## 分发要求
 

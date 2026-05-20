@@ -5,7 +5,6 @@ using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using RestSharp;
 
 
 namespace AiCleanVolume.Desktop.Services
@@ -38,6 +37,16 @@ namespace AiCleanVolume.Desktop.Services
             public string risk { get; set; }
             public double score { get; set; }
             public string reason { get; set; }
+        }
+
+        private sealed class AiHttpResponse
+        {
+            public int StatusCode { get; set; }
+            public string StatusDescription { get; set; }
+            public string ResponseStatus { get; set; }
+            public string Content { get; set; }
+            public string ErrorMessage { get; set; }
+            public bool IsCompleted { get; set; }
         }
     }
 }

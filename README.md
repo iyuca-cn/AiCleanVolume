@@ -1,6 +1,6 @@
 # AI Clean Volume
 
-基于 `.NET Framework 4.0 + AntdUI` 的 Windows 磁盘清理桌面工具原型。
+基于 `.NET Framework 4.0 / 4.8 + AntdUI` 的 Windows 磁盘清理桌面工具原型。
 
 ## 已实现
 
@@ -31,10 +31,16 @@
    dotnet build E:\work\ai-clean-volume\AiCleanVolume.sln -c Debug
    ```
 
-2. 运行：
+2. 运行 `.NET Framework 4.0` 版本：
 
    ```pwsh
    .\src\AiCleanVolume.Desktop\bin\Debug\net40\AiCleanVolume.exe
+   ```
+
+   运行 `.NET Framework 4.8` 版本：
+
+   ```pwsh
+   .\src\AiCleanVolume.Desktop\bin\Debug\net48\AiCleanVolume.exe
    ```
 
 3. 如需 AI：
@@ -51,5 +57,5 @@
 - 扫描 NTFS 盘时，`folder-size-ranker-cli` 可能需要管理员权限。
 - 当前 OpenAI 兼容实现走 `/v1/chat/completions`。
 - `2API` 模式不会发送 `Authorization`，而是根据当前模型精确匹配 `模型 Cookie` 配置并发送 `X-Provider-Cookie`。
-- 为满足 `.NET Framework 4.0` 约束，当前只能使用 `RestSharp 105.2.3`，构建时会出现已知漏洞告警；如果你允许把目标框架提升到 `net452+`，我建议再升级 RestSharp 版本。
+- 项目会同时生成 `.NET Framework 4.0` 与 `.NET Framework 4.8` 两套产物；`net40` 版本使用框架自带 `HttpWebRequest`，`net48` 版本使用 `RestSharp 106.15.0`，避免继续引用存在高危漏洞告警的 `RestSharp 105.2.3`。
 - 本地为兼容当前 SDK，对 `third_party/AntdUI-v2.3.0/src/AntdUI/AntdUI.csproj` 去掉了 `net10.0-windows` 目标框架。

@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Net;
 using System.Text;
 using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+#if !NET40
 using RestSharp;
+#endif
 
 
 namespace AiCleanVolume.Desktop.Services
@@ -17,7 +21,7 @@ namespace AiCleanVolume.Desktop.Services
             if (log != null) log(message);
         }
 
-        private static bool AddAuthHeaders(RestRequest request, AiSettings settings, string accessMode, out string message)
+        private static bool AddAuthHeaders(IDictionary<string, string> headers, AiSettings settings, string accessMode, out string message)
         {
             if (string.Equals(accessMode, AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase))
             {
@@ -27,15 +31,15 @@ namespace AiCleanVolume.Desktop.Services
                     message = "2API Cookie 为空或未匹配当前模型。model=" + settings.Model + " mappingCount=" + (settings.ModelCookieMappings == null ? 0 : settings.ModelCookieMappings.Count);
                     return false;
                 }
-                request.AddHeader("X-Provider-Cookie", providerCookie);
-                request.AddHeader("Cookie", providerCookie);
+                headers["X-Provider-Cookie"] = providerCookie;
+                headers["Cookie"] = providerCookie;
                 message = "2API Cookie 已添加：" + MaskSecret(providerCookie) + "，长度 " + providerCookie.Length + "。";
                 return true;
             }
 
             if (!string.IsNullOrWhiteSpace(settings.ApiKey))
             {
-                request.AddHeader("Authorization", "Bearer " + settings.ApiKey);
+                headers["Authorization"] = "Bearer " + settings.ApiKey;
                 message = "标准 API Key 已添加：" + MaskSecret(settings.ApiKey) + "。";
                 return true;
             }
@@ -44,11 +48,156 @@ namespace AiCleanVolume.Desktop.Services
             return true;
         }
 
-        private static string BuildResponseSummary(IRestResponse response, TimeSpan elapsed)
+        private static AiHttpResponse ExecuteJsonPost(string endpoint, string path, IDictionary<string, string> headers, string body)
+        {
+#if NET40
+            return ExecuteJsonPostWithHttpWebRequest(endpoint, path, headers, body);
+#else
+            return ExecuteJsonPostWithRestSharp(endpoint, path, headers, body);
+#endif
+        }
+
+#if NET40
+        private static AiHttpResponse ExecuteJsonPostWithHttpWebRequest(string endpoint, string path, IDictionary<string, string> headers, string body)
+        {
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(endpoint + path);
+            request.Method = "POST";
+            request.ContentType = "application/json";
+            request.Accept = "application/json";
+            request.UserAgent = "AiCleanVolume";
+
+            ApplyHeaders(request, headers);
+
+            byte[] bytes = Encoding.UTF8.GetBytes(body ?? string.Empty);
+            request.ContentLength = bytes.Length;
+            using (Stream requestStream = request.GetRequestStream())
+            {
+                requestStream.Write(bytes, 0, bytes.Length);
+            }
+
+            try
+            {
+                using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+                {
+                    return ReadHttpWebResponse(response, null);
+                }
+            }
+            catch (WebException ex)
+            {
+                HttpWebResponse errorResponse = ex.Response as HttpWebResponse;
+                if (errorResponse == null)
+                {
+                    return new AiHttpResponse
+                    {
+                        ResponseStatus = ex.Status.ToString(),
+                        ErrorMessage = ex.Message,
+                        IsCompleted = false
+                    };
+                }
+
+                using (errorResponse)
+                {
+                    return ReadHttpWebResponse(errorResponse, ex.Message);
+                }
+            }
+        }
+
+        private static void ApplyHeaders(HttpWebRequest request, IDictionary<string, string> headers)
+        {
+            if (headers == null) return;
+
+            foreach (KeyValuePair<string, string> header in headers)
+            {
+                if (string.IsNullOrWhiteSpace(header.Key) || header.Value == null) continue;
+
+                if (string.Equals(header.Key, "Accept", StringComparison.OrdinalIgnoreCase))
+                {
+                    request.Accept = header.Value;
+                    continue;
+                }
+
+                if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                {
+                    request.ContentType = header.Value;
+                    continue;
+                }
+
+                if (string.Equals(header.Key, "User-Agent", StringComparison.OrdinalIgnoreCase))
+                {
+                    request.UserAgent = header.Value;
+                    continue;
+                }
+
+                if (string.Equals(header.Key, "Cookie", StringComparison.OrdinalIgnoreCase))
+                {
+                    request.Headers[HttpRequestHeader.Cookie] = header.Value;
+                    continue;
+                }
+
+                request.Headers[header.Key] = header.Value;
+            }
+        }
+
+        private static AiHttpResponse ReadHttpWebResponse(HttpWebResponse response, string errorMessage)
+        {
+            string content = string.Empty;
+            using (Stream responseStream = response.GetResponseStream())
+            {
+                if (responseStream != null)
+                {
+                    using (StreamReader reader = new StreamReader(responseStream, Encoding.UTF8))
+                    {
+                        content = reader.ReadToEnd();
+                    }
+                }
+            }
+
+            return new AiHttpResponse
+            {
+                StatusCode = (int)response.StatusCode,
+                StatusDescription = response.StatusDescription,
+                ResponseStatus = "Completed",
+                Content = content,
+                ErrorMessage = errorMessage,
+                IsCompleted = true
+            };
+        }
+#else
+        private static AiHttpResponse ExecuteJsonPostWithRestSharp(string endpoint, string path, IDictionary<string, string> headers, string body)
+        {
+            RestClient client = new RestClient(endpoint);
+            RestRequest request = new RestRequest(path, Method.POST);
+            request.AddHeader("Content-Type", "application/json");
+            if (headers != null)
+            {
+                foreach (KeyValuePair<string, string> header in headers)
+                {
+                    if (string.IsNullOrWhiteSpace(header.Key) || header.Value == null) continue;
+                    request.AddHeader(header.Key, header.Value);
+                }
+            }
+
+            request.AddParameter("application/json", body, ParameterType.RequestBody);
+            IRestResponse response = client.Execute(request);
+            if (response == null) return null;
+
+            return new AiHttpResponse
+            {
+                StatusCode = (int)response.StatusCode,
+                StatusDescription = response.StatusDescription,
+                ResponseStatus = response.ResponseStatus.ToString(),
+                Content = response.Content,
+                ErrorMessage = response.ErrorMessage,
+                IsCompleted = response.ResponseStatus == ResponseStatus.Completed
+            };
+        }
+#endif
+
+        private static string BuildResponseSummary(AiHttpResponse response, TimeSpan elapsed)
         {
             if (response == null) return " elapsed=" + elapsed.TotalMilliseconds.ToString("0") + "ms";
             string error = string.IsNullOrWhiteSpace(response.ErrorMessage) ? string.Empty : " error=" + response.ErrorMessage;
-            return " status=" + (int)response.StatusCode + " " + response.StatusDescription + " responseStatus=" + response.ResponseStatus + " elapsed=" + elapsed.TotalMilliseconds.ToString("0") + "ms contentChars=" + (response.Content == null ? 0 : response.Content.Length) + error + " contentPreview=" + Preview(response.Content, 500);
+            return " status=" + response.StatusCode + " " + response.StatusDescription + " responseStatus=" + response.ResponseStatus + " elapsed=" + elapsed.TotalMilliseconds.ToString("0") + "ms contentChars=" + (response.Content == null ? 0 : response.Content.Length) + error + " contentPreview=" + Preview(response.Content, 500);
         }
 
         private static string MaskSecret(string value)

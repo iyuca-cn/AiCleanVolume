@@ -5,7 +5,6 @@ using AiCleanVolume.Core.Models;
 using AiCleanVolume.Core.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using RestSharp;
 
 
 namespace AiCleanVolume.Desktop.Services
