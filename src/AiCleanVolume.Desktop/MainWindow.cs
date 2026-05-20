@@ -756,21 +756,13 @@ namespace AiCleanVolume.Desktop
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
 
-            AntdUI.StackPanel scrollHost = CreateVerticalScrollPanel();
-            scrollHost.Dock = DockStyle.Fill;
-            scrollHost.AutoScroll = true;
-            scrollHost.BackColor = PageBackground;
-
-            AntdUI.GridPanel layout = CreateGridPanel("fill;fill;fill-82 370 266");
-            layout.Dock = DockStyle.Top;
-            layout.Height = 718;
+            AntdUI.GridPanel layout = CreateGridPanel("82:fill;fill:fill;190:fill");
+            layout.Dock = DockStyle.Fill;
             layout.BackColor = PageBackground;
-            scrollHost.Resize += delegate
+            layout.Resize += delegate
             {
-                layout.Width = Math.Max(320, scrollHost.ClientSize.Width - 4);
                 ResizeAiProfileCards();
             };
-            layout.Width = Math.Max(320, scrollHost.ClientSize.Width - 4);
 
             Control overviewSection = CreateSettingsOverviewSection();
             Control profilesSection = CreateAiProfileSection();
@@ -783,8 +775,7 @@ namespace AiCleanVolume.Desktop
             AddGridControl(layout, profilesSection, 1);
             AddGridControl(layout, sandboxSection, 2);
 
-            scrollHost.Controls.Add(layout);
-            panel.Controls.Add(scrollHost);
+            panel.Controls.Add(layout);
             panel.Controls.Add(desc);
             panel.Controls.Add(heading);
             return panel;
@@ -1674,7 +1665,7 @@ namespace AiCleanVolume.Desktop
             panel.BackColor = PageBackground;
             panel.Padding = new Padding(20);
 
-            AntdUI.GridPanel pageLayout = CreateGridPanel("fill;fill-56");
+            AntdUI.GridPanel pageLayout = CreateGridPanel("fill;56:fill");
             pageLayout.Dock = DockStyle.Fill;
             pageLayout.BackColor = Color.Transparent;
 
@@ -1684,7 +1675,7 @@ namespace AiCleanVolume.Desktop
             scrollHost.BackColor = PageBackground;
             scrollHost.Padding = new Padding(0, 0, 4, 12);
 
-            AntdUI.GridPanel content = CreateGridPanel("fill;fill;fill;fill-88 196 196 390");
+            AntdUI.GridPanel content = CreateGridPanel("88:fill;196:fill;196:fill;390:fill");
             content.Dock = DockStyle.Top;
             content.BackColor = PageBackground;
             content.Height = 870;
@@ -1742,7 +1733,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.Label desc = CreateSectionDescription("填写接入参数并保存为配置卡片。");
             desc.Dock = DockStyle.Fill;
 
-            AntdUI.GridPanel textLayout = CreateGridPanel("fill;fill-36 30");
+            AntdUI.GridPanel textLayout = CreateGridPanel("36:fill;30:fill");
             textLayout.Dock = DockStyle.Fill;
             AddGridControl(textLayout, title, 0);
             AddGridControl(textLayout, desc, 1);
@@ -1804,7 +1795,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel body;
             AntdUI.Panel section = CreateSettingsGroupPanel("提示词与 Cookie", "多行内容使用完整宽度，避免长文本挤压。", out body);
 
-            AntdUI.GridPanel form = CreateGridPanel("92 fill;fill;fill;fill;fill-44 26 92 26 fill");
+            AntdUI.GridPanel form = CreateGridPanel("44:92 fill;104:92 fill;148:92 fill");
             form.Dock = DockStyle.Fill;
             form.BackColor = Color.Transparent;
 
@@ -1820,9 +1811,9 @@ namespace AiCleanVolume.Desktop
             aiProfilePromptPresetSelect.SelectedValueChanged += AiProfilePromptPresetSelect_SelectedValueChanged;
             aiProfileSystemPromptInput.TextChanged += AiProfileSystemPromptInput_TextChanged;
 
-            AddProfileField(form, "AI 预设", aiProfilePromptPresetSelect, 0, 0);
-            AddFullWidthProfileField(form, "模型 Cookie", aiProfileCookieMappingsInput, 1, 2);
-            AddFullWidthProfileField(form, "系统提示词", aiProfileSystemPromptInput, 3, 4);
+            AddWideProfileField(form, "AI 预设", aiProfilePromptPresetSelect, 0);
+            AddWideProfileField(form, "模型 Cookie", aiProfileCookieMappingsInput, 1);
+            AddWideProfileField(form, "系统提示词", aiProfileSystemPromptInput, 2);
 
             body.Controls.Add(form);
             return section;
@@ -1858,11 +1849,9 @@ namespace AiCleanVolume.Desktop
 
         private static AntdUI.GridPanel CreateTwoColumnProfileForm(int rows)
         {
-            string[] rowSpans = new string[rows];
-            for (int row = 0; row < rows; row++) rowSpans[row] = "92 fill 92 fill";
-            string[] rowHeights = new string[rows];
-            for (int row = 0; row < rows; row++) rowHeights[row] = "44";
-            AntdUI.GridPanel form = CreateGridPanel(string.Join(";", rowSpans) + "-" + string.Join(" ", rowHeights));
+            string[] rowDefinitions = new string[rows];
+            for (int row = 0; row < rows; row++) rowDefinitions[row] = "44:92 fill 92 fill";
+            AntdUI.GridPanel form = CreateGridPanel(string.Join(";", rowDefinitions));
             form.Dock = DockStyle.Fill;
             form.BackColor = Color.Transparent;
             return form;
@@ -1878,13 +1867,14 @@ namespace AiCleanVolume.Desktop
             AddGridControl(form, control, index + 1);
         }
 
-        private static void AddFullWidthProfileField(AntdUI.GridPanel form, string caption, Control control, int labelRow, int controlRow)
+        private static void AddWideProfileField(AntdUI.GridPanel form, string caption, Control control, int row)
         {
             AntdUI.Label label = CreateCaption(caption);
-            label.Margin = new Padding(0, 0, 8, 0);
+            label.Margin = new Padding(0, 0, 8, 8);
             control.Margin = new Padding(0, 0, 0, 8);
-            AddGridControl(form, label, labelRow + 1);
-            AddGridControl(form, control, controlRow + 1);
+            int index = row * 2;
+            AddGridControl(form, label, index);
+            AddGridControl(form, control, index + 1);
         }
 
         private void InitializeAiProfilePageValues()
