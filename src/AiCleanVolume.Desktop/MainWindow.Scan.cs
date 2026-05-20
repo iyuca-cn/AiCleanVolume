@@ -62,6 +62,13 @@ namespace AiCleanVolume.Desktop
             RefreshPromptForCurrentLocation();
         }
 
+        private void SizeModeSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        {
+            if (loadingStartupUi) return;
+            SaveSettingsFromUi();
+            UpdateStorageSizeColumnTitle(ResolveSelectedSizeMode());
+        }
+
         private void ScanCurrentLocation()
         {
             ScanCurrentLocation(null, null);
@@ -109,7 +116,7 @@ namespace AiCleanVolume.Desktop
                 storageTable.DataSource = rows;
                 UpdateDriveSummaryForLocation(result.Path);
                 UpdateScanProgressState("扫描完成 " + elapsed.TotalSeconds.ToString("0.00") + " 秒", 1F, false, AntdUI.TType.Success);
-                Log("扫描完成：" + result.Path + "，大小 " + StorageFormatting.FormatBytes(result.Bytes) + "，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒，子项 " + (result.Children == null ? 0 : result.Children.Count) + "。");
+                Log("扫描完成：" + result.Path + "，" + DescribeSizeMode(request.SortMode) + " " + StorageFormatting.FormatBytes(result.Bytes) + "，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒，子项 " + (result.Children == null ? 0 : result.Children.Count) + "。");
                 if (onCompleted != null) onCompleted();
             }, delegate
             {
@@ -295,7 +302,7 @@ namespace AiCleanVolume.Desktop
                 Location = location,
                 MinSizeBytes = ParseMinSizeBytes(minSizeInput.Text, -1),
                 PerLevelLimit = ParseInt(limitInput.Text, -1),
-                SortMode = sortSelect.SelectedValue is ScanSortMode ? (ScanSortMode)sortSelect.SelectedValue : ScanSortMode.Allocated,
+                SortMode = ResolveSelectedSizeMode(),
                 LoadDepth = loadDepth
             };
         }
@@ -307,7 +314,7 @@ namespace AiCleanVolume.Desktop
                 Location = location,
                 MinSizeBytes = ParseMinSizeBytes(suggestionMinSizeInput == null ? null : suggestionMinSizeInput.Text, 128),
                 PerLevelLimit = ParseInt(suggestionLimitInput == null ? null : suggestionLimitInput.Text, -1),
-                SortMode = sortSelect.SelectedValue is ScanSortMode ? (ScanSortMode)sortSelect.SelectedValue : ScanSortMode.Allocated,
+                SortMode = ResolveSelectedSizeMode(),
                 LoadDepth = loadDepth
             };
         }
@@ -328,7 +335,24 @@ namespace AiCleanVolume.Desktop
         private static string DescribeScanRequest(ScanRequest request)
         {
             if (request == null) return "<null>";
-            return "location=" + request.Location + "，minSize=" + (request.MinSizeBytes < 0 ? "不限" : StorageFormatting.FormatBytes(request.MinSizeBytes)) + "，limit=" + request.PerLevelLimit + "，sort=" + request.SortMode + "，loadDepth=" + request.LoadDepth + "，session=" + request.SessionIdentity + "/" + request.SessionNodeId;
+            return "location=" + request.Location + "，minSize=" + (request.MinSizeBytes < 0 ? "不限" : StorageFormatting.FormatBytes(request.MinSizeBytes)) + "，limit=" + request.PerLevelLimit + "，mode=" + DescribeSizeMode(request.SortMode) + "，loadDepth=" + request.LoadDepth + "，session=" + request.SessionIdentity + "/" + request.SessionNodeId;
+        }
+
+        private ScanSortMode ResolveSelectedSizeMode()
+        {
+            return sortSelect != null && sortSelect.SelectedValue is ScanSortMode ? (ScanSortMode)sortSelect.SelectedValue : ScanSortMode.Allocated;
+        }
+
+        private static string DescribeSizeMode(ScanSortMode mode)
+        {
+            return mode == ScanSortMode.Logical ? "实际大小" : "占用大小";
+        }
+
+        private void UpdateStorageSizeColumnTitle(ScanSortMode mode)
+        {
+            if (storageSizeColumn == null) return;
+            storageSizeColumn.Title = mode == ScanSortMode.Logical ? "实际大小" : "占用大小";
+            if (storageTable != null) storageTable.Invalidate();
         }
 
         private static bool CanReloadStorageNode(StorageItem item)

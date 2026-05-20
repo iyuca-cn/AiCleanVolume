@@ -227,10 +227,6 @@ namespace AiCleanVolume.Desktop
             host.Dock = DockStyle.Fill;
             host.BackColor = Color.Transparent;
 
-            AntdUI.GridPanel topRow = CreateGridPanel("42 192 86 42 fill");
-            topRow.Dock = DockStyle.Fill;
-            topRow.BackColor = Color.Transparent;
-
             driveSelect = new AntdUI.Select();
             driveSelect.Dock = DockStyle.Fill;
             driveSelect.DropDownArrow = true;
@@ -245,26 +241,34 @@ namespace AiCleanVolume.Desktop
             pathInput.PrefixSvg = "FolderOpenOutlined";
             pathInput.TextChanged += PathInput_TextChanged;
 
-            AddGridControl(topRow, CreateToolbarCaption("选择:"), 0);
-            AddGridControl(topRow, driveSelect, 1);
-            AddGridControl(topRow, scanButton, 2);
-            AddGridControl(topRow, CreateToolbarCaption("位置:"), 3);
-            AddGridControl(topRow, pathInput, 4);
-
-            minSizeInput = CreateInput("-1 表示不限");
-            limitInput = CreateInput("-1 表示不限");
-
             sortSelect = new AntdUI.Select();
             sortSelect.Dock = DockStyle.Fill;
             sortSelect.DropDownArrow = true;
             sortSelect.ListAutoWidth = true;
             sortSelect.Font = Font;
-            string[] sortOptionTexts = { "分配大小", "逻辑大小" };
+            string[] sortOptionTexts = { "占用大小", "实际大小" };
             sortSelect.Items.Add(new AntdUI.SelectItem(sortOptionTexts[0], ScanSortMode.Allocated));
             sortSelect.Items.Add(new AntdUI.SelectItem(sortOptionTexts[1], ScanSortMode.Logical));
+            sortSelect.SelectedValueChanged += SizeModeSelect_SelectedValueChanged;
             int sortSelectWidth = MeasureSelectWidth(sortSelect.Font, sortOptionTexts);
             sortSelect.Width = sortSelectWidth;
-            AntdUI.GridPanel bottomRow = CreateGridPanel("42 58 42 58 48 " + sortSelectWidth.ToString() + " fill");
+
+            AntdUI.GridPanel topRow = CreateGridPanel("42 192 86 42 " + sortSelectWidth.ToString() + " 42 fill");
+            topRow.Dock = DockStyle.Fill;
+            topRow.BackColor = Color.Transparent;
+
+            AddGridControl(topRow, CreateToolbarCaption("选择:"), 0);
+            AddGridControl(topRow, driveSelect, 1);
+            AddGridControl(topRow, scanButton, 2);
+            AddGridControl(topRow, CreateToolbarCaption("模式:"), 3);
+            AddGridControl(topRow, sortSelect, 4);
+            AddGridControl(topRow, CreateToolbarCaption("位置:"), 5);
+            AddGridControl(topRow, pathInput, 6);
+
+            minSizeInput = CreateInput("-1 表示不限");
+            limitInput = CreateInput("-1 表示不限");
+
+            AntdUI.GridPanel bottomRow = CreateGridPanel("42 58 42 58 fill");
             bottomRow.Dock = DockStyle.Fill;
             bottomRow.BackColor = Color.Transparent;
 
@@ -272,9 +276,7 @@ namespace AiCleanVolume.Desktop
             AddGridControl(bottomRow, minSizeInput, 1);
             AddGridControl(bottomRow, CreateToolbarCaption("限制:"), 2);
             AddGridControl(bottomRow, limitInput, 3);
-            AddGridControl(bottomRow, CreateToolbarCaption("排序:"), 4);
-            AddGridControl(bottomRow, sortSelect, 5);
-            AddGridControl(bottomRow, CreateGridSpacer(), 6);
+            AddGridControl(bottomRow, CreateGridSpacer(), 4);
 
             AddGridControl(host, topRow, 0);
             AddGridControl(host, bottomRow, 1);

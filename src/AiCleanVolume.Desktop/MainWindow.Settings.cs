@@ -38,6 +38,7 @@ namespace AiCleanVolume.Desktop
             if (suggestionMinSizeInput != null) suggestionMinSizeInput.Text = "128";
             if (suggestionLimitInput != null) suggestionLimitInput.Text = "-1";
             sortSelect.SelectedValue = settings.Scan.SortMode;
+            UpdateStorageSizeColumnTitle(settings.Scan.SortMode);
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(settings.Sandbox.AllowedRoots);
             allowRootsInput.Text = string.Join(Environment.NewLine, new List<string>(settings.Sandbox.AllowedRoots).ToArray());
         }

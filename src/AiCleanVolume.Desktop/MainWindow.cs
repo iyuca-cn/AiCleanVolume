@@ -192,6 +192,8 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Table suggestionTable;
 
+        private AntdUI.Column storageSizeColumn;
+
         private StorageEntryRow storageContextRow;
 
         private AntdUI.Switch aiEnabledSwitch;
@@ -447,10 +449,11 @@ namespace AiCleanVolume.Desktop
 
         private void ConfigureTables()
         {
+            storageSizeColumn = new AntdUI.Column("size", "占用大小", AntdUI.ColumnAlign.Right).SetWidth("126");
             storageTable.Columns = new AntdUI.ColumnCollection
             {
                 new AntdUI.Column("name", "名称").SetTree("Children").SetWidth("auto"),
-                new AntdUI.Column("size", "大小", AntdUI.ColumnAlign.Right).SetWidth("112"),
+                storageSizeColumn,
                 new AntdUI.Column("kind", "类型", AntdUI.ColumnAlign.Center).SetWidth("86"),
                 new AntdUI.Column("files", "文件数", AntdUI.ColumnAlign.Right).SetWidth("90"),
                 new AntdUI.Column("dirs", "子目录", AntdUI.ColumnAlign.Right).SetWidth("90"),
