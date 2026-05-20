@@ -86,18 +86,18 @@ namespace AiCleanVolume.Desktop
         private AntdUI.PageHeader appBar;
         private AntdUI.PageHeader titleBar;
         private AntdUI.Menu navigationMenu;
-        private Panel pageHost;
-        private Panel sidebarHost;
+        private AntdUI.Panel pageHost;
+        private AntdUI.Panel sidebarHost;
         private AntdUI.Panel sidebarPanel;
-        private Panel sidebarBrandPanel;
-        private Label sidebarBrandTextLabel;
-        private Panel sidebarResizeRail;
+        private AntdUI.Panel sidebarBrandPanel;
+        private AntdUI.Label sidebarBrandTextLabel;
+        private AntdUI.Panel sidebarResizeRail;
         private AntdUI.Button settingsNavButton;
-        private Panel scanPage;
-        private Panel suggestionsPage;
-        private Panel logPage;
-        private Panel settingsPage;
-        private Panel aiProfileCreatePage;
+        private AntdUI.Panel scanPage;
+        private AntdUI.Panel suggestionsPage;
+        private AntdUI.Panel logPage;
+        private AntdUI.Panel settingsPage;
+        private AntdUI.Panel aiProfileCreatePage;
         private AntdUI.Button scanButton;
         private AntdUI.Button analyzeButton;
         private AntdUI.Button regularCleanButton;
@@ -121,9 +121,6 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Table storageTable;
         private AntdUI.Table suggestionTable;
-        private ContextMenuStrip storageContextMenu;
-        private ToolStripMenuItem openStorageMenuItem;
-        private ToolStripMenuItem deleteStorageMenuItem;
         private StorageEntryRow storageContextRow;
 
         private AntdUI.Switch aiEnabledSwitch;
@@ -136,7 +133,7 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Input modelInput;
         private AntdUI.Input maxSuggestionsInput;
         private AntdUI.Select aiProfileSelect;
-        private FlowLayoutPanel aiProfileListPanel;
+        private AntdUI.StackPanel aiProfileListPanel;
         private AntdUI.Button applyAiProfileButton;
         private AntdUI.Button addAiProfileButton;
         private AntdUI.Button saveAiProfilePageButton;
@@ -159,17 +156,19 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Input allowRootsInput;
         private AntdUI.Input logInput;
 
-        private Label selectedDriveValueLabel;
-        private Label totalSpaceValueLabel;
-        private Label usedSpaceValueLabel;
-        private Label availableSpaceValueLabel;
-        private Label reservedSpaceValueLabel;
-        private Label scanStatusLabel;
+        private AntdUI.Label selectedDriveValueLabel;
+        private AntdUI.Label totalSpaceValueLabel;
+        private AntdUI.Label usedSpaceValueLabel;
+        private AntdUI.Label availableSpaceValueLabel;
+        private AntdUI.Label reservedSpaceValueLabel;
+        private AntdUI.Label scanStatusLabel;
         private AntdUI.Progress scanProgress;
 
         private readonly string defaultDescription = "选择磁盘或目录，扫描空间占用，生成可确认的安全清理建议";
         private FormWindowState lastWindowState;
         private bool applyingNormalBounds;
+        private bool startupRedrawSuspended;
+        private bool startupRedrawCompleted;
         private bool restoreRedrawSuspended;
         private bool restoreBoundsQueued;
         private bool busy;
@@ -184,6 +183,8 @@ namespace AiCleanVolume.Desktop
         private int sidebarResizeStartX;
         private int sidebarResizeStartWidth;
         private readonly HashSet<string> expandedStoragePaths;
+        private const string StorageContextOpenId = "open";
+        private const string StorageContextDeleteId = "delete";
 
         public MainWindow()
         {
@@ -275,17 +276,17 @@ namespace AiCleanVolume.Desktop
             titleBar.Controls.Add(superCleanButton);
             titleBar.Controls.Add(regularCleanButton);
 
-            DoubleBufferedPanel shell = new DoubleBufferedPanel();
+            AntdUI.Panel shell = CreateFlatPanel();
             shell.Dock = DockStyle.Fill;
             shell.BackColor = SurfaceColor;
             shell.Padding = Padding.Empty;
 
-            DoubleBufferedPanel contentHost = new DoubleBufferedPanel();
+            AntdUI.Panel contentHost = CreateFlatPanel();
             contentHost.Dock = DockStyle.Fill;
             contentHost.BackColor = SurfaceColor;
             contentHost.Padding = Padding.Empty;
 
-            pageHost = new DoubleBufferedPanel();
+            pageHost = CreateFlatPanel();
             pageHost.Dock = DockStyle.Fill;
             pageHost.BackColor = PageBackground;
             pageHost.Padding = new Padding(24, 12, 24, 24);
@@ -326,22 +327,22 @@ namespace AiCleanVolume.Desktop
             ApplySidebarWidth(ResolveInitialSidebarWidth());
         }
 
-        private Panel CreatePageContainer()
+        private AntdUI.Panel CreatePageContainer()
         {
-            Panel page = new DoubleBufferedPanel();
+            AntdUI.Panel page = CreateFlatPanel();
             page.Dock = DockStyle.Fill;
             page.BackColor = PageBackground;
             return page;
         }
 
-        private Panel CreateSidebarHost()
+        private AntdUI.Panel CreateSidebarHost()
         {
-            Panel host = new Panel();
+            AntdUI.Panel host = CreateFlatPanel();
             host.Dock = DockStyle.Left;
             host.Width = SidebarMinWidth + SidebarRailWidth;
             host.BackColor = SurfaceColor;
 
-            sidebarResizeRail = new Panel();
+            sidebarResizeRail = CreateFlatPanel();
             sidebarResizeRail.Dock = DockStyle.Right;
             sidebarResizeRail.Width = SidebarRailWidth;
             sidebarResizeRail.BackColor = PageBackground;
@@ -360,8 +361,8 @@ namespace AiCleanVolume.Desktop
             sidebarPanel.Shadow = 0;
             sidebarPanel.Padding = new Padding(14, 12, 14, 14);
 
-            Panel footerPanel = CreateSidebarFooterPanel();
-            Panel dividerPanel = new Panel();
+            AntdUI.Panel footerPanel = CreateSidebarFooterPanel();
+            AntdUI.Panel dividerPanel = CreateFlatPanel();
             dividerPanel.Dock = DockStyle.Bottom;
             dividerPanel.Height = 1;
             dividerPanel.BackColor = BorderLightColor;
@@ -379,15 +380,15 @@ namespace AiCleanVolume.Desktop
             return host;
         }
 
-        private Panel CreateSidebarBrandPanel()
+        private AntdUI.Panel CreateSidebarBrandPanel()
         {
-            Panel brandPanel = new Panel();
+            AntdUI.Panel brandPanel = CreateFlatPanel();
             brandPanel.Dock = DockStyle.Top;
             brandPanel.Height = 70;
             brandPanel.Padding = new Padding(6, 10, 6, 14);
             brandPanel.BackColor = Color.Transparent;
 
-            sidebarBrandTextLabel = new Label();
+            sidebarBrandTextLabel = new AntdUI.Label();
             sidebarBrandTextLabel.Dock = DockStyle.Fill;
             sidebarBrandTextLabel.Text = AppDisplayName;
             sidebarBrandTextLabel.Font = new Font("Microsoft YaHei UI", 14F, FontStyle.Bold);
@@ -429,9 +430,9 @@ namespace AiCleanVolume.Desktop
             return menu;
         }
 
-        private Panel CreateSidebarFooterPanel()
+        private AntdUI.Panel CreateSidebarFooterPanel()
         {
-            Panel footerPanel = new Panel();
+            AntdUI.Panel footerPanel = CreateFlatPanel();
             footerPanel.Dock = DockStyle.Bottom;
             footerPanel.Height = 64;
             footerPanel.Padding = new Padding(10, 10, 10, 10);
@@ -457,7 +458,7 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateScanToolbarPanel()
         {
-            Panel toolbarHost = new Panel();
+            AntdUI.Panel toolbarHost = CreateFlatPanel();
             toolbarHost.Dock = DockStyle.Top;
             toolbarHost.BackColor = PageBackground;
             toolbarHost.Height = 188;
@@ -468,34 +469,27 @@ namespace AiCleanVolume.Desktop
             toolbarCard.Shadow = 14;
             toolbarCard.ShadowOpacity = 0.07F;
 
-            TableLayoutPanel toolbarLayout = new TableLayoutPanel();
+            AntdUI.GridPanel toolbarLayout = CreateGridPanel("fill 1 336");
             toolbarLayout.Dock = DockStyle.Fill;
             toolbarLayout.BackColor = Color.Transparent;
-            toolbarLayout.ColumnCount = 3;
-            toolbarLayout.RowCount = 3;
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 1F));
-            toolbarLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 336F));
-            toolbarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-            toolbarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-            toolbarLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             Control filtersPanel = CreateScanFiltersPanel();
-            Panel divider = new Panel();
+            AntdUI.Divider divider = new AntdUI.Divider();
             divider.Dock = DockStyle.Fill;
-            divider.BackColor = BorderLightColor;
+            divider.Vertical = true;
+            divider.ColorSplit = BorderLightColor;
             divider.Margin = new Padding(18, 4, 18, 8);
 
             Control summaryPanel = CreateDriveSummaryPanel();
             Control statusPanel = CreateScanStatusPanel();
+            AntdUI.GridPanel leftLayout = CreateGridPanel("84:fill;fill:fill");
+            leftLayout.Dock = DockStyle.Fill;
+            AddGridControl(leftLayout, filtersPanel, 0);
+            AddGridControl(leftLayout, statusPanel, 1);
 
-            toolbarLayout.Controls.Add(filtersPanel, 0, 0);
-            toolbarLayout.SetRowSpan(filtersPanel, 2);
-            toolbarLayout.Controls.Add(divider, 1, 0);
-            toolbarLayout.SetRowSpan(divider, 3);
-            toolbarLayout.Controls.Add(summaryPanel, 2, 0);
-            toolbarLayout.SetRowSpan(summaryPanel, 3);
-            toolbarLayout.Controls.Add(statusPanel, 0, 2);
+            AddGridControl(toolbarLayout, leftLayout, 0);
+            AddGridControl(toolbarLayout, divider, 1);
+            AddGridControl(toolbarLayout, summaryPanel, 2);
 
             toolbarCard.Controls.Add(toolbarLayout);
             toolbarHost.Controls.Add(toolbarCard);
@@ -504,23 +498,13 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateScanFiltersPanel()
         {
-            TableLayoutPanel host = new TableLayoutPanel();
+            AntdUI.GridPanel host = CreateGridPanel("42:fill;42:fill");
             host.Dock = DockStyle.Fill;
             host.BackColor = Color.Transparent;
-            host.RowCount = 2;
-            host.ColumnCount = 1;
-            host.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-            host.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
 
-            TableLayoutPanel topRow = new TableLayoutPanel();
+            AntdUI.GridPanel topRow = CreateGridPanel("48 216 92 48 fill");
             topRow.Dock = DockStyle.Fill;
             topRow.BackColor = Color.Transparent;
-            topRow.ColumnCount = 5;
-            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 216F));
-            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            topRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
             driveSelect = new AntdUI.Select();
             driveSelect.Dock = DockStyle.Fill;
@@ -536,23 +520,11 @@ namespace AiCleanVolume.Desktop
             pathInput.PrefixSvg = "FolderOpenOutlined";
             pathInput.TextChanged += PathInput_TextChanged;
 
-            topRow.Controls.Add(CreateToolbarCaption("选择:"), 0, 0);
-            topRow.Controls.Add(driveSelect, 1, 0);
-            topRow.Controls.Add(scanButton, 2, 0);
-            topRow.Controls.Add(CreateToolbarCaption("位置:"), 3, 0);
-            topRow.Controls.Add(pathInput, 4, 0);
-
-            TableLayoutPanel bottomRow = new TableLayoutPanel();
-            bottomRow.Dock = DockStyle.Fill;
-            bottomRow.BackColor = Color.Transparent;
-            bottomRow.ColumnCount = 7;
-            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));
-            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 58F));
-            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
-            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            bottomRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            AddGridControl(topRow, CreateToolbarCaption("选择:"), 0);
+            AddGridControl(topRow, driveSelect, 1);
+            AddGridControl(topRow, scanButton, 2);
+            AddGridControl(topRow, CreateToolbarCaption("位置:"), 3);
+            AddGridControl(topRow, pathInput, 4);
 
             minSizeInput = CreateInput("-1 表示不限");
             limitInput = CreateInput("-1 表示不限");
@@ -566,36 +538,29 @@ namespace AiCleanVolume.Desktop
             sortSelect.Items.Add(new AntdUI.SelectItem(sortOptionTexts[0], ScanSortMode.Allocated));
             sortSelect.Items.Add(new AntdUI.SelectItem(sortOptionTexts[1], ScanSortMode.Logical));
             int sortSelectWidth = MeasureSelectWidth(sortSelect.Font, sortOptionTexts);
-            bottomRow.ColumnStyles[5].Width = sortSelectWidth;
             sortSelect.Width = sortSelectWidth;
+            AntdUI.GridPanel bottomRow = CreateGridPanel("48 58 48 58 56 " + sortSelectWidth.ToString() + " fill");
+            bottomRow.Dock = DockStyle.Fill;
+            bottomRow.BackColor = Color.Transparent;
 
-            bottomRow.Controls.Add(CreateToolbarCaption("最小:"), 0, 0);
-            bottomRow.Controls.Add(minSizeInput, 1, 0);
-            bottomRow.Controls.Add(CreateToolbarCaption("限制:"), 2, 0);
-            bottomRow.Controls.Add(limitInput, 3, 0);
-            bottomRow.Controls.Add(CreateToolbarCaption("排序:"), 4, 0);
-            bottomRow.Controls.Add(sortSelect, 5, 0);
+            AddGridControl(bottomRow, CreateToolbarCaption("最小:"), 0);
+            AddGridControl(bottomRow, minSizeInput, 1);
+            AddGridControl(bottomRow, CreateToolbarCaption("限制:"), 2);
+            AddGridControl(bottomRow, limitInput, 3);
+            AddGridControl(bottomRow, CreateToolbarCaption("排序:"), 4);
+            AddGridControl(bottomRow, sortSelect, 5);
+            AddGridControl(bottomRow, CreateGridSpacer(), 6);
 
-            host.Controls.Add(topRow, 0, 0);
-            host.Controls.Add(bottomRow, 0, 1);
+            AddGridControl(host, topRow, 0);
+            AddGridControl(host, bottomRow, 1);
             return host;
         }
 
         private Control CreateDriveSummaryPanel()
         {
-            TableLayoutPanel layout = new TableLayoutPanel();
+            AntdUI.GridPanel layout = CreateGridPanel("24:48 fill;24:48 fill 48 96;24:48 fill;24:48 fill");
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 4;
-            layout.RowCount = 4;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
             layout.Padding = new Padding(0, 2, 0, 0);
 
             selectedDriveValueLabel = CreateSummaryValueLabel(true);
@@ -605,33 +570,27 @@ namespace AiCleanVolume.Desktop
             availableSpaceValueLabel = CreateSummaryValueLabel(true);
             reservedSpaceValueLabel = CreateSummaryValueLabel(true);
 
-            layout.Controls.Add(CreateSummaryCaption("选择:"), 0, 0);
-            layout.Controls.Add(selectedDriveValueLabel, 1, 0);
-            layout.SetColumnSpan(selectedDriveValueLabel, 3);
-
-            layout.Controls.Add(CreateSummaryCaption("总空间:"), 0, 1);
-            layout.Controls.Add(totalSpaceValueLabel, 1, 1);
-            layout.Controls.Add(CreateSummaryCaption("预留:"), 2, 1);
-            layout.Controls.Add(reservedSpaceValueLabel, 3, 1);
-
-            layout.Controls.Add(CreateSummaryCaption("已用:"), 0, 2);
-            layout.Controls.Add(usedSpaceValueLabel, 1, 2);
-            layout.SetColumnSpan(usedSpaceValueLabel, 3);
-
-            layout.Controls.Add(CreateSummaryCaption("可用:"), 0, 3);
-            layout.Controls.Add(availableSpaceValueLabel, 1, 3);
-            layout.SetColumnSpan(availableSpaceValueLabel, 3);
+            AddGridControl(layout, CreateSummaryCaption("选择:"), 0);
+            AddGridControl(layout, selectedDriveValueLabel, 1);
+            AddGridControl(layout, CreateSummaryCaption("总空间:"), 2);
+            AddGridControl(layout, totalSpaceValueLabel, 3);
+            AddGridControl(layout, CreateSummaryCaption("预留:"), 4);
+            AddGridControl(layout, reservedSpaceValueLabel, 5);
+            AddGridControl(layout, CreateSummaryCaption("已用:"), 6);
+            AddGridControl(layout, usedSpaceValueLabel, 7);
+            AddGridControl(layout, CreateSummaryCaption("可用:"), 8);
+            AddGridControl(layout, availableSpaceValueLabel, 9);
             return layout;
         }
 
         private Control CreateScanStatusPanel()
         {
-            Panel panel = new Panel();
+            AntdUI.Panel panel = CreateFlatPanel();
             panel.Dock = DockStyle.Fill;
             panel.BackColor = Color.Transparent;
             panel.Padding = new Padding(0, 6, 0, 0);
 
-            scanStatusLabel = new Label();
+            scanStatusLabel = new AntdUI.Label();
             scanStatusLabel.Dock = DockStyle.Top;
             scanStatusLabel.Height = 20;
             scanStatusLabel.Font = new Font("Microsoft YaHei UI", 9F);
@@ -670,37 +629,8 @@ namespace AiCleanVolume.Desktop
             storageTable.CellDoubleClick += StorageTable_CellDoubleClick;
             storageTable.KeyDown += StorageTable_KeyDown;
 
-            storageContextMenu = new ContextMenuStrip();
-            openStorageMenuItem = new ToolStripMenuItem("在文件资源管理器打开");
-            openStorageMenuItem.Click += OpenStorageMenuItem_Click;
-            deleteStorageMenuItem = new ToolStripMenuItem("删除");
-            deleteStorageMenuItem.Click += DeleteStorageMenuItem_Click;
-            storageContextMenu.Items.Add(openStorageMenuItem);
-            storageContextMenu.Items.Add(new ToolStripSeparator());
-            storageContextMenu.Items.Add(deleteStorageMenuItem);
-
             panel.Controls.Add(storageTable);
             return panel;
-        }
-
-        private Control CreateSuggestionAndLogPage()
-        {
-            TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
-            layout.RowCount = 2;
-            layout.ColumnCount = 1;
-            layout.BackColor = PageBackground;
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 64F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 36F));
-
-            Control suggestionPanel = CreateSuggestionPanel();
-            Control logPanel = CreateLogPanel();
-            suggestionPanel.Margin = new Padding(0, 0, 0, 12);
-            logPanel.Margin = Padding.Empty;
-
-            layout.Controls.Add(suggestionPanel, 0, 0);
-            layout.Controls.Add(logPanel, 0, 1);
-            return layout;
         }
 
         private Control CreateSuggestionPanel()
@@ -708,11 +638,11 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel panel = CreateCardPanel(20);
             panel.Dock = DockStyle.Fill;
 
-            Label heading = CreateSectionTitle("清理建议");
+            AntdUI.Label heading = CreateSectionTitle("清理建议");
 
-            Label desc = CreateSectionDescription("支持“常规清理”（仅内置/配置路径汇总）、“超级清理”（扫描规则）和“AI 识别”；列表默认勾选可安全处理项。");
+            AntdUI.Label desc = CreateSectionDescription("支持“常规清理”（仅内置/配置路径汇总）、“超级清理”（扫描规则）和“AI 识别”；列表默认勾选可安全处理项。");
 
-            Panel optionsBar = new Panel();
+            AntdUI.Panel optionsBar = CreateFlatPanel();
             optionsBar.Dock = DockStyle.Top;
             optionsBar.Height = 34;
             optionsBar.Padding = new Padding(0, 0, 0, 6);
@@ -739,19 +669,11 @@ namespace AiCleanVolume.Desktop
             optionsBar.Controls.Add(clearAllSuggestionsButton);
             optionsBar.Controls.Add(selectAllSuggestionsButton);
 
-            TableLayoutPanel scanOptionsBar = new TableLayoutPanel();
+            AntdUI.GridPanel scanOptionsBar = CreateGridPanel("48 160 150 78 90 78 fill");
             scanOptionsBar.Dock = DockStyle.Top;
             scanOptionsBar.Height = 42;
             scanOptionsBar.Padding = new Padding(0, 0, 0, 8);
             scanOptionsBar.BackColor = Color.Transparent;
-            scanOptionsBar.ColumnCount = 7;
-            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160F));
-            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150F));
-            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78F));
-            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90F));
-            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78F));
-            scanOptionsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
             suggestionDriveSelect = CreateSelect();
             suggestionDriveSelect.ListAutoWidth = true;
@@ -761,12 +683,13 @@ namespace AiCleanVolume.Desktop
             suggestionLimitInput = CreateInput("数量限制，-1 不限");
             suggestionLimitInput.Text = "-1";
 
-            scanOptionsBar.Controls.Add(CreateToolbarCaption("盘符:"), 0, 0);
-            scanOptionsBar.Controls.Add(suggestionDriveSelect, 1, 0);
-            scanOptionsBar.Controls.Add(CreateToolbarCaption("最小值（MB）:"), 2, 0);
-            scanOptionsBar.Controls.Add(suggestionMinSizeInput, 3, 0);
-            scanOptionsBar.Controls.Add(CreateToolbarCaption("数量限制:"), 4, 0);
-            scanOptionsBar.Controls.Add(suggestionLimitInput, 5, 0);
+            AddGridControl(scanOptionsBar, CreateToolbarCaption("盘符:"), 0);
+            AddGridControl(scanOptionsBar, suggestionDriveSelect, 1);
+            AddGridControl(scanOptionsBar, CreateToolbarCaption("最小值（MB）:"), 2);
+            AddGridControl(scanOptionsBar, suggestionMinSizeInput, 3);
+            AddGridControl(scanOptionsBar, CreateToolbarCaption("数量限制:"), 4);
+            AddGridControl(scanOptionsBar, suggestionLimitInput, 5);
+            AddGridControl(scanOptionsBar, CreateGridSpacer(), 6);
 
             suggestionTable = new AntdUI.Table();
             suggestionTable.Dock = DockStyle.Fill;
@@ -786,13 +709,13 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateSettingsPanel()
         {
-            Panel panel = new DoubleBufferedPanel();
+            AntdUI.Panel panel = CreateFlatPanel();
             panel.Dock = DockStyle.Fill;
             panel.BackColor = PageBackground;
             panel.Padding = new Padding(20);
 
-            Label heading = CreateSectionTitle("设置");
-            Label desc = CreateSectionDescription("管理 AI 接入、提示词、沙盒白名单和删除策略。");
+            AntdUI.Label heading = CreateSectionTitle("设置");
+            AntdUI.Label desc = CreateSectionDescription("管理 AI 接入、提示词、沙盒白名单和删除策略。");
 
             aiEnabledSwitch = CreateSettingsSwitch();
             testAiSettingsButton = CreateSettingsActionButton("测试 AI", AntdUI.TTypeMini.Default);
@@ -833,22 +756,15 @@ namespace AiCleanVolume.Desktop
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
 
-            Panel scrollHost = new SmoothScrollPanel();
+            AntdUI.StackPanel scrollHost = CreateVerticalScrollPanel();
             scrollHost.Dock = DockStyle.Fill;
             scrollHost.AutoScroll = true;
             scrollHost.BackColor = PageBackground;
 
-            TableLayoutPanel layout = new TableLayoutPanel();
+            AntdUI.GridPanel layout = CreateGridPanel("fill;fill;fill-82 370 266");
             layout.Dock = DockStyle.Top;
             layout.Height = 718;
             layout.BackColor = PageBackground;
-            layout.ColumnCount = 2;
-            layout.RowCount = 3;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 82F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 370F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 266F));
             scrollHost.Resize += delegate
             {
                 layout.Width = Math.Max(320, scrollHost.ClientSize.Width - 4);
@@ -863,12 +779,9 @@ namespace AiCleanVolume.Desktop
             profilesSection.Margin = new Padding(0, 0, 0, 12);
             sandboxSection.Margin = new Padding(0);
 
-            layout.Controls.Add(overviewSection, 0, 0);
-            layout.SetColumnSpan(overviewSection, 2);
-            layout.Controls.Add(profilesSection, 0, 1);
-            layout.SetColumnSpan(profilesSection, 2);
-            layout.Controls.Add(sandboxSection, 0, 2);
-            layout.SetColumnSpan(sandboxSection, 2);
+            AddGridControl(layout, overviewSection, 0);
+            AddGridControl(layout, profilesSection, 1);
+            AddGridControl(layout, sandboxSection, 2);
 
             scrollHost.Controls.Add(layout);
             panel.Controls.Add(scrollHost);
@@ -881,28 +794,19 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel section = CreateSettingsSurfacePanel(12);
 
-            TableLayoutPanel layout = new TableLayoutPanel();
+            AntdUI.GridPanel layout = CreateGridPanel("48 78 84 78 86 104 fill");
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 7;
-            layout.RowCount = 1;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             maxSuggestionsInput.Margin = new Padding(0, 8, 0, 8);
 
-            layout.Controls.Add(CreateCaption("AI"), 0, 0);
-            layout.Controls.Add(aiEnabledSwitch, 1, 0);
-            layout.Controls.Add(CreateCaption("回收站"), 2, 0);
-            layout.Controls.Add(recycleSwitch, 3, 0);
-            layout.Controls.Add(CreateCaption("建议条数"), 4, 0);
-            layout.Controls.Add(maxSuggestionsInput, 5, 0);
+            AddGridControl(layout, CreateCaption("AI"), 0);
+            AddGridControl(layout, aiEnabledSwitch, 1);
+            AddGridControl(layout, CreateCaption("回收站"), 2);
+            AddGridControl(layout, recycleSwitch, 3);
+            AddGridControl(layout, CreateCaption("建议条数"), 4);
+            AddGridControl(layout, maxSuggestionsInput, 5);
+            AddGridControl(layout, CreateGridSpacer(), 6);
 
             section.Controls.Add(layout);
             return section;
@@ -910,62 +814,45 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateAiProfileSection()
         {
-            Panel body;
+            AntdUI.Panel body;
             AntdUI.Panel section = CreateSettingsGroupPanel("AI 配置", "最近保存的接口、模型和访问方式会显示在这里。", out body);
 
-            TableLayoutPanel layout = new TableLayoutPanel();
+            AntdUI.GridPanel layout = CreateGridPanel("fill 230 108 116 46;fill-44 fill");
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 5;
-            layout.RowCount = 2;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 230F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 46F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            Label hint = CreateSmallMutedLabel("点击卡片选择配置，右侧按钮可直接应用到当前设置。");
+            AntdUI.Label hint = CreateSmallMutedLabel("点击卡片选择配置，右侧按钮可直接应用到当前设置。");
             privilegedCheckbox.Margin = new Padding(0, 4, 8, 4);
-            layout.Controls.Add(hint, 0, 0);
-            layout.Controls.Add(privilegedCheckbox, 1, 0);
-            layout.Controls.Add(testAiSettingsButton, 2, 0);
-            layout.Controls.Add(applyAiProfileButton, 3, 0);
-            layout.Controls.Add(addAiProfileButton, 4, 0);
+            AddGridControl(layout, hint, 0);
+            AddGridControl(layout, privilegedCheckbox, 1);
+            AddGridControl(layout, testAiSettingsButton, 2);
+            AddGridControl(layout, applyAiProfileButton, 3);
+            AddGridControl(layout, addAiProfileButton, 4);
 
-            aiProfileListPanel = new DoubleBufferedFlowLayoutPanel();
+            aiProfileListPanel = CreateVerticalScrollPanel();
             aiProfileListPanel.Dock = DockStyle.Fill;
             aiProfileListPanel.BackColor = SurfaceColor;
-            aiProfileListPanel.FlowDirection = FlowDirection.TopDown;
-            aiProfileListPanel.WrapContents = false;
             aiProfileListPanel.AutoScroll = true;
             aiProfileListPanel.Padding = new Padding(0);
             aiProfileListPanel.Margin = new Padding(0);
             aiProfileListPanel.Resize += delegate { ResizeAiProfileCards(); };
 
-            layout.Controls.Add(aiProfileListPanel, 0, 1);
-            layout.SetColumnSpan(aiProfileListPanel, 5);
+            AddGridControl(layout, aiProfileListPanel, 5);
             body.Controls.Add(layout);
             return section;
         }
 
         private Control CreateSandboxSection()
         {
-            Panel body;
+            AntdUI.Panel body;
             AntdUI.Panel section = CreateSettingsGroupPanel("沙盒范围", "允许位置内的路径可直接执行删除，其他位置会继续确认。", out body);
 
-            TableLayoutPanel layout = new TableLayoutPanel();
+            AntdUI.GridPanel layout = CreateGridPanel("fill;fill-26 fill");
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 1;
-            layout.RowCount = 2;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            layout.Controls.Add(CreateSmallMutedLabel("允许位置"), 0, 0);
-            layout.Controls.Add(allowRootsInput, 0, 1);
+            AddGridControl(layout, CreateSmallMutedLabel("允许位置"), 0);
+            AddGridControl(layout, allowRootsInput, 1);
 
             body.Controls.Add(layout);
             return section;
@@ -984,16 +871,16 @@ namespace AiCleanVolume.Desktop
             return panel;
         }
 
-        private static AntdUI.Panel CreateSettingsGroupPanel(string title, string description, out Panel body)
+        private static AntdUI.Panel CreateSettingsGroupPanel(string title, string description, out AntdUI.Panel body)
         {
             AntdUI.Panel panel = CreateSettingsSurfacePanel(16);
 
-            Label titleLabel = CreateSettingsGroupTitle(title);
-            Label descLabel = CreateSmallMutedLabel(description);
+            AntdUI.Label titleLabel = CreateSettingsGroupTitle(title);
+            AntdUI.Label descLabel = CreateSmallMutedLabel(description);
             descLabel.Dock = DockStyle.Top;
             descLabel.Height = 22;
 
-            body = new DoubleBufferedPanel();
+            body = CreateFlatPanel();
             body.Dock = DockStyle.Fill;
             body.BackColor = Color.Transparent;
             body.Padding = new Padding(0, 8, 0, 0);
@@ -1004,29 +891,9 @@ namespace AiCleanVolume.Desktop
             return panel;
         }
 
-        private static TableLayoutPanel CreateSettingsFieldGrid(int rows)
+        private static AntdUI.Label CreateSettingsGroupTitle(string text)
         {
-            TableLayoutPanel layout = new TableLayoutPanel();
-            layout.Dock = DockStyle.Fill;
-            layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 4;
-            layout.RowCount = rows;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            return layout;
-        }
-
-        private static void AddSettingsField(TableLayoutPanel layout, string caption, Control control, int column, int row)
-        {
-            layout.Controls.Add(CreateCaption(caption), column, row);
-            layout.Controls.Add(control, column + 1, row);
-        }
-
-        private static Label CreateSettingsGroupTitle(string text)
-        {
-            Label label = new Label();
+            AntdUI.Label label = new AntdUI.Label();
             label.Dock = DockStyle.Top;
             label.Height = 26;
             label.Text = text;
@@ -1037,9 +904,9 @@ namespace AiCleanVolume.Desktop
             return label;
         }
 
-        private static Label CreateSmallMutedLabel(string text)
+        private static AntdUI.Label CreateSmallMutedLabel(string text)
         {
-            Label label = new Label();
+            AntdUI.Label label = new AntdUI.Label();
             label.Dock = DockStyle.Fill;
             label.Text = text;
             label.TextAlign = ContentAlignment.MiddleLeft;
@@ -1054,7 +921,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel panel = CreateCardPanel(20);
             panel.Dock = DockStyle.Fill;
 
-            Label heading = CreateSectionTitle("执行日志");
+            AntdUI.Label heading = CreateSectionTitle("执行日志");
 
             logInput = CreateInput(string.Empty);
             logInput.Dock = DockStyle.Fill;
@@ -1695,12 +1562,12 @@ namespace AiCleanVolume.Desktop
                 SaveCurrentAiProfileAutomatic();
                 settingsStore.Save(settings);
                 Log("配置已保存。");
-                MessageBox.Show(this, "配置已保存。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowInfo("完成", "配置已保存。");
             }
             catch (Exception ex)
             {
                 Log("保存配置失败：" + ex.Message);
-                MessageBox.Show(this, ex.Message, "保存失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError("保存失败", ex.Message);
             }
         }
 
@@ -1749,7 +1616,7 @@ namespace AiCleanVolume.Desktop
             catch (Exception ex)
             {
                 Log("AI 配置测试准备失败：" + ex.Message);
-                MessageBox.Show(this, ex.Message, "测试失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError("测试失败", ex.Message);
                 return;
             }
 
@@ -1763,7 +1630,7 @@ namespace AiCleanVolume.Desktop
                 LogBackground(resultMessage);
             }, delegate
             {
-                MessageBox.Show(this, resultMessage ?? "AI 配置测试完成。", success ? "测试成功" : "测试失败", MessageBoxButtons.OK, success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                ShowNotice(success ? "测试成功" : "测试失败", resultMessage ?? "AI 配置测试完成。", success ? AntdUI.TType.Success : AntdUI.TType.Warn);
             });
         }
 
@@ -1802,41 +1669,29 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateAiProfileCreatePage()
         {
-            Panel panel = new DoubleBufferedPanel();
+            AntdUI.Panel panel = CreateFlatPanel();
             panel.Dock = DockStyle.Fill;
             panel.BackColor = PageBackground;
             panel.Padding = new Padding(20);
 
-            TableLayoutPanel pageLayout = new TableLayoutPanel();
+            AntdUI.GridPanel pageLayout = CreateGridPanel("fill;fill-56");
             pageLayout.Dock = DockStyle.Fill;
             pageLayout.BackColor = Color.Transparent;
-            pageLayout.ColumnCount = 1;
-            pageLayout.RowCount = 2;
-            pageLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            pageLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            pageLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56F));
 
-            Panel scrollHost = new SmoothScrollPanel();
+            AntdUI.StackPanel scrollHost = CreateVerticalScrollPanel();
             scrollHost.Dock = DockStyle.Fill;
             scrollHost.AutoScroll = true;
             scrollHost.BackColor = PageBackground;
             scrollHost.Padding = new Padding(0, 0, 4, 12);
 
-            TableLayoutPanel content = new TableLayoutPanel();
+            AntdUI.GridPanel content = CreateGridPanel("fill;fill;fill;fill-88 196 196 390");
             content.Dock = DockStyle.Top;
             content.BackColor = PageBackground;
-            content.ColumnCount = 1;
-            content.RowCount = 4;
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 88F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 196F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 196F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 390F));
             content.Height = 870;
             content.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
             scrollHost.Resize += delegate { content.Width = Math.Max(720, scrollHost.ClientSize.Width - 8); };
 
-            Panel header = CreateAiProfileCreateHeader();
+            AntdUI.Panel header = CreateAiProfileCreateHeader();
             Control basicSection = CreateAiProfileBasicSection();
             Control endpointSection = CreateAiProfileEndpointSection();
             Control promptSection = CreateAiProfilePromptSection();
@@ -1845,34 +1700,28 @@ namespace AiCleanVolume.Desktop
             endpointSection.Margin = new Padding(0, 0, 0, 12);
             promptSection.Margin = new Padding(0);
 
-            content.Controls.Add(header, 0, 0);
-            content.Controls.Add(basicSection, 0, 1);
-            content.Controls.Add(endpointSection, 0, 2);
-            content.Controls.Add(promptSection, 0, 3);
+            AddGridControl(content, header, 0);
+            AddGridControl(content, basicSection, 1);
+            AddGridControl(content, endpointSection, 2);
+            AddGridControl(content, promptSection, 3);
             scrollHost.Controls.Add(content);
 
-            Panel footer = CreateAiProfileCreateFooter();
-            pageLayout.Controls.Add(scrollHost, 0, 0);
-            pageLayout.Controls.Add(footer, 0, 1);
+            AntdUI.Panel footer = CreateAiProfileCreateFooter();
+            AddGridControl(pageLayout, scrollHost, 0);
+            AddGridControl(pageLayout, footer, 1);
             panel.Controls.Add(pageLayout);
             return panel;
         }
 
-        private Panel CreateAiProfileCreateHeader()
+        private AntdUI.Panel CreateAiProfileCreateHeader()
         {
-            Panel header = new DoubleBufferedPanel();
+            AntdUI.Panel header = CreateFlatPanel();
             header.Dock = DockStyle.Fill;
             header.BackColor = PageBackground;
 
-            TableLayoutPanel layout = new TableLayoutPanel();
+            AntdUI.GridPanel layout = CreateGridPanel("48 fill");
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 2;
-            layout.RowCount = 2;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
 
             backAiProfilePageButton = new AntdUI.Button();
             backAiProfilePageButton.Dock = DockStyle.Fill;
@@ -1888,25 +1737,28 @@ namespace AiCleanVolume.Desktop
             backAiProfilePageButton.WaveSize = 2;
             backAiProfilePageButton.Click += delegate { CancelAiProfileCreatePage(); };
 
-            Label title = CreateSectionTitle("新增 AI 配置");
+            AntdUI.Label title = CreateSectionTitle("新增 AI 配置");
             title.Dock = DockStyle.Fill;
-            Label desc = CreateSectionDescription("填写接入参数并保存为配置卡片。");
+            AntdUI.Label desc = CreateSectionDescription("填写接入参数并保存为配置卡片。");
             desc.Dock = DockStyle.Fill;
 
-            layout.Controls.Add(backAiProfilePageButton, 0, 0);
-            layout.SetRowSpan(backAiProfilePageButton, 2);
-            layout.Controls.Add(title, 1, 0);
-            layout.Controls.Add(desc, 1, 1);
+            AntdUI.GridPanel textLayout = CreateGridPanel("fill;fill-36 30");
+            textLayout.Dock = DockStyle.Fill;
+            AddGridControl(textLayout, title, 0);
+            AddGridControl(textLayout, desc, 1);
+
+            AddGridControl(layout, backAiProfilePageButton, 0);
+            AddGridControl(layout, textLayout, 1);
             header.Controls.Add(layout);
             return header;
         }
 
         private Control CreateAiProfileBasicSection()
         {
-            Panel body;
+            AntdUI.Panel body;
             AntdUI.Panel section = CreateSettingsGroupPanel("基础信息", "命名这套配置，并选择访问方式。", out body);
 
-            TableLayoutPanel form = CreateTwoColumnProfileForm(2);
+            AntdUI.GridPanel form = CreateTwoColumnProfileForm(2);
             aiProfileNameInput = CreateInput("例如：开发环境");
             aiProfileAccessModeSelect = CreateSelect();
             PopulateAiAccessModes(aiProfileAccessModeSelect);
@@ -1924,10 +1776,10 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateAiProfileEndpointSection()
         {
-            Panel body;
+            AntdUI.Panel body;
             AntdUI.Panel section = CreateSettingsGroupPanel("接口参数", "配置 OpenAI 兼容接口地址、密钥和模型。", out body);
 
-            TableLayoutPanel form = CreateTwoColumnProfileForm(2);
+            AntdUI.GridPanel form = CreateTwoColumnProfileForm(2);
             aiProfileProviderPresetSelect = CreateSelect();
             PopulateAiProviderPresets(aiProfileProviderPresetSelect);
             aiProfileEndpointInput = CreateInput("https://api.openai.com");
@@ -1949,21 +1801,12 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateAiProfilePromptSection()
         {
-            Panel body;
+            AntdUI.Panel body;
             AntdUI.Panel section = CreateSettingsGroupPanel("提示词与 Cookie", "多行内容使用完整宽度，避免长文本挤压。", out body);
 
-            TableLayoutPanel form = new TableLayoutPanel();
+            AntdUI.GridPanel form = CreateGridPanel("92 fill;fill;fill;fill;fill-44 26 92 26 fill");
             form.Dock = DockStyle.Fill;
             form.BackColor = Color.Transparent;
-            form.ColumnCount = 2;
-            form.RowCount = 5;
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 92F));
-            form.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
-            form.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             aiProfilePromptPresetSelect = CreateSelect();
             PopulateAiPromptPresets(aiProfilePromptPresetSelect);
@@ -1985,22 +1828,17 @@ namespace AiCleanVolume.Desktop
             return section;
         }
 
-        private Panel CreateAiProfileCreateFooter()
+        private AntdUI.Panel CreateAiProfileCreateFooter()
         {
-            Panel footer = new DoubleBufferedPanel();
+            AntdUI.Panel footer = CreateFlatPanel();
             footer.Dock = DockStyle.Fill;
             footer.BackColor = PageBackground;
             footer.Padding = new Padding(0, 10, 0, 0);
 
-            TableLayoutPanel layout = new TableLayoutPanel();
+            AntdUI.GridPanel layout = CreateGridPanel("108 116");
             layout.Dock = DockStyle.Right;
             layout.BackColor = Color.Transparent;
             layout.Width = 236;
-            layout.ColumnCount = 2;
-            layout.RowCount = 1;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 116F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             cancelAiProfilePageButton = CreateSettingsActionButton("取消", AntdUI.TTypeMini.Default);
             cancelAiProfilePageButton.Dock = DockStyle.Fill;
@@ -2012,48 +1850,41 @@ namespace AiCleanVolume.Desktop
             saveAiProfilePageButton.Margin = new Padding(0, 4, 0, 4);
             saveAiProfilePageButton.Click += delegate { SaveAiProfileFromPage(); };
 
-            layout.Controls.Add(cancelAiProfilePageButton, 0, 0);
-            layout.Controls.Add(saveAiProfilePageButton, 1, 0);
+            AddGridControl(layout, cancelAiProfilePageButton, 0);
+            AddGridControl(layout, saveAiProfilePageButton, 1);
             footer.Controls.Add(layout);
             return footer;
         }
 
-        private static TableLayoutPanel CreateTwoColumnProfileForm(int rows)
+        private static AntdUI.GridPanel CreateTwoColumnProfileForm(int rows)
         {
-            TableLayoutPanel form = new TableLayoutPanel();
+            string[] rowSpans = new string[rows];
+            for (int row = 0; row < rows; row++) rowSpans[row] = "92 fill 92 fill";
+            string[] rowHeights = new string[rows];
+            for (int row = 0; row < rows; row++) rowHeights[row] = "44";
+            AntdUI.GridPanel form = CreateGridPanel(string.Join(";", rowSpans) + "-" + string.Join(" ", rowHeights));
             form.Dock = DockStyle.Fill;
             form.BackColor = Color.Transparent;
-            form.ColumnCount = 4;
-            form.RowCount = rows;
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92F));
-            form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            for (int row = 0; row < rows; row++)
-            {
-                form.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
-            }
             return form;
         }
 
-        private static void AddProfileField(TableLayoutPanel form, string caption, Control control, int column, int row)
+        private static void AddProfileField(AntdUI.GridPanel form, string caption, Control control, int column, int row)
         {
-            Label label = CreateCaption(caption);
+            AntdUI.Label label = CreateCaption(caption);
             label.Margin = new Padding(0, 0, 8, 8);
             control.Margin = new Padding(0, 0, 0, 8);
-            form.Controls.Add(label, column, row);
-            form.Controls.Add(control, column + 1, row);
+            int index = row * 4 + column;
+            AddGridControl(form, label, index);
+            AddGridControl(form, control, index + 1);
         }
 
-        private static void AddFullWidthProfileField(TableLayoutPanel form, string caption, Control control, int labelRow, int controlRow)
+        private static void AddFullWidthProfileField(AntdUI.GridPanel form, string caption, Control control, int labelRow, int controlRow)
         {
-            Label label = CreateCaption(caption);
+            AntdUI.Label label = CreateCaption(caption);
             label.Margin = new Padding(0, 0, 8, 0);
             control.Margin = new Padding(0, 0, 0, 8);
-            form.Controls.Add(label, 0, labelRow);
-            form.SetColumnSpan(label, 2);
-            form.Controls.Add(control, 0, controlRow);
-            form.SetColumnSpan(control, 2);
+            AddGridControl(form, label, labelRow + 1);
+            AddGridControl(form, control, controlRow + 1);
         }
 
         private void InitializeAiProfilePageValues()
@@ -2086,12 +1917,12 @@ namespace AiCleanVolume.Desktop
                 settingsStore.Save(settings);
                 PopulateAiProfiles();
                 Log("AI 配置方案已保存：" + profile.Name + "。");
-                MessageBox.Show(this, "AI 配置方案已保存。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowInfo("完成", "AI 配置方案已保存。");
             }
             catch (Exception ex)
             {
                 Log("保存 AI 配置方案失败：" + ex.Message);
-                MessageBox.Show(this, ex.Message, "保存失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError("保存失败", ex.Message);
             }
         }
 
@@ -2106,12 +1937,12 @@ namespace AiCleanVolume.Desktop
                 SelectAiProfile(0);
                 SetActivePage(PageSettings);
                 Log("AI 配置方案已新增：" + profile.Name + "。");
-                MessageBox.Show(this, "AI 配置方案已新增。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowInfo("完成", "AI 配置方案已新增。");
             }
             catch (Exception ex)
             {
                 Log("新增 AI 配置方案失败：" + ex.Message);
-                MessageBox.Show(this, ex.Message, "保存失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError("保存失败", ex.Message);
             }
         }
 
@@ -2161,7 +1992,7 @@ namespace AiCleanVolume.Desktop
             AiProfile profile = ResolveSelectedAiProfile();
             if (profile == null)
             {
-                MessageBox.Show(this, "暂无可应用的 AI 历史配置。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowInfo("提示", "暂无可应用的 AI 历史配置。");
                 return;
             }
 
@@ -2210,7 +2041,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel card = CreateAiProfileCardSurface(false);
             card.Height = 88;
 
-            Label label = CreateSmallMutedLabel("还没有保存过 AI 配置。填写接入参数后点击“保存为配置”，这里会生成类似接口列表的配置卡片。");
+            AntdUI.Label label = CreateSmallMutedLabel("还没有保存过 AI 配置。填写接入参数后点击“保存为配置”，这里会生成类似接口列表的配置卡片。");
             label.Dock = DockStyle.Fill;
             label.TextAlign = ContentAlignment.MiddleCenter;
             card.Controls.Add(label);
@@ -2221,17 +2052,11 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel card = CreateAiProfileCardSurface(selected);
 
-            TableLayoutPanel layout = new TableLayoutPanel();
+            AntdUI.GridPanel layout = CreateGridPanel("54 fill 122");
             layout.Dock = DockStyle.Fill;
             layout.BackColor = Color.Transparent;
-            layout.ColumnCount = 3;
-            layout.RowCount = 1;
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 54F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 122F));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            Panel avatarCell = new DoubleBufferedPanel();
+            AntdUI.Panel avatarCell = CreateFlatPanel();
             avatarCell.Dock = DockStyle.Fill;
             avatarCell.BackColor = Color.Transparent;
             AntdUI.Avatar avatar = new AntdUI.Avatar();
@@ -2248,27 +2073,17 @@ namespace AiCleanVolume.Desktop
             avatar.Radius = 18;
             avatarCell.Controls.Add(avatar);
 
-            TableLayoutPanel content = new TableLayoutPanel();
+            AntdUI.GridPanel content = CreateGridPanel("fill;fill;fill-30 24 fill");
             content.Dock = DockStyle.Fill;
             content.BackColor = Color.Transparent;
-            content.ColumnCount = 1;
-            content.RowCount = 3;
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
-            content.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
-            content.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            TableLayoutPanel titleRow = new TableLayoutPanel();
+            AntdUI.GridPanel titleRow = CreateGridPanel("fill 182");
             titleRow.Dock = DockStyle.Fill;
             titleRow.BackColor = Color.Transparent;
             titleRow.Margin = Padding.Empty;
             titleRow.Padding = Padding.Empty;
-            titleRow.ColumnCount = 2;
-            titleRow.RowCount = 1;
-            titleRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            titleRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 182F));
-            titleRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            Label title = new Label();
+            AntdUI.Label title = new AntdUI.Label();
             title.Dock = DockStyle.Fill;
             title.AutoEllipsis = true;
             title.Text = BuildAiProfileDisplayName(profile);
@@ -2278,21 +2093,20 @@ namespace AiCleanVolume.Desktop
             title.TextAlign = ContentAlignment.MiddleLeft;
             title.Margin = new Padding(0, 3, 8, 0);
 
-            FlowLayoutPanel tagRow = new FlowLayoutPanel();
+            AntdUI.FlowPanel tagRow = new AntdUI.FlowPanel();
             tagRow.Dock = DockStyle.Fill;
             tagRow.BackColor = Color.Transparent;
-            tagRow.FlowDirection = FlowDirection.LeftToRight;
-            tagRow.WrapContents = false;
+            tagRow.Align = AntdUI.TAlignFlow.LeftCenter;
             tagRow.Margin = Padding.Empty;
             tagRow.Padding = Padding.Empty;
 
-            titleRow.Controls.Add(title, 0, 0);
+            AddGridControl(titleRow, title, 0);
             tagRow.Controls.Add(CreateAiProfileTag(IsAiProfileConfigured(profile) ? "正常" : "待补全", IsAiProfileConfigured(profile) ? AntdUI.TTypeMini.Success : AntdUI.TTypeMini.Warn));
             tagRow.Controls.Add(CreateAiProfileTag(FormatAiAccessModeLabel(profile.AccessMode), AntdUI.TTypeMini.Info));
             tagRow.Controls.Add(CreateAiProfileTag("P" + (index + 1).ToString(), AntdUI.TTypeMini.Primary));
-            titleRow.Controls.Add(tagRow, 1, 0);
+            AddGridControl(titleRow, tagRow, 1);
 
-            Label endpoint = new Label();
+            AntdUI.Label endpoint = new AntdUI.Label();
             endpoint.Dock = DockStyle.Fill;
             endpoint.Text = NormalizeEndpoint(profile.Endpoint);
             endpoint.Font = new Font("Microsoft YaHei UI", 10F);
@@ -2301,20 +2115,15 @@ namespace AiCleanVolume.Desktop
             endpoint.TextAlign = ContentAlignment.MiddleLeft;
             endpoint.AutoEllipsis = true;
 
-            Label meta = CreateSmallMutedLabel(BuildAiProfileMeta(profile));
+            AntdUI.Label meta = CreateSmallMutedLabel(BuildAiProfileMeta(profile));
 
-            content.Controls.Add(titleRow, 0, 0);
-            content.Controls.Add(endpoint, 0, 1);
-            content.Controls.Add(meta, 0, 2);
+            AddGridControl(content, titleRow, 0);
+            AddGridControl(content, endpoint, 1);
+            AddGridControl(content, meta, 2);
 
-            TableLayoutPanel actions = new TableLayoutPanel();
+            AntdUI.GridPanel actions = CreateGridPanel("fill;fill;fill-fill 34 fill");
             actions.Dock = DockStyle.Fill;
             actions.BackColor = Color.Transparent;
-            actions.ColumnCount = 1;
-            actions.RowCount = 3;
-            actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-            actions.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
-            actions.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 
             AntdUI.Button applyButton = CreateAiProfileCardActionButton(selected ? "已选中" : "应用", "CheckOutlined", selected);
             applyButton.Click += delegate
@@ -2322,11 +2131,13 @@ namespace AiCleanVolume.Desktop
                 SelectAiProfile(index);
                 ApplySelectedAiProfile();
             };
-            actions.Controls.Add(applyButton, 0, 1);
+            AddGridControl(actions, CreateGridSpacer(), 0);
+            AddGridControl(actions, applyButton, 1);
+            AddGridControl(actions, CreateGridSpacer(), 2);
 
-            layout.Controls.Add(avatarCell, 0, 0);
-            layout.Controls.Add(content, 1, 0);
-            layout.Controls.Add(actions, 2, 0);
+            AddGridControl(layout, avatarCell, 0);
+            AddGridControl(layout, content, 1);
+            AddGridControl(layout, actions, 2);
             card.Controls.Add(layout);
 
             BindAiProfileCardSelection(card, index);
@@ -2434,7 +2245,7 @@ namespace AiCleanVolume.Desktop
         private int ResolveAiProfileCardWidth()
         {
             if (aiProfileListPanel == null) return 640;
-            int scrollBarOffset = aiProfileListPanel.VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0;
+            int scrollBarOffset = aiProfileListPanel.ScrollBar != null && aiProfileListPanel.ScrollBar.ShowY ? aiProfileListPanel.ScrollBar.SIZE : 0;
             return Math.Max(420, aiProfileListPanel.ClientSize.Width - scrollBarOffset - 8);
         }
 
@@ -2552,47 +2363,30 @@ namespace AiCleanVolume.Desktop
 
         private string PromptForAiProfileName(string defaultName)
         {
-            using (Form form = new Form())
-            using (TextBox input = new TextBox())
-            using (Button okButton = new Button())
-            using (Button cancelButton = new Button())
-            {
-                form.Text = "保存 AI 配置方案";
-                form.StartPosition = FormStartPosition.CenterParent;
-                form.FormBorderStyle = FormBorderStyle.FixedDialog;
-                form.MinimizeBox = false;
-                form.MaximizeBox = false;
-                form.ClientSize = new Size(420, 116);
-                form.Font = Font;
+            AntdUI.Panel content = CreateFlatPanel();
+            content.Width = 420;
+            content.Height = 72;
+            content.Padding = new Padding(0, 4, 0, 0);
+            content.BackColor = Color.Transparent;
 
-                Label label = new Label();
-                label.Text = "配置名称";
-                label.AutoSize = true;
-                label.Location = new Point(14, 18);
+            AntdUI.GridPanel layout = CreateGridPanel("78 fill");
+            layout.Dock = DockStyle.Fill;
+            layout.BackColor = Color.Transparent;
 
-                input.Text = defaultName ?? string.Empty;
-                input.Location = new Point(84, 14);
-                input.Width = 318;
+            AntdUI.Label label = CreateCaption("配置名称");
+            AntdUI.Input input = CreateInput("例如：开发环境");
+            input.Text = defaultName ?? string.Empty;
+            AddGridControl(layout, label, 0);
+            AddGridControl(layout, input, 1);
+            content.Controls.Add(layout);
 
-                okButton.Text = "保存";
-                okButton.DialogResult = DialogResult.OK;
-                okButton.Location = new Point(246, 70);
-                okButton.Width = 75;
-
-                cancelButton.Text = "取消";
-                cancelButton.DialogResult = DialogResult.Cancel;
-                cancelButton.Location = new Point(327, 70);
-                cancelButton.Width = 75;
-
-                form.Controls.Add(label);
-                form.Controls.Add(input);
-                form.Controls.Add(okButton);
-                form.Controls.Add(cancelButton);
-                form.AcceptButton = okButton;
-                form.CancelButton = cancelButton;
-
-                return form.ShowDialog(this) == DialogResult.OK ? NormalizeValue(input.Text) : null;
-            }
+            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "保存 AI 配置方案", content, AntdUI.TType.Info);
+            config.OkText = "保存";
+            config.CancelText = "取消";
+            config.OkType = AntdUI.TTypeMini.Primary;
+            config.Width = 480;
+            config.MaskClosable = false;
+            return AntdUI.Modal.open(config) == DialogResult.OK ? NormalizeValue(input.Text) : null;
         }
 
         private static bool IsAiConfigured(AiSettings ai)
@@ -3047,7 +2841,7 @@ namespace AiCleanVolume.Desktop
                         row.ReloadChildren();
                         storageTable.Refresh();
                         Log("目录节点加载失败：" + error.Message);
-                        MessageBox.Show(this, error.Message, "加载失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ShowError("加载失败", error.Message);
                         return;
                     }
 
@@ -3100,15 +2894,7 @@ namespace AiCleanVolume.Desktop
             storageTable.SetSelected(row);
             if (eventArgs.Button != MouseButtons.Right) return;
 
-            openStorageMenuItem.Enabled = !string.IsNullOrWhiteSpace(row.Item.Path);
-            deleteStorageMenuItem.Enabled = CanOfferStorageDelete(row);
-            deleteStorageMenuItem.Text = "删除" + (row.Item.IsDirectory ? "文件夹" : "文件");
-            storageContextMenu.Show(storageTable, new Point(eventArgs.X, eventArgs.Y));
-        }
-
-        private void OpenStorageMenuItem_Click(object sender, EventArgs eventArgs)
-        {
-            OpenStorageRow(storageContextRow);
+            ShowStorageContextMenu(row, eventArgs.X, eventArgs.Y);
         }
 
         private void OpenStorageRow(StorageEntryRow row)
@@ -3117,9 +2903,50 @@ namespace AiCleanVolume.Desktop
             explorerService.OpenPath(row.Item.Path, !row.Item.IsDirectory);
         }
 
-        private void DeleteStorageMenuItem_Click(object sender, EventArgs eventArgs)
+        private void ShowStorageContextMenu(StorageEntryRow row, int x, int y)
         {
-            DeleteStorageRow(storageContextRow);
+            if (row == null || row.Item == null) return;
+
+            bool canOpen = !string.IsNullOrWhiteSpace(row.Item.Path);
+            bool canDelete = CanOfferStorageDelete(row);
+            AntdUI.IContextMenuStripItem[] items =
+            {
+                new AntdUI.ContextMenuStripItem("在文件资源管理器打开")
+                {
+                    ID = StorageContextOpenId,
+                    IconSvg = "FolderOpenOutlined",
+                    Enabled = canOpen
+                },
+                new AntdUI.ContextMenuStripItemDivider(),
+                new AntdUI.ContextMenuStripItem("删除" + (row.Item.IsDirectory ? "文件夹" : "文件"))
+                {
+                    ID = StorageContextDeleteId,
+                    IconSvg = "DeleteOutlined",
+                    Fore = AntdUI.Style.Db.Error,
+                    Enabled = canDelete
+                }
+            };
+
+            Point menuPoint = storageTable == null ? Cursor.Position : storageTable.PointToScreen(new Point(x, y));
+            AntdUI.ContextMenuStrip.Config config = new AntdUI.ContextMenuStrip.Config(storageTable ?? (Control)this, StorageContextMenu_Click, items);
+            config.Location = menuPoint;
+            config.Align = AntdUI.TAlign.BR;
+            AntdUI.ContextMenuStrip.open(config);
+        }
+
+        private void StorageContextMenu_Click(AntdUI.IContextMenuStrip item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.ID)) return;
+            if (string.Equals(item.ID, StorageContextOpenId, StringComparison.OrdinalIgnoreCase))
+            {
+                OpenStorageRow(storageContextRow);
+                return;
+            }
+
+            if (string.Equals(item.ID, StorageContextDeleteId, StringComparison.OrdinalIgnoreCase))
+            {
+                DeleteStorageRow(storageContextRow);
+            }
         }
 
         private void StorageTable_KeyDown(object sender, KeyEventArgs eventArgs)
@@ -3209,7 +3036,7 @@ namespace AiCleanVolume.Desktop
 
                 string message = deleteResult == null ? "删除失败。" : deleteResult.Message;
                 Log("文件树删除失败：" + suggestion.Path + "，" + message);
-                MessageBox.Show(this, message, "删除失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowError("删除失败", message);
             });
         }
 
@@ -3217,13 +3044,13 @@ namespace AiCleanVolume.Desktop
         {
             if (row == null || row.Item == null || string.IsNullOrWhiteSpace(row.Item.Path))
             {
-                MessageBox.Show(this, "删除目标为空。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowInfo("提示", "删除目标为空。");
                 return false;
             }
 
             if (IsProtectedStorageDeleteTarget(row.Item.Path))
             {
-                MessageBox.Show(this, "为避免误删，不支持直接删除当前扫描根或磁盘根目录。请展开到具体子项后再删除。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowWarning("提示", "为避免误删，不支持直接删除当前扫描根或磁盘根目录。请展开到具体子项后再删除。");
                 return false;
             }
 
@@ -3676,6 +3503,23 @@ namespace AiCleanVolume.Desktop
             lastWindowState = WindowState;
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            if (!startupRedrawCompleted)
+            {
+                SuspendControlRedraw(this);
+                startupRedrawSuspended = true;
+            }
+
+            base.OnHandleCreated(e);
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            ResumeStartupRedraw();
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing && backgroundWorker != null) backgroundWorker.Dispose();
@@ -3777,6 +3621,14 @@ namespace AiCleanVolume.Desktop
         {
             if (!restoreRedrawSuspended) return;
             restoreRedrawSuspended = false;
+            ResumeControlRedraw(this, true, false);
+        }
+
+        private void ResumeStartupRedraw()
+        {
+            if (!startupRedrawSuspended) return;
+            startupRedrawSuspended = false;
+            startupRedrawCompleted = true;
             ResumeControlRedraw(this, true, false);
         }
 
@@ -3883,13 +3735,33 @@ namespace AiCleanVolume.Desktop
                     {
                         if (onError != null) onError();
                         Log(caption + "失败：" + error.Message + Environment.NewLine + error);
-                        MessageBox.Show(this, error.Message, "操作失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        ShowError("操作失败", error.Message);
                         return;
                     }
 
                     if (onSuccess != null) onSuccess();
                 });
             });
+        }
+
+        private void ShowInfo(string title, string message)
+        {
+            ShowNotice(title, message, AntdUI.TType.Info);
+        }
+
+        private void ShowWarning(string title, string message)
+        {
+            ShowNotice(title, message, AntdUI.TType.Warn);
+        }
+
+        private void ShowError(string title, string message)
+        {
+            ShowNotice(title, message, AntdUI.TType.Error);
+        }
+
+        private void ShowNotice(string title, string message, AntdUI.TType icon)
+        {
+            AntdUI.Modal.open(this, title, message ?? string.Empty, icon);
         }
 
         private void SetBusy(bool busy, string description)
@@ -4022,7 +3894,7 @@ namespace AiCleanVolume.Desktop
             return StorageFormatting.FormatBytes(bytes) + " (" + percent.ToString("0.0") + "%)";
         }
 
-        private static void SetDriveSummaryValue(Label label, string text)
+        private static void SetDriveSummaryValue(AntdUI.Label label, string text)
         {
             if (label != null) label.Text = text;
         }
@@ -4246,9 +4118,9 @@ namespace AiCleanVolume.Desktop
             return maxTextWidth + 40;
         }
 
-        private static Label CreateToolbarCaption(string text)
+        private static AntdUI.Label CreateToolbarCaption(string text)
         {
-            Label label = new Label();
+            AntdUI.Label label = new AntdUI.Label();
             label.Dock = DockStyle.Fill;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Text = text;
@@ -4258,9 +4130,9 @@ namespace AiCleanVolume.Desktop
             return label;
         }
 
-        private static Label CreateSummaryCaption(string text)
+        private static AntdUI.Label CreateSummaryCaption(string text)
         {
-            Label label = new Label();
+            AntdUI.Label label = new AntdUI.Label();
             label.Dock = DockStyle.Fill;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Text = text;
@@ -4270,9 +4142,9 @@ namespace AiCleanVolume.Desktop
             return label;
         }
 
-        private static Label CreateSummaryValueLabel(bool bold)
+        private static AntdUI.Label CreateSummaryValueLabel(bool bold)
         {
-            Label label = new Label();
+            AntdUI.Label label = new AntdUI.Label();
             label.Dock = DockStyle.Fill;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Font = new Font("Microsoft YaHei UI", bold ? 10F : 9.5F, bold ? FontStyle.Bold : FontStyle.Regular);
@@ -4309,9 +4181,50 @@ namespace AiCleanVolume.Desktop
             return panel;
         }
 
-        private static Label CreateSectionTitle(string text)
+        private static AntdUI.Panel CreateFlatPanel()
         {
-            Label heading = new Label();
+            AntdUI.Panel panel = new AntdUI.Panel();
+            panel.Radius = 0;
+            panel.Shadow = 0;
+            panel.BorderWidth = 0F;
+            panel.Back = Color.Transparent;
+            return panel;
+        }
+
+        private static AntdUI.StackPanel CreateVerticalScrollPanel()
+        {
+            AntdUI.StackPanel panel = new AntdUI.StackPanel();
+            panel.Vertical = true;
+            panel.Radius = 0;
+            panel.Gap = 0;
+            return panel;
+        }
+
+        private static AntdUI.GridPanel CreateGridPanel(string span)
+        {
+            AntdUI.GridPanel panel = new AntdUI.GridPanel();
+            panel.Span = span;
+            panel.Radius = 0;
+            panel.BorderWidth = 0F;
+            panel.Back = Color.Transparent;
+            panel.BackColor = Color.Transparent;
+            return panel;
+        }
+
+        private static void AddGridControl(AntdUI.GridPanel panel, Control control, int index)
+        {
+            panel.Controls.Add(control);
+            panel.SetIndex(control, index);
+        }
+
+        private static Control CreateGridSpacer()
+        {
+            return CreateFlatPanel();
+        }
+
+        private static AntdUI.Label CreateSectionTitle(string text)
+        {
+            AntdUI.Label heading = new AntdUI.Label();
             heading.Dock = DockStyle.Top;
             heading.Height = 34;
             heading.Text = text;
@@ -4321,9 +4234,9 @@ namespace AiCleanVolume.Desktop
             return heading;
         }
 
-        private static Label CreateSectionDescription(string text)
+        private static AntdUI.Label CreateSectionDescription(string text)
         {
-            Label desc = new Label();
+            AntdUI.Label desc = new AntdUI.Label();
             desc.Dock = DockStyle.Top;
             desc.Height = 26;
             desc.Text = text;
@@ -4499,9 +4412,9 @@ namespace AiCleanVolume.Desktop
             return select;
         }
 
-        private static Label CreateCaption(string text)
+        private static AntdUI.Label CreateCaption(string text)
         {
-            Label label = new Label();
+            AntdUI.Label label = new AntdUI.Label();
             label.Dock = DockStyle.Fill;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Text = text;
@@ -4519,7 +4432,7 @@ namespace AiCleanVolume.Desktop
             table.GapCell = 8;
         }
 
-        private static Control CreateInfoCard(string title, out Label valueLabel)
+        private static Control CreateInfoCard(string title, out AntdUI.Label valueLabel)
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Dock = DockStyle.Fill;
@@ -4529,7 +4442,7 @@ namespace AiCleanVolume.Desktop
             panel.BorderWidth = 1F;
             panel.BorderColor = BorderLightColor;
 
-            Label titleLabel = new Label();
+            AntdUI.Label titleLabel = new AntdUI.Label();
             titleLabel.Dock = DockStyle.Top;
             titleLabel.Height = 18;
             titleLabel.Text = title;
@@ -4537,7 +4450,7 @@ namespace AiCleanVolume.Desktop
             titleLabel.ForeColor = TextTertiaryColor;
             titleLabel.BackColor = Color.Transparent;
 
-            valueLabel = new Label();
+            valueLabel = new AntdUI.Label();
             valueLabel.Dock = DockStyle.Fill;
             valueLabel.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
             valueLabel.ForeColor = TextPrimaryColor;
@@ -4628,60 +4541,6 @@ namespace AiCleanVolume.Desktop
             public string Model { get; private set; }
         }
 
-        private sealed class DoubleBufferedPanel : Panel
-        {
-            public DoubleBufferedPanel()
-            {
-                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
-                UpdateStyles();
-            }
-        }
-
-        private sealed class SmoothScrollPanel : Panel
-        {
-            public SmoothScrollPanel()
-            {
-                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
-                UpdateStyles();
-            }
-
-            protected override void WndProc(ref Message m)
-            {
-                if (m.Msg == WmEraseBackground)
-                {
-                    m.Result = new IntPtr(1);
-                    return;
-                }
-
-                base.WndProc(ref m);
-            }
-
-            protected override void OnScroll(ScrollEventArgs se)
-            {
-                base.OnScroll(se);
-                Invalidate(false);
-            }
-        }
-
-        private sealed class DoubleBufferedFlowLayoutPanel : FlowLayoutPanel
-        {
-            public DoubleBufferedFlowLayoutPanel()
-            {
-                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
-                UpdateStyles();
-            }
-
-            protected override void WndProc(ref Message m)
-            {
-                if (m.Msg == WmEraseBackground)
-                {
-                    m.Result = new IntPtr(1);
-                    return;
-                }
-
-                base.WndProc(ref m);
-            }
-        }
     }
 }
 
