@@ -725,25 +725,25 @@ namespace AiCleanVolume.Desktop
             recycleSwitch = CreateSettingsSwitch();
             privilegedCheckbox = CreateCheckbox("启用完全权限（管理员）");
             privilegedCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
-            aiAccessModeSelect = CreateSelect();
+            aiAccessModeSelect = CreateSettingsSelect();
             PopulateAiAccessModes();
             aiAccessModeSelect.SelectedValueChanged += AiAccessModeSelect_SelectedValueChanged;
             endpointInput = CreateInput("https://api.openai.com");
             apiKeyInput = CreateInput("sk-...");
             modelInput = CreateInput(AiSettings.DefaultModel);
             maxSuggestionsInput = CreateInput("30");
-            aiProfileSelect = CreateSelect();
+            aiProfileSelect = CreateSettingsSelect();
             applyAiProfileButton = CreateSettingsActionButton("应用选中", AntdUI.TTypeMini.Primary);
             applyAiProfileButton.IconSvg = "CheckOutlined";
             applyAiProfileButton.Click += delegate { ApplySelectedAiProfile(); };
             addAiProfileButton = CreateAddAiProfileButton();
             addAiProfileButton.Click += delegate { OpenAiProfileCreatePage(); };
-            aiProviderPresetSelect = CreateSelect();
+            aiProviderPresetSelect = CreateSettingsSelect();
             PopulateAiProviderPresets();
             aiProviderPresetSelect.SelectedValueChanged += AiProviderPresetSelect_SelectedValueChanged;
             endpointInput.TextChanged += AiEndpointOrModelInput_TextChanged;
             modelInput.TextChanged += AiEndpointOrModelInput_TextChanged;
-            aiPromptPresetSelect = CreateSelect();
+            aiPromptPresetSelect = CreateSettingsSelect();
             PopulateAiPromptPresets();
             aiPromptPresetSelect.SelectedValueChanged += AiPromptPresetSelect_SelectedValueChanged;
             systemPromptInput = CreateInput("系统提示词");
@@ -1763,7 +1763,7 @@ namespace AiCleanVolume.Desktop
 
             AntdUI.GridPanel form = CreateTwoColumnProfileForm(2);
             aiProfileNameInput = CreateInput("例如：开发环境");
-            aiProfileAccessModeSelect = CreateSelect();
+            aiProfileAccessModeSelect = CreateSettingsSelect();
             PopulateAiAccessModes(aiProfileAccessModeSelect);
             aiProfileMaxSuggestionsInput = CreateInput("30");
 
@@ -1783,7 +1783,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel section = CreateSettingsGroupPanel("接口参数", "配置 OpenAI 兼容接口地址、密钥和模型。", out body);
 
             AntdUI.GridPanel form = CreateTwoColumnProfileForm(2);
-            aiProfileProviderPresetSelect = CreateSelect();
+            aiProfileProviderPresetSelect = CreateSettingsSelect();
             PopulateAiProviderPresets(aiProfileProviderPresetSelect);
             aiProfileEndpointInput = CreateInput("https://api.openai.com");
             aiProfileApiKeyInput = CreateInput("sk-...");
@@ -1811,7 +1811,7 @@ namespace AiCleanVolume.Desktop
             form.Dock = DockStyle.Fill;
             form.BackColor = Color.Transparent;
 
-            aiProfilePromptPresetSelect = CreateSelect();
+            aiProfilePromptPresetSelect = CreateSettingsSelect();
             PopulateAiPromptPresets(aiProfilePromptPresetSelect);
             aiProfileCookieMappingsInput = CreateInput("直接粘贴当前模型的一整行 Cookie；也兼容 model=Cookie");
             aiProfileCookieMappingsInput.Multiline = true;
@@ -4411,6 +4411,13 @@ namespace AiCleanVolume.Desktop
             select.BorderActive = PrimaryColor;
             select.BackColor = SurfaceColor;
             select.Font = Font;
+            return select;
+        }
+
+        private AntdUI.Select CreateSettingsSelect()
+        {
+            AntdUI.Select select = CreateSelect();
+            select.WheelModifyEnabled = false;
             return select;
         }
 
