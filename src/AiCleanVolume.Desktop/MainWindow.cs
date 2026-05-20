@@ -2156,9 +2156,9 @@ namespace AiCleanVolume.Desktop
             card.Back = selected ? Color.FromArgb(247, 255, 252) : SurfaceColor;
             card.BorderWidth = 1F;
             card.BorderColor = selected ? Color.FromArgb(91, 213, 163) : BorderDefaultColor;
-            card.Shadow = selected ? 10 : 0;
-            card.ShadowOpacity = selected ? 0.07F : 0F;
-            card.ShadowOffsetY = 3;
+            card.Shadow = 0;
+            card.ShadowOpacity = 0F;
+            card.ShadowOffsetY = 0;
             return card;
         }
 
