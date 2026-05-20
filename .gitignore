@@ -82,3 +82,6 @@ BundleArtifacts/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+
+AGENTS.md

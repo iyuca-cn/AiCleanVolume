@@ -35,6 +35,13 @@ namespace AiCleanVolume.Desktop
         private const int WmEraseBackground = 0x0014;
         private const int WmGetMinMaxInfo = 0x0024;
         private const int WmSetRedraw = 0x000B;
+        private const int RedrawWindowInvalidate = 0x0001;
+        private const int RedrawWindowErase = 0x0004;
+        private const int RedrawWindowAllChildren = 0x0080;
+        private const int RedrawWindowUpdateNow = 0x0100;
+        private const int RedrawWindowEraseNow = 0x0200;
+        private const int RedrawWindowFrame = 0x0400;
+        private const int RestoreRedrawFlags = RedrawWindowInvalidate | RedrawWindowErase | RedrawWindowAllChildren | RedrawWindowUpdateNow | RedrawWindowEraseNow | RedrawWindowFrame;
         private static readonly IntPtr SizeRestored = IntPtr.Zero;
         private static readonly IntPtr SizeMaximized = new IntPtr(2);
         private static readonly Size DefaultClientArea = new Size(1540, 920);
@@ -170,7 +177,6 @@ namespace AiCleanVolume.Desktop
         private bool applyingNormalBounds;
         private bool startupRedrawSuspended;
         private bool startupRedrawCompleted;
-        private bool restoreRedrawSuspended;
         private bool restoreBoundsQueued;
         private bool busy;
         private bool sidebarResizing;
@@ -215,6 +221,8 @@ namespace AiCleanVolume.Desktop
 
         private void InitializeComponent()
         {
+            SetStyle(ControlStyles.ResizeRedraw, true);
+            UpdateStyles();
             Font = new Font("Microsoft YaHei UI", 10.5F);
             BackColor = PageBackground;
             ForeColor = TextPrimaryColor;
@@ -3550,6 +3558,9 @@ namespace AiCleanVolume.Desktop
         [DllImport("user32.dll")]
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, int flags);
+
         protected override void OnSizeChanged(EventArgs e)
         {
             FormWindowState previousState = lastWindowState;
@@ -3578,12 +3589,12 @@ namespace AiCleanVolume.Desktop
             }
 
             bool restoreFromMinimized = IsRestoreFromMinimizedSizeMessage(m);
-            if (restoreFromMinimized) SuspendWindowRestoreRedraw();
 
             base.WndProc(ref m);
 
-            if (restoreFromMinimized && restoreRedrawSuspended && !restoreBoundsQueued)
+            if (restoreFromMinimized && !restoreBoundsQueued)
             {
+                ForceWindowRestoreRepaint();
                 QueueWindowRestoreCompletion();
             }
         }
@@ -3592,13 +3603,6 @@ namespace AiCleanVolume.Desktop
         {
             if (message.Msg != WmSize || lastWindowState != FormWindowState.Minimized) return false;
             return message.WParam == SizeRestored || message.WParam == SizeMaximized;
-        }
-
-        private void SuspendWindowRestoreRedraw()
-        {
-            if (restoreRedrawSuspended || !IsHandleCreated) return;
-            SuspendControlRedraw(this);
-            restoreRedrawSuspended = true;
         }
 
         private void QueueWindowRestoreCompletion()
@@ -3614,16 +3618,18 @@ namespace AiCleanVolume.Desktop
                 finally
                 {
                     restoreBoundsQueued = false;
-                    ResumeWindowRestoreRedraw();
+                    ForceWindowRestoreRepaint();
                 }
             });
         }
 
-        private void ResumeWindowRestoreRedraw()
+        private void ForceWindowRestoreRepaint()
         {
-            if (!restoreRedrawSuspended) return;
-            restoreRedrawSuspended = false;
-            ResumeControlRedraw(this, true, false);
+            if (!IsHandleCreated || IsDisposed || WindowState == FormWindowState.Minimized) return;
+            PerformLayout();
+            RefreshDWM();
+            Invalidate(true);
+            RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RestoreRedrawFlags);
         }
 
         private void ResumeStartupRedraw()
