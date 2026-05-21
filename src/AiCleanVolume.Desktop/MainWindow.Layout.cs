@@ -140,7 +140,7 @@ namespace AiCleanVolume.Desktop
             menu.IconRatio = 1.08F;
             menu.Padding = new Padding(2, 6, 2, 6);
             menu.ForeColor = TextSecondaryColor;
-            menu.BackHover = Color.FromArgb(245, 248, 255);
+            menu.BackHover = Color.FromArgb(242, 246, 252);
             menu.BackActive = PrimarySoftColor;
             menu.ForeActive = PrimaryColor;
             menu.ScrollBarBlock = true;

@@ -372,10 +372,10 @@ namespace AiCleanVolume.Desktop
             avatar.Top = 20;
             avatar.Text = BuildAiProfileAvatarText(profile);
             avatar.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
-            avatar.ForeColor = TextSecondaryColor;
-            avatar.BackColor = Color.FromArgb(248, 250, 252);
+            avatar.ForeColor = PrimaryColor;
+            avatar.BackColor = Color.FromArgb(235, 245, 255);
             avatar.BorderWidth = 1F;
-            avatar.BorderColor = BorderLightColor;
+            avatar.BorderColor = Color.FromArgb(200, 225, 255);
             avatar.Radius = 18;
             avatarCell.Controls.Add(avatar);
 
@@ -476,13 +476,15 @@ namespace AiCleanVolume.Desktop
             card.Height = 102;
             card.Margin = new Padding(0, 0, 0, 10);
             card.Padding = new Padding(14, 10, 14, 10);
-            card.Radius = 14;
-            card.Back = selected ? Color.FromArgb(247, 255, 252) : SurfaceColor;
+            card.Radius = 12;
+            card.Back = selected ? Color.FromArgb(240, 248, 255) : SurfaceColor;
             card.BorderWidth = 1F;
-            card.BorderColor = selected ? Color.FromArgb(91, 213, 163) : BorderDefaultColor;
-            card.Shadow = 0;
-            card.ShadowOpacity = 0F;
-            card.ShadowOffsetY = 0;
+            card.BorderColor = selected ? Color.FromArgb(120, 180, 255) : BorderDefaultColor;
+            card.Shadow = 6;
+            card.ShadowOpacity = 0.04F;
+            card.ShadowOpacityHover = 0.12F;
+            card.ShadowOpacityAnimation = true;
+            card.ShadowOffsetY = 2;
             return card;
         }
 
@@ -519,9 +521,9 @@ namespace AiCleanVolume.Desktop
             button.Margin = new Padding(8, 0, 0, 0);
             if (selected)
             {
-                button.DefaultBorderColor = Color.FromArgb(186, 231, 204);
-                button.ForeColor = Color.FromArgb(0, 120, 75);
-                button.BackColor = Color.FromArgb(240, 253, 244);
+                button.DefaultBorderColor = Color.FromArgb(160, 200, 255);
+                button.ForeColor = Color.FromArgb(22, 100, 220);
+                button.BackColor = Color.FromArgb(235, 245, 255);
             }
             return button;
         }

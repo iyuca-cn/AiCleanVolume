@@ -48,29 +48,5 @@ namespace AiCleanVolume.Core.Models
 
             return clone;
         }
-
-        public string BuildFingerprint()
-        {
-            List<string> parts = new List<string>();
-            parts.Add(AiSettings.NormalizeAccessMode(AccessMode));
-            parts.Add(NormalizeValue(Endpoint));
-            parts.Add(NormalizeValue(ApiKey));
-            parts.Add(NormalizeValue(Model));
-            parts.Add(MaxSuggestions.ToString());
-            parts.Add(NormalizeValue(SystemPrompt));
-
-            IList<AiModelCookieMapping> mappings = AiSettings.NormalizeModelCookieMappings(ModelCookieMappings);
-            for (int i = 0; i < mappings.Count; i++)
-            {
-                parts.Add(NormalizeValue(mappings[i].Model) + "=" + NormalizeValue(mappings[i].Cookie));
-            }
-
-            return string.Join("\n", parts.ToArray());
-        }
-
-        private static string NormalizeValue(string value)
-        {
-            return (value ?? string.Empty).Trim();
-        }
     }
 }

@@ -21,11 +21,13 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Dock = DockStyle.Fill;
             panel.Padding = new Padding(padding);
-            panel.Radius = 14;
+            panel.Radius = 12;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
             panel.BorderColor = BorderLightColor;
-            panel.Shadow = 0;
+            panel.Shadow = 4;
+            panel.ShadowOpacity = 0.03F;
+            panel.ShadowOffsetY = 2;
             return panel;
         }
 
@@ -141,15 +143,15 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Padding = new Padding(padding);
-            panel.Radius = 14;
+            panel.Radius = 12;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
             panel.BorderColor = BorderLightColor;
-            panel.Shadow = 18;
-            panel.ShadowOpacity = 0.08F;
-            panel.ShadowOpacityHover = animateShadowOnHover ? 0.14F : 0.08F;
+            panel.Shadow = 12;
+            panel.ShadowOpacity = 0.06F;
+            panel.ShadowOpacityHover = animateShadowOnHover ? 0.12F : 0.06F;
             panel.ShadowOpacityAnimation = animateShadowOnHover;
-            panel.ShadowOffsetY = 5;
+            panel.ShadowOffsetY = 4;
             return panel;
         }
 

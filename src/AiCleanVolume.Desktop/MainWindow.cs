@@ -16,25 +16,25 @@ namespace AiCleanVolume.Desktop
 {
     public sealed partial class MainWindow : AntdUI.Window
     {
-        private static readonly Color PageBackground = Color.FromArgb(250, 250, 250);
+        private static readonly Color PageBackground = Color.FromArgb(245, 247, 250);
 
         private static readonly Color SurfaceColor = Color.White;
 
-        private static readonly Color FillSecondary = Color.FromArgb(247, 249, 252);
+        private static readonly Color FillSecondary = Color.FromArgb(246, 248, 252);
 
-        private static readonly Color BorderDefaultColor = Color.FromArgb(217, 224, 236);
+        private static readonly Color BorderDefaultColor = Color.FromArgb(212, 220, 232);
 
-        private static readonly Color BorderLightColor = Color.FromArgb(235, 238, 245);
+        private static readonly Color BorderLightColor = Color.FromArgb(230, 234, 242);
 
         private static readonly Color PrimaryColor = Color.FromArgb(22, 119, 255);
 
         private static readonly Color PrimarySoftColor = Color.FromArgb(230, 244, 255);
 
-        private static readonly Color TextPrimaryColor = Color.FromArgb(31, 31, 31);
+        private static readonly Color TextPrimaryColor = Color.FromArgb(25, 25, 28);
 
-        private static readonly Color TextSecondaryColor = Color.FromArgb(89, 89, 89);
+        private static readonly Color TextSecondaryColor = Color.FromArgb(82, 82, 92);
 
-        private static readonly Color TextTertiaryColor = Color.FromArgb(140, 140, 140);
+        private static readonly Color TextTertiaryColor = Color.FromArgb(130, 135, 145);
 
         private const string PageScan = "scan";
 

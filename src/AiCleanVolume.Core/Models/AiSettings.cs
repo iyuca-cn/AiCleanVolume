@@ -50,7 +50,6 @@ namespace AiCleanVolume.Core.Models
         public static IList<AiProfile> NormalizeProfiles(IEnumerable<AiProfile> profiles)
         {
             List<AiProfile> result = new List<AiProfile>();
-            HashSet<string> keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (profiles == null) return result;
 
             foreach (AiProfile profile in profiles)
@@ -70,8 +69,7 @@ namespace AiCleanVolume.Core.Models
                 if (normalized.MaxSuggestions <= 0) normalized.MaxSuggestions = 30;
                 if (string.IsNullOrWhiteSpace(normalized.SystemPrompt)) normalized.SystemPrompt = DefaultSystemPrompt;
 
-                string fingerprint = normalized.BuildFingerprint();
-                if (keys.Add(fingerprint)) result.Add(normalized);
+                result.Add(normalized);
             }
 
             return result;
