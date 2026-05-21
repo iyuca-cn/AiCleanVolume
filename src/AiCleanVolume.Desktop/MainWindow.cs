@@ -16,25 +16,26 @@ namespace AiCleanVolume.Desktop
 {
     public sealed partial class MainWindow : AntdUI.Window
     {
-        private static readonly Color PageBackground = Color.FromArgb(245, 247, 250);
+        // 颜色全部通过 AntdUI.Style.Db 主题令牌动态读取，跟随 Light/Dark 主题切换。
+        private static Color PageBackground { get { return AntdUI.Style.Db.BgLayout; } }
 
-        private static readonly Color SurfaceColor = Color.White;
+        private static Color SurfaceColor { get { return AntdUI.Style.Db.BgContainer; } }
 
-        private static readonly Color FillSecondary = Color.FromArgb(246, 248, 252);
+        private static Color FillSecondary { get { return AntdUI.Style.Db.FillQuaternary; } }
 
-        private static readonly Color BorderDefaultColor = Color.FromArgb(212, 220, 232);
+        private static Color BorderDefaultColor { get { return AntdUI.Style.Db.BorderColor; } }
 
-        private static readonly Color BorderLightColor = Color.FromArgb(230, 234, 242);
+        private static Color BorderLightColor { get { return AntdUI.Style.Db.BorderSecondary; } }
 
-        private static readonly Color PrimaryColor = Color.FromArgb(22, 119, 255);
+        private static Color PrimaryColor { get { return AntdUI.Style.Db.Primary; } }
 
-        private static readonly Color PrimarySoftColor = Color.FromArgb(230, 244, 255);
+        private static Color PrimarySoftColor { get { return AntdUI.Style.Db.PrimaryBg; } }
 
-        private static readonly Color TextPrimaryColor = Color.FromArgb(25, 25, 28);
+        private static Color TextPrimaryColor { get { return AntdUI.Style.Db.Text; } }
 
-        private static readonly Color TextSecondaryColor = Color.FromArgb(82, 82, 92);
+        private static Color TextSecondaryColor { get { return AntdUI.Style.Db.TextSecondary; } }
 
-        private static readonly Color TextTertiaryColor = Color.FromArgb(130, 135, 145);
+        private static Color TextTertiaryColor { get { return AntdUI.Style.Db.TextTertiary; } }
 
         private const string PageScan = "scan";
 
@@ -421,15 +422,19 @@ namespace AiCleanVolume.Desktop
             scanPage = CreatePageContainer();
             scanPage.Controls.Add(CreateStoragePanel());
             scanPage.Controls.Add(CreateScanToolbarPanel());
+            scanPage.Controls.Add(CreatePageHeader(GetPageTitle(PageScan), GetPageDescription(PageScan)));
 
             suggestionsPage = CreatePageContainer();
             suggestionsPage.Controls.Add(CreateSuggestionPanel());
+            suggestionsPage.Controls.Add(CreatePageHeader(GetPageTitle(PageSuggestions), GetPageDescription(PageSuggestions)));
 
             logPage = CreatePageContainer();
             logPage.Controls.Add(CreateLogPanel());
+            logPage.Controls.Add(CreatePageHeader(GetPageTitle(PageLog), GetPageDescription(PageLog)));
 
             settingsPage = CreatePageContainer();
             settingsPage.Controls.Add(CreateSettingsPanel());
+            settingsPage.Controls.Add(CreatePageHeader(GetPageTitle(PageSettings), GetPageDescription(PageSettings)));
 
             aiProfileCreatePage = CreatePageContainer();
             aiProfileCreatePage.Controls.Add(CreateAiProfileCreatePage());

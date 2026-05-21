@@ -24,6 +24,36 @@ namespace AiCleanVolume.Desktop
             return page;
         }
 
+        private static AntdUI.PageHeader CreatePageHeader(string title, string description)
+        {
+            AntdUI.PageHeader header = new AntdUI.PageHeader();
+            header.Dock = DockStyle.Top;
+            header.Height = 68;
+            header.Text = title;
+            header.Description = description;
+            header.UseTitleFont = true;
+            header.ShowButton = false;
+            header.ShowIcon = false;
+            header.DividerShow = true;
+            header.DividerMargin = 2;
+            header.DividerColor = BorderLightColor;
+            header.BackColor = Color.Transparent;
+            header.Padding = new Padding(4, 0, 4, 8);
+            return header;
+        }
+
+        private static AntdUI.Divider CreateSectionDivider(string text)
+        {
+            AntdUI.Divider divider = new AntdUI.Divider();
+            divider.Dock = DockStyle.Top;
+            divider.Height = 28;
+            divider.Text = text;
+            divider.Font = new Font("Microsoft YaHei UI", 10F);
+            divider.Orientation = AntdUI.TOrientation.Left;
+            divider.Margin = new Padding(0, 4, 0, 4);
+            return divider;
+        }
+
         private AntdUI.Panel CreateSidebarHost()
         {
             AntdUI.Panel host = CreateFlatPanel();
@@ -43,12 +73,12 @@ namespace AiCleanVolume.Desktop
 
             sidebarPanel = new AntdUI.Panel();
             sidebarPanel.Dock = DockStyle.Fill;
-            sidebarPanel.Back = SurfaceColor;
-            sidebarPanel.BorderWidth = 1F;
-            sidebarPanel.BorderColor = BorderLightColor;
+            sidebarPanel.Back = Color.FromArgb(0, 21, 41);
+            sidebarPanel.BorderWidth = 0F;
             sidebarPanel.Radius = 0;
             sidebarPanel.Shadow = 0;
             sidebarPanel.Padding = new Padding(14, 12, 14, 14);
+            sidebarPanel.ColorScheme = AntdUI.TAMode.Dark;
 
             sidebarCollapseButton = CreateSidebarCollapseButton();
 
@@ -56,7 +86,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel dividerPanel = CreateFlatPanel();
             dividerPanel.Dock = DockStyle.Bottom;
             dividerPanel.Height = 1;
-            dividerPanel.BackColor = BorderLightColor;
+            dividerPanel.BackColor = Color.FromArgb(255, 255, 255, 40);
 
             navigationMenu = CreateSidebarMenu();
             sidebarBrandPanel = CreateSidebarBrandPanel();
@@ -84,9 +114,9 @@ namespace AiCleanVolume.Desktop
             sidebarBrandIconLabel = new AntdUI.Label();
             sidebarBrandIconLabel.Dock = DockStyle.Left;
             sidebarBrandIconLabel.Width = 32;
-            sidebarBrandIconLabel.Text = "T";
-            sidebarBrandIconLabel.Font = new Font("Microsoft YaHei UI", 16F, FontStyle.Bold);
-            sidebarBrandIconLabel.ForeColor = PrimaryColor;
+            sidebarBrandIconLabel.Text = "AI";
+            sidebarBrandIconLabel.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
+            sidebarBrandIconLabel.ForeColor = Color.FromArgb(64, 169, 255);
             sidebarBrandIconLabel.BackColor = Color.Transparent;
             sidebarBrandIconLabel.TextAlign = ContentAlignment.MiddleCenter;
 
@@ -94,8 +124,8 @@ namespace AiCleanVolume.Desktop
             sidebarBrandTextLabel.Dock = DockStyle.Fill;
             sidebarBrandTextLabel.Width = 156;
             sidebarBrandTextLabel.Text = AppDisplayName;
-            sidebarBrandTextLabel.Font = new Font("Microsoft YaHei UI", 14F, FontStyle.Bold);
-            sidebarBrandTextLabel.ForeColor = TextPrimaryColor;
+            sidebarBrandTextLabel.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold);
+            sidebarBrandTextLabel.ForeColor = Color.White;
             sidebarBrandTextLabel.BackColor = Color.Transparent;
             sidebarBrandTextLabel.AutoEllipsis = true;
             sidebarBrandTextLabel.TextAlign = ContentAlignment.MiddleLeft;
@@ -114,12 +144,13 @@ namespace AiCleanVolume.Desktop
             button.Radius = 10;
             button.IconSvg = "ArrowLeftOutlined";
             button.Type = AntdUI.TTypeMini.Default;
-            button.Ghost = true;
+            button.Ghost = false;
             button.BorderWidth = 1F;
             button.DefaultBorderColor = BorderLightColor;
             button.BackColor = SurfaceColor;
-            button.Width = 20;
-            button.Height = 30;
+            button.ForeColor = TextSecondaryColor;
+            button.Width = 22;
+            button.Height = 32;
             button.IconRatio = 0.58F;
             button.WaveSize = 1;
             button.Click += delegate { ToggleSidebarCollapsed(); };
@@ -132,17 +163,19 @@ namespace AiCleanVolume.Desktop
             menu.Dock = DockStyle.Fill;
             menu.Mode = AntdUI.TMenuMode.Inline;
             menu.Unique = true;
-            menu.Radius = 9;
+            menu.Radius = 8;
             menu.Indent = false;
             menu.Gap = 12;
             menu.IconGap = 10;
             menu.itemMargin = 5;
             menu.IconRatio = 1.08F;
             menu.Padding = new Padding(2, 6, 2, 6);
-            menu.ForeColor = TextSecondaryColor;
-            menu.BackHover = Color.FromArgb(242, 246, 252);
-            menu.BackActive = PrimarySoftColor;
-            menu.ForeActive = PrimaryColor;
+            menu.ForeColor = Color.FromArgb(166, 187, 210);
+            menu.BackColor = Color.Transparent;
+            menu.BackHover = Color.FromArgb(255, 255, 255, 15);
+            menu.BackActive = Color.FromArgb(22, 119, 255);
+            menu.ForeActive = Color.White;
+            menu.ColorScheme = AntdUI.TAMode.Dark;
             menu.ScrollBarBlock = true;
             menu.SelectChanged += NavigationMenu_SelectChanged;
 
@@ -171,12 +204,14 @@ namespace AiCleanVolume.Desktop
             settingsNavButton.Text = null;
             settingsNavButton.DisplayStyle = AntdUI.TButtonDisplayStyle.Image;
             settingsNavButton.IconRatio = 0.86F;
-            settingsNavButton.Radius = 12;
+            settingsNavButton.Radius = 10;
             settingsNavButton.Type = AntdUI.TTypeMini.Default;
-            settingsNavButton.BorderWidth = 1F;
+            settingsNavButton.BorderWidth = 0F;
             settingsNavButton.Ghost = true;
             settingsNavButton.WaveSize = 2;
-            settingsNavButton.DefaultBorderColor = BorderLightColor;
+            settingsNavButton.ForeColor = Color.FromArgb(166, 187, 210);
+            settingsNavButton.BackColor = Color.Transparent;
+            settingsNavButton.DefaultBorderColor = Color.Transparent;
             settingsNavButton.Click += SettingsNavButton_Click;
 
             footerPanel.Controls.Add(settingsNavButton);

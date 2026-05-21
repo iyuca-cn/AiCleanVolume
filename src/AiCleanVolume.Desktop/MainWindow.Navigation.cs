@@ -97,13 +97,13 @@ namespace AiCleanVolume.Desktop
             if (sidebarBrandPanel != null)
             {
                 sidebarBrandPanel.Height = sidebarCollapsed ? 58 : 70;
-                sidebarBrandPanel.Padding = sidebarCollapsed ? new Padding(8, 10, 8, 10) : new Padding(6, 10, 6, 14);
+                sidebarBrandPanel.Padding = sidebarCollapsed ? new Padding(4, 10, 4, 10) : new Padding(6, 10, 6, 14);
             }
 
             if (sidebarBrandIconLabel != null)
             {
                 sidebarBrandIconLabel.Width = sidebarCollapsed ? 48 : 32;
-                sidebarBrandIconLabel.TextAlign = sidebarCollapsed ? ContentAlignment.MiddleCenter : ContentAlignment.MiddleLeft;
+                sidebarBrandIconLabel.TextAlign = sidebarCollapsed ? ContentAlignment.MiddleCenter : ContentAlignment.MiddleCenter;
             }
 
             if (sidebarBrandTextLabel != null)
@@ -111,7 +111,7 @@ namespace AiCleanVolume.Desktop
                 sidebarBrandTextLabel.Visible = !sidebarCollapsed;
             }
 
-            if (sidebarPanel != null) sidebarPanel.Padding = sidebarCollapsed ? new Padding(8, 12, 8, 14) : new Padding(14, 12, 14, 14);
+            if (sidebarPanel != null) sidebarPanel.Padding = sidebarCollapsed ? new Padding(6, 12, 6, 14) : new Padding(14, 12, 14, 14);
 
             if (navigationMenu != null)
             {
@@ -131,7 +131,7 @@ namespace AiCleanVolume.Desktop
 
             if (settingsNavButton != null && settingsNavButton.Parent != null)
             {
-                settingsNavButton.Parent.Padding = sidebarCollapsed ? new Padding(8, 10, 8, 10) : new Padding(10, 10, 10, 10);
+                settingsNavButton.Parent.Padding = sidebarCollapsed ? new Padding(6, 10, 6, 10) : new Padding(10, 10, 10, 10);
                 settingsNavButton.Left = 0;
                 settingsNavButton.Top = 0;
             }
@@ -140,7 +140,7 @@ namespace AiCleanVolume.Desktop
             {
                 sidebarCollapseButton.IconSvg = sidebarCollapsed ? "ArrowRightOutlined" : "ArrowLeftOutlined";
                 int sidebarContentRight = sidebarHost.Width - SidebarRailWidth;
-                sidebarCollapseButton.Left = Math.Max(0, sidebarCollapsed ? sidebarContentRight - sidebarCollapseButton.Width / 2 : sidebarContentRight - sidebarCollapseButton.Width);
+                sidebarCollapseButton.Left = Math.Max(0, sidebarContentRight - sidebarCollapseButton.Width / 2);
                 sidebarCollapseButton.Top = 96;
                 sidebarCollapseButton.BringToFront();
             }
@@ -182,9 +182,9 @@ namespace AiCleanVolume.Desktop
         {
             if (settingsNavButton == null) return;
             bool selected = activePageId == PageSettings;
-            settingsNavButton.BackColor = selected ? PrimarySoftColor : SurfaceColor;
-            settingsNavButton.DefaultBorderColor = selected ? Color.FromArgb(145, 202, 255) : BorderLightColor;
-            settingsNavButton.ForeColor = selected ? PrimaryColor : TextSecondaryColor;
+            settingsNavButton.BackColor = selected ? Color.FromArgb(22, 119, 255) : Color.Transparent;
+            settingsNavButton.DefaultBorderColor = Color.Transparent;
+            settingsNavButton.ForeColor = selected ? Color.White : Color.FromArgb(166, 187, 210);
             settingsNavButton.IconSvg = "SettingOutlined";
         }
 
@@ -215,7 +215,7 @@ namespace AiCleanVolume.Desktop
 
                 if (compactStorageTree) CompactStorageTreeRowsForNavigation();
 
-                appBar.SubText = string.Empty;
+                appBar.SubText = GetPageTitle(pageId);
 
                 SyncNavigationSelection(pageId);
                 UpdateSettingsNavigationState();

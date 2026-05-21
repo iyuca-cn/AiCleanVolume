@@ -21,13 +21,13 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Dock = DockStyle.Fill;
             panel.Padding = new Padding(padding);
-            panel.Radius = 12;
+            panel.Radius = 10;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
             panel.BorderColor = BorderLightColor;
-            panel.Shadow = 4;
-            panel.ShadowOpacity = 0.03F;
-            panel.ShadowOffsetY = 2;
+            panel.Shadow = 18;
+            panel.ShadowOpacity = 0.10F;
+            panel.ShadowOffsetY = 3;
             return panel;
         }
 
@@ -143,13 +143,13 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Padding = new Padding(padding);
-            panel.Radius = 12;
+            panel.Radius = 10;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
             panel.BorderColor = BorderLightColor;
-            panel.Shadow = 12;
-            panel.ShadowOpacity = 0.06F;
-            panel.ShadowOpacityHover = animateShadowOnHover ? 0.12F : 0.06F;
+            panel.Shadow = 24;
+            panel.ShadowOpacity = 0.12F;
+            panel.ShadowOpacityHover = animateShadowOnHover ? 0.18F : 0.12F;
             panel.ShadowOpacityAnimation = animateShadowOnHover;
             panel.ShadowOffsetY = 4;
             return panel;
@@ -159,11 +159,13 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Padding = new Padding(padding);
-            panel.Radius = 4;
+            panel.Radius = 10;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
             panel.BorderColor = BorderLightColor;
-            panel.Shadow = 0;
+            panel.Shadow = 16;
+            panel.ShadowOpacity = 0.08F;
+            panel.ShadowOffsetY = 2;
             return panel;
         }
 
@@ -241,7 +243,7 @@ namespace AiCleanVolume.Desktop
             table.BorderColor = BorderLightColor;
             table.ColumnBack = FillSecondary;
             table.ColumnFore = TextSecondaryColor;
-            table.RowHoverBg = Color.FromArgb(245, 248, 255);
+            table.RowHoverBg = AntdUI.Style.Db.HoverBg;
             table.RowSelectedBg = PrimarySoftColor;
         }
 
@@ -251,10 +253,11 @@ namespace AiCleanVolume.Desktop
             button.AutoSizeMode = AntdUI.TAutoSize.None;
             button.Text = text;
             button.Type = type;
-            button.Width = text == "删除勾选" || text == "保存配置" ? 104 : 92;
-            button.Height = 40;
-            button.Radius = 9;
+            button.Width = text == "删除勾选" || text == "保存配置" ? 108 : 96;
+            button.Height = 38;
+            button.Radius = 8;
             button.BorderWidth = 0F;
+            button.WaveSize = 4;
             button.IconSvg = GetToolbarButtonIconSvg(text);
             button.Margin = Padding.Empty;
             return button;
@@ -287,9 +290,10 @@ namespace AiCleanVolume.Desktop
             button.Text = text;
             button.Type = type;
             button.Width = 78;
-            button.Height = 28;
+            button.Height = 30;
             button.Radius = 8;
             button.BorderWidth = 1F;
+            button.WaveSize = 3;
             button.Ghost = type == AntdUI.TTypeMini.Default;
             button.Margin = new Padding(8, 0, 0, 0);
             return button;
@@ -302,9 +306,10 @@ namespace AiCleanVolume.Desktop
             button.AutoSizeMode = AntdUI.TAutoSize.None;
             button.Text = text;
             button.Type = type;
-            button.Height = 34;
+            button.Height = 36;
             button.Radius = 8;
             button.BorderWidth = 1F;
+            button.WaveSize = 3;
             button.Ghost = type == AntdUI.TTypeMini.Default;
             button.Margin = new Padding(0, 4, 8, 4);
             return button;
