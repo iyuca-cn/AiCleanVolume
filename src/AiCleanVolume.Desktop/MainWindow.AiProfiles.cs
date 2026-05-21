@@ -208,9 +208,11 @@ namespace AiCleanVolume.Desktop
                 AiProfile profile = CreateAiProfileFromPage();
                 UpsertAiProfile(profile, true);
                 settingsStore.Save(settings);
+                SetActivePage(PageSettings);
                 PopulateAiProfiles();
                 SelectAiProfile(0);
-                SetActivePage(PageSettings);
+                ResetAiProfileListScroll();
+                RefreshAiProfileListLayout();
                 Log("AI 配置方案已新增：" + profile.Name + "。");
                 ShowInfo("完成", "AI 配置方案已新增。");
             }
@@ -307,8 +309,22 @@ namespace AiCleanVolume.Desktop
             finally
             {
                 aiProfileListPanel.ResumeLayout();
-                ResizeAiProfileCards();
+                RefreshAiProfileListLayout();
             }
+        }
+
+        private void ResetAiProfileListScroll()
+        {
+            if (aiProfileListPanel == null || aiProfileListPanel.ScrollBar == null) return;
+            aiProfileListPanel.ScrollBar.ValueY = 0;
+        }
+
+        private void RefreshAiProfileListLayout()
+        {
+            if (aiProfileListPanel == null) return;
+            ResizeAiProfileCards();
+            aiProfileListPanel.PerformLayout();
+            aiProfileListPanel.Invalidate(true);
         }
 
         private Control CreateEmptyAiProfileCard()
