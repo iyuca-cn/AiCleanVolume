@@ -88,8 +88,10 @@ namespace AiCleanVolume.Desktop
 
             AntdUI.Label title = CreateSectionTitle("新增 AI 配置");
             title.Dock = DockStyle.Fill;
+            aiProfilePageTitle = title;
             AntdUI.Label desc = CreateSectionDescription("填写接入参数并保存为配置卡片。");
             desc.Dock = DockStyle.Fill;
+            aiProfilePageDesc = desc;
 
             AntdUI.GridPanel textLayout = CreateGridPanel("36:fill;30:fill");
             textLayout.Dock = DockStyle.Fill;

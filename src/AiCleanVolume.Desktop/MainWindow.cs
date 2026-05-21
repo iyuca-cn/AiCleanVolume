@@ -248,6 +248,10 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Input aiProfileSystemPromptInput;
 
+        private AntdUI.Label aiProfilePageTitle;
+
+        private AntdUI.Label aiProfilePageDesc;
+
         private AntdUI.Select aiProviderPresetSelect;
 
         private AntdUI.Select aiPromptPresetSelect;
@@ -309,6 +313,8 @@ namespace AiCleanVolume.Desktop
         private bool syncingPrivilegeCheckboxes;
 
         private bool storageTreeDeleteDirty;
+
+        private int editingAiProfileIndex = -1;
 
         private int sidebarWidth;
 

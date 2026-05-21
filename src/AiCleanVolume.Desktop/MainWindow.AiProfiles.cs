@@ -158,8 +158,17 @@ namespace AiCleanVolume.Desktop
 
         private void OpenAiProfileCreatePage()
         {
+            editingAiProfileIndex = -1;
             InitializeAiProfilePageValues();
+            UpdateAiProfilePageHeader(false);
             SetActivePage(PageAiProfileCreate);
+        }
+
+        private void UpdateAiProfilePageHeader(bool editing)
+        {
+            if (aiProfilePageTitle != null) aiProfilePageTitle.Text = editing ? "编辑 AI 配置" : "新增 AI 配置";
+            if (aiProfilePageDesc != null) aiProfilePageDesc.Text = editing ? "修改接入参数，保存后会更新原有的配置卡片。" : "填写接入参数并保存为配置卡片。";
+            if (saveAiProfilePageButton != null) saveAiProfilePageButton.Text = editing ? "更新" : "保存";
         }
 
         private void InitializeAiProfilePageValues()
@@ -206,19 +215,24 @@ namespace AiCleanVolume.Desktop
             try
             {
                 AiProfile profile = CreateAiProfileFromPage();
-                UpsertAiProfile(profile, true);
+                bool editing = editingAiProfileIndex >= 0 && settings.Ai.Profiles != null && editingAiProfileIndex < settings.Ai.Profiles.Count;
+                int targetIndex = editing ? editingAiProfileIndex : -1;
+                InsertOrReplaceAiProfile(profile, targetIndex);
                 settingsStore.Save(settings);
+                int selectedIndex = editing ? targetIndex : 0;
+                editingAiProfileIndex = -1;
                 SetActivePage(PageSettings);
                 PopulateAiProfiles();
-                SelectAiProfile(0);
+                SelectAiProfile(selectedIndex);
                 ResetAiProfileListScroll();
                 RefreshAiProfileListLayout();
-                Log("AI 配置方案已新增：" + profile.Name + "。");
-                ShowInfo("完成", "AI 配置方案已新增。");
+                string verb = editing ? "已更新" : "已新增";
+                Log("AI 配置方案" + verb + "：" + profile.Name + "。");
+                ShowInfo("完成", "AI 配置方案" + verb + "。");
             }
             catch (Exception ex)
             {
-                Log("新增 AI 配置方案失败：" + ex.Message);
+                Log("保存 AI 配置方案失败：" + ex.Message);
                 ShowError("保存失败", ex.Message);
             }
         }
@@ -261,6 +275,7 @@ namespace AiCleanVolume.Desktop
 
         private void CancelAiProfileCreatePage()
         {
+            editingAiProfileIndex = -1;
             SetActivePage(PageSettings);
         }
 
@@ -394,7 +409,6 @@ namespace AiCleanVolume.Desktop
             AddGridControl(titleRow, title, 0);
             tagRow.Controls.Add(CreateAiProfileTag(IsAiProfileConfigured(profile) ? "正常" : "待补全", IsAiProfileConfigured(profile) ? AntdUI.TTypeMini.Success : AntdUI.TTypeMini.Warn));
             tagRow.Controls.Add(CreateAiProfileTag(FormatAiAccessModeLabel(profile.AccessMode), AntdUI.TTypeMini.Info));
-            tagRow.Controls.Add(CreateAiProfileTag("P" + (index + 1).ToString(), AntdUI.TTypeMini.Primary));
             AddGridControl(titleRow, tagRow, 1);
 
             AntdUI.Label endpoint = new AntdUI.Label();
@@ -412,7 +426,7 @@ namespace AiCleanVolume.Desktop
             AddGridControl(content, endpoint, 1);
             AddGridControl(content, meta, 2);
 
-            AntdUI.GridPanel actions = CreateGridPanel("fill;fill;fill-fill 34 fill");
+            AntdUI.GridPanel actions = CreateGridPanel("fill;fill;fill;fill;fill-fill 32 4 28 fill");
             actions.Dock = DockStyle.Fill;
             actions.BackColor = Color.Transparent;
 
@@ -422,9 +436,29 @@ namespace AiCleanVolume.Desktop
                 SelectAiProfile(index);
                 ApplySelectedAiProfile();
             };
+
+            AntdUI.GridPanel iconRow = CreateGridPanel("fill 28 6 28 fill");
+            iconRow.Dock = DockStyle.Fill;
+            iconRow.BackColor = Color.Transparent;
+            iconRow.Margin = new Padding(8, 0, 0, 0);
+
+            AntdUI.Button editButton = CreateAiProfileCardIconButton("EditOutlined", AntdUI.TTypeMini.Primary);
+            editButton.Click += delegate { EditAiProfile(index); };
+
+            AntdUI.Button deleteButton = CreateAiProfileCardIconButton("DeleteOutlined", AntdUI.TTypeMini.Error);
+            deleteButton.Click += delegate { DeleteAiProfile(index); };
+
+            AddGridControl(iconRow, CreateGridSpacer(), 0);
+            AddGridControl(iconRow, editButton, 1);
+            AddGridControl(iconRow, CreateGridSpacer(), 2);
+            AddGridControl(iconRow, deleteButton, 3);
+            AddGridControl(iconRow, CreateGridSpacer(), 4);
+
             AddGridControl(actions, CreateGridSpacer(), 0);
             AddGridControl(actions, applyButton, 1);
             AddGridControl(actions, CreateGridSpacer(), 2);
+            AddGridControl(actions, iconRow, 3);
+            AddGridControl(actions, CreateGridSpacer(), 4);
 
             AddGridControl(layout, avatarCell, 0);
             AddGridControl(layout, content, 1);
@@ -450,6 +484,23 @@ namespace AiCleanVolume.Desktop
             card.ShadowOpacity = 0F;
             card.ShadowOffsetY = 0;
             return card;
+        }
+
+        private AntdUI.Button CreateAiProfileCardIconButton(string iconSvg, AntdUI.TTypeMini type)
+        {
+            AntdUI.Button button = new AntdUI.Button();
+            button.Dock = DockStyle.Fill;
+            button.AutoSizeMode = AntdUI.TAutoSize.None;
+            button.DisplayStyle = AntdUI.TButtonDisplayStyle.Image;
+            button.IconSvg = iconSvg;
+            button.Type = type;
+            button.Ghost = true;
+            button.Height = 30;
+            button.Radius = 8;
+            button.BorderWidth = 1F;
+            button.WaveSize = 2;
+            button.Margin = new Padding(0, 1, 0, 1);
+            return button;
         }
 
         private AntdUI.Button CreateAiProfileCardActionButton(string text, string iconSvg, bool selected)
@@ -615,24 +666,25 @@ namespace AiCleanVolume.Desktop
 
         private void UpsertAiProfile(AiProfile profile, bool matchByName)
         {
+            InsertOrReplaceAiProfile(profile, -1);
+        }
+
+        private void InsertOrReplaceAiProfile(AiProfile profile, int replaceIndex)
+        {
             if (profile == null) return;
             if (settings.Ai.Profiles == null) settings.Ai.Profiles = new List<AiProfile>();
 
             List<AiProfile> profiles = new List<AiProfile>(AiSettings.NormalizeProfiles(settings.Ai.Profiles));
-            string fingerprint = profile.BuildFingerprint();
-            int matchIndex = -1;
-            for (int i = 0; i < profiles.Count; i++)
+
+            if (replaceIndex >= 0 && replaceIndex < profiles.Count)
             {
-                if ((matchByName && string.Equals(NormalizeValue(profiles[i].Name), NormalizeValue(profile.Name), StringComparison.OrdinalIgnoreCase)) ||
-                    string.Equals(profiles[i].BuildFingerprint(), fingerprint, StringComparison.OrdinalIgnoreCase))
-                {
-                    matchIndex = i;
-                    break;
-                }
+                profiles[replaceIndex] = profile.Clone();
+            }
+            else
+            {
+                profiles.Insert(0, profile.Clone());
             }
 
-            if (matchIndex >= 0) profiles.RemoveAt(matchIndex);
-            profiles.Insert(0, profile.Clone());
             while (profiles.Count > 10) profiles.RemoveAt(profiles.Count - 1);
             settings.Ai.Profiles = profiles;
         }
@@ -707,6 +759,57 @@ namespace AiCleanVolume.Desktop
             if (loadingStartupUi) return;
             if (syncingAiProfilePromptPreset || aiProfileSystemPromptInput == null) return;
             SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
+        }
+
+        private void EditAiProfile(int index)
+        {
+            if (settings == null || settings.Ai == null || settings.Ai.Profiles == null) return;
+            if (index < 0 || index >= settings.Ai.Profiles.Count) return;
+
+            AiProfile profile = settings.Ai.Profiles[index];
+            editingAiProfileIndex = index;
+            LoadAiProfilePageValues(profile);
+            UpdateAiProfilePageHeader(true);
+            SetActivePage(PageAiProfileCreate);
+        }
+
+        private void LoadAiProfilePageValues(AiProfile profile)
+        {
+            if (profile == null) return;
+            aiProfileNameInput.Text = NormalizeValue(profile.Name);
+            aiProfileAccessModeSelect.SelectedValue = AiSettings.NormalizeAccessMode(profile.AccessMode);
+            aiProfileEndpointInput.Text = NormalizeValue(profile.Endpoint);
+            aiProfileApiKeyInput.Text = NormalizeValue(profile.ApiKey);
+            aiProfileModelInput.Text = NormalizeValue(profile.Model);
+            aiProfileMaxSuggestionsInput.Text = (profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions).ToString();
+            aiProfileCookieMappingsInput.Text = FormatModelCookieMappings(profile.ModelCookieMappings, profile.Model);
+            aiProfileSystemPromptInput.Text = NormalizeValue(profile.SystemPrompt);
+            UpdateAiProfileAccessModeUi();
+            SelectAiProfileProviderPresetForValues(aiProfileEndpointInput.Text, aiProfileModelInput.Text);
+            SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
+        }
+
+        private void DeleteAiProfile(int index)
+        {
+            if (settings == null || settings.Ai == null || settings.Ai.Profiles == null) return;
+            if (index < 0 || index >= settings.Ai.Profiles.Count) return;
+
+            AiProfile profile = settings.Ai.Profiles[index];
+            string name = string.IsNullOrWhiteSpace(profile.Name) ? "未命名配置" : profile.Name;
+
+            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "确认删除", "确定要删除配置「" + name + "」吗？此操作不可撤销。", AntdUI.TType.Warn);
+            config.OkText = "删除";
+            config.CancelText = "取消";
+            config.OkType = AntdUI.TTypeMini.Error;
+            config.MaskClosable = false;
+            if (AntdUI.Modal.open(config) != DialogResult.OK) return;
+
+            List<AiProfile> profiles = new List<AiProfile>(settings.Ai.Profiles);
+            profiles.RemoveAt(index);
+            settings.Ai.Profiles = profiles;
+            settingsStore.Save(settings);
+            PopulateAiProfiles();
+            Log("已删除 AI 配置方案：" + name + "。");
         }
     }
 }
