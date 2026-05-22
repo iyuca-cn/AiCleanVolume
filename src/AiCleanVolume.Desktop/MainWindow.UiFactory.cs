@@ -21,29 +21,29 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Dock = DockStyle.Fill;
             panel.Padding = new Padding(padding);
-            panel.Radius = 14;
+            panel.Radius = 8;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
-            panel.BorderColor = BorderLightColor;
-            panel.Shadow = 20;
-            panel.ShadowOpacity = 0.12F;
-            panel.ShadowOffsetY = 4;
+            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.Shadow = 12;
+            panel.ShadowOpacity = 0.06F;
+            panel.ShadowOffsetY = 2;
             return panel;
         }
 
         private static AntdUI.Panel CreateSettingsGroupPanel(string title, string description, out AntdUI.Panel body)
         {
-            AntdUI.Panel panel = CreateSettingsSurfacePanel(20);
+            AntdUI.Panel panel = CreateSettingsSurfacePanel(16);
 
             AntdUI.Label titleLabel = CreateSettingsGroupTitle(title);
             AntdUI.Label descLabel = CreateSmallMutedLabel(description);
             descLabel.Dock = DockStyle.Top;
-            descLabel.Height = 24;
+            descLabel.Height = 22;
 
             body = CreateFlatPanel();
             body.Dock = DockStyle.Fill;
             body.BackColor = Color.Transparent;
-            body.Padding = new Padding(0, 10, 0, 0);
+            body.Padding = new Padding(0, 8, 0, 0);
 
             panel.Controls.Add(body);
             panel.Controls.Add(descLabel);
@@ -55,11 +55,11 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Label label = new AntdUI.Label();
             label.Dock = DockStyle.Top;
-            label.Height = 28;
+            label.Height = 26;
             label.Text = text;
             label.TextAlign = ContentAlignment.MiddleLeft;
-            label.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            label.ForeColor = TextPrimaryColor;
+            label.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            label.ForeColor = Color.FromArgb(30, 30, 30);
             label.BackColor = Color.Transparent;
             return label;
         }
@@ -70,8 +70,8 @@ namespace AiCleanVolume.Desktop
             label.Dock = DockStyle.Fill;
             label.Text = text;
             label.TextAlign = ContentAlignment.MiddleLeft;
-            label.Font = new Font("Microsoft YaHei UI", 9F);
-            label.ForeColor = TextTertiaryColor;
+            label.Font = new Font("Segoe UI", 9F);
+            label.ForeColor = Color.FromArgb(120, 120, 120);
             label.BackColor = Color.Transparent;
             return label;
         }
@@ -143,15 +143,15 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Padding = new Padding(padding);
-            panel.Radius = 12;
+            panel.Radius = 8;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
-            panel.BorderColor = BorderLightColor;
-            panel.Shadow = 28;
-            panel.ShadowOpacity = 0.15F;
-            panel.ShadowOpacityHover = animateShadowOnHover ? 0.22F : 0.15F;
+            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.Shadow = 16;
+            panel.ShadowOpacity = 0.08F;
+            panel.ShadowOpacityHover = animateShadowOnHover ? 0.12F : 0.08F;
             panel.ShadowOpacityAnimation = animateShadowOnHover;
-            panel.ShadowOffsetY = 6;
+            panel.ShadowOffsetY = 3;
             return panel;
         }
 
@@ -159,13 +159,13 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Padding = new Padding(padding);
-            panel.Radius = 12;
+            panel.Radius = 8;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
-            panel.BorderColor = BorderLightColor;
-            panel.Shadow = 18;
-            panel.ShadowOpacity = 0.10F;
-            panel.ShadowOffsetY = 3;
+            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.Shadow = 10;
+            panel.ShadowOpacity = 0.05F;
+            panel.ShadowOffsetY = 2;
             return panel;
         }
 
@@ -237,14 +237,14 @@ namespace AiCleanVolume.Desktop
         private static void ConfigureTableSurface(AntdUI.Table table)
         {
             table.Bordered = true;
-            table.Radius = 12;
+            table.Radius = 8;
             table.BorderWidth = 1F;
             table.BorderCellWidth = 1F;
-            table.BorderColor = BorderLightColor;
-            table.ColumnBack = AntdUI.Style.Db.TagDefaultBg;
-            table.ColumnFore = TextSecondaryColor;
-            table.RowHoverBg = AntdUI.Style.Db.HoverBg;
-            table.RowSelectedBg = PrimarySoftColor;
+            table.BorderColor = Color.FromArgb(230, 230, 230);
+            table.ColumnBack = Color.FromArgb(250, 250, 250);
+            table.ColumnFore = Color.FromArgb(80, 80, 80);
+            table.RowHoverBg = Color.FromArgb(245, 247, 250);
+            table.RowSelectedBg = Color.FromArgb(230, 244, 255);
         }
 
         private static AntdUI.Button CreateToolbarActionButton(string text, AntdUI.TTypeMini type)
@@ -253,11 +253,11 @@ namespace AiCleanVolume.Desktop
             button.AutoSizeMode = AntdUI.TAutoSize.None;
             button.Text = text;
             button.Type = type;
-            button.Width = text == "删除勾选" || text == "保存配置" ? 116 : 104;
-            button.Height = 42;
-            button.Radius = 10;
+            button.Width = text == "删除勾选" || text == "保存配置" ? 110 : 100;
+            button.Height = 36;
+            button.Radius = 6;
             button.BorderWidth = 0F;
-            button.WaveSize = 4;
+            button.WaveSize = 3;
             button.IconSvg = GetToolbarButtonIconSvg(text);
             button.Margin = Padding.Empty;
             return button;
@@ -289,11 +289,11 @@ namespace AiCleanVolume.Desktop
             button.AutoSizeMode = AntdUI.TAutoSize.None;
             button.Text = text;
             button.Type = type;
-            button.Width = 84;
-            button.Height = 34;
-            button.Radius = 10;
+            button.Width = 76;
+            button.Height = 30;
+            button.Radius = 6;
             button.BorderWidth = 1F;
-            button.WaveSize = 3;
+            button.WaveSize = 2;
             button.Ghost = type == AntdUI.TTypeMini.Default;
             button.Margin = new Padding(8, 0, 0, 0);
             return button;
@@ -306,10 +306,10 @@ namespace AiCleanVolume.Desktop
             button.AutoSizeMode = AntdUI.TAutoSize.None;
             button.Text = text;
             button.Type = type;
-            button.Height = 40;
-            button.Radius = 10;
+            button.Height = 34;
+            button.Radius = 6;
             button.BorderWidth = 1F;
-            button.WaveSize = 3;
+            button.WaveSize = 2;
             button.Ghost = type == AntdUI.TTypeMini.Default;
             button.Margin = new Padding(0, 4, 8, 4);
             return button;
@@ -323,9 +323,9 @@ namespace AiCleanVolume.Desktop
             button.DisplayStyle = AntdUI.TButtonDisplayStyle.Image;
             button.Shape = AntdUI.TShape.Circle;
             button.IconSvg = "PlusOutlined";
-            button.Type = AntdUI.TTypeMini.Warn;
-            button.Width = 38;
-            button.Height = 38;
+            button.Type = AntdUI.TTypeMini.Primary;
+            button.Width = 32;
+            button.Height = 32;
             button.BorderWidth = 0F;
             button.Margin = new Padding(8, 4, 0, 4);
             button.WaveSize = 2;
@@ -335,8 +335,8 @@ namespace AiCleanVolume.Desktop
         private static AntdUI.Switch CreateSettingsSwitch()
         {
             AntdUI.Switch control = new AntdUI.Switch();
-            control.Width = 64;
-            control.Height = 36;
+            control.Width = 56;
+            control.Height = 28;
             control.Anchor = AnchorStyles.Left;
             control.Margin = new Padding(0, 8, 16, 8);
             control.WaveSize = 2;
@@ -348,13 +348,13 @@ namespace AiCleanVolume.Desktop
             AntdUI.Input input = new AntdUI.Input();
             input.Dock = DockStyle.Fill;
             input.PlaceholderText = placeholder;
-            input.Font = new Font("Segoe UI", 10.5F);
-            input.Radius = 10;
+            input.Font = new Font("Segoe UI", 10F);
+            input.Radius = 6;
             input.BorderWidth = 1F;
-            input.BorderColor = BorderDefaultColor;
-            input.BorderHover = PrimaryColor;
-            input.BorderActive = PrimaryColor;
-            input.BackColor = SurfaceColor;
+            input.BorderColor = Color.FromArgb(210, 210, 210);
+            input.BorderHover = Color.FromArgb(22, 119, 255);
+            input.BorderActive = Color.FromArgb(22, 119, 255);
+            input.BackColor = Color.White;
             return input;
         }
 
@@ -363,8 +363,8 @@ namespace AiCleanVolume.Desktop
             AntdUI.Checkbox checkbox = new AntdUI.Checkbox();
             checkbox.Dock = DockStyle.Fill;
             checkbox.Text = text;
-            checkbox.Font = new Font("Microsoft YaHei UI", 9.5F);
-            checkbox.ForeColor = TextPrimaryColor;
+            checkbox.Font = new Font("Segoe UI", 9.5F);
+            checkbox.ForeColor = Color.FromArgb(50, 50, 50);
             checkbox.BackColor = Color.Transparent;
             return checkbox;
         }
@@ -375,13 +375,13 @@ namespace AiCleanVolume.Desktop
             select.Dock = DockStyle.Fill;
             select.DropDownArrow = true;
             select.ListAutoWidth = true;
-            select.DropDownRadius = 10;
-            select.Radius = 10;
+            select.DropDownRadius = 6;
+            select.Radius = 6;
             select.BorderWidth = 1F;
-            select.BorderColor = BorderDefaultColor;
-            select.BorderHover = PrimaryColor;
-            select.BorderActive = PrimaryColor;
-            select.BackColor = SurfaceColor;
+            select.BorderColor = Color.FromArgb(210, 210, 210);
+            select.BorderHover = Color.FromArgb(22, 119, 255);
+            select.BorderActive = Color.FromArgb(22, 119, 255);
+            select.BackColor = Color.White;
             select.Font = Font;
             return select;
         }
@@ -399,8 +399,8 @@ namespace AiCleanVolume.Desktop
             label.Dock = DockStyle.Fill;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Text = text;
-            label.Font = new Font("Segoe UI", 10F);
-            label.ForeColor = TextSecondaryColor;
+            label.Font = new Font("Segoe UI", 9.5F);
+            label.ForeColor = Color.FromArgb(80, 80, 80);
             label.BackColor = Color.Transparent;
             return label;
         }
@@ -408,33 +408,33 @@ namespace AiCleanVolume.Desktop
         private static void ConfigureCleanupListSurface(AntdUI.Table table)
         {
             ConfigureTableSurface(table);
-            table.RowHeight = 58;
-            table.RowHeightHeader = 44;
-            table.GapCell = 10;
+            table.RowHeight = 52;
+            table.RowHeightHeader = 40;
+            table.GapCell = 8;
         }
 
         private static Control CreateInfoCard(string title, out AntdUI.Label valueLabel)
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Dock = DockStyle.Fill;
-            panel.Radius = 8;
+            panel.Radius = 6;
             panel.Padding = new Padding(12, 8, 12, 8);
-            panel.Back = FillSecondary;
+            panel.Back = Color.FromArgb(250, 250, 250);
             panel.BorderWidth = 1F;
-            panel.BorderColor = BorderLightColor;
+            panel.BorderColor = Color.FromArgb(230, 230, 230);
 
             AntdUI.Label titleLabel = new AntdUI.Label();
             titleLabel.Dock = DockStyle.Top;
             titleLabel.Height = 18;
             titleLabel.Text = title;
-            titleLabel.Font = new Font("Microsoft YaHei UI", 9F);
-            titleLabel.ForeColor = TextTertiaryColor;
+            titleLabel.Font = new Font("Segoe UI", 9F);
+            titleLabel.ForeColor = Color.FromArgb(120, 120, 120);
             titleLabel.BackColor = Color.Transparent;
 
             valueLabel = new AntdUI.Label();
             valueLabel.Dock = DockStyle.Fill;
-            valueLabel.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold);
-            valueLabel.ForeColor = TextPrimaryColor;
+            valueLabel.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            valueLabel.ForeColor = Color.FromArgb(30, 30, 30);
             valueLabel.BackColor = Color.Transparent;
             valueLabel.TextAlign = ContentAlignment.MiddleLeft;
             valueLabel.Text = "-";

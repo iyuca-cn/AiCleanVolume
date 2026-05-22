@@ -182,9 +182,9 @@ namespace AiCleanVolume.Desktop
         {
             if (settingsNavButton == null) return;
             bool selected = activePageId == PageSettings;
-            settingsNavButton.BackColor = selected ? Color.FromArgb(22, 119, 255) : Color.Transparent;
+            settingsNavButton.BackColor = selected ? Color.FromArgb(245, 247, 250) : Color.Transparent;
             settingsNavButton.DefaultBorderColor = Color.Transparent;
-            settingsNavButton.ForeColor = selected ? Color.White : Color.FromArgb(166, 187, 210);
+            settingsNavButton.ForeColor = selected ? Color.FromArgb(22, 119, 255) : Color.FromArgb(100, 100, 100);
             settingsNavButton.IconSvg = "SettingOutlined";
         }
 
