@@ -28,17 +28,17 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.PageHeader header = new AntdUI.PageHeader();
             header.Dock = DockStyle.Top;
-            header.Height = 68;
+            header.Height = 80;
             header.Text = title;
             header.Description = description;
             header.UseTitleFont = true;
             header.ShowButton = false;
             header.ShowIcon = false;
             header.DividerShow = true;
-            header.DividerMargin = 2;
+            header.DividerMargin = 3;
             header.DividerColor = BorderLightColor;
             header.BackColor = Color.Transparent;
-            header.Padding = new Padding(4, 0, 4, 8);
+            header.Padding = new Padding(8, 4, 8, 12);
             return header;
         }
 
@@ -73,7 +73,7 @@ namespace AiCleanVolume.Desktop
 
             sidebarPanel = new AntdUI.Panel();
             sidebarPanel.Dock = DockStyle.Fill;
-            sidebarPanel.Back = Color.FromArgb(0, 21, 41);
+            sidebarPanel.Back = Color.FromArgb(15, 30, 55);
             sidebarPanel.BorderWidth = 0F;
             sidebarPanel.Radius = 0;
             sidebarPanel.Shadow = 0;
@@ -107,16 +107,26 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel brandPanel = CreateFlatPanel();
             brandPanel.Dock = DockStyle.Top;
-            brandPanel.Height = 70;
-            brandPanel.Padding = new Padding(6, 10, 6, 14);
+            brandPanel.Height = 80;
+            brandPanel.Padding = new Padding(10, 16, 10, 16);
             brandPanel.BackColor = Color.Transparent;
 
+            AntdUI.Panel iconContainer = new AntdUI.Panel();
+            iconContainer.Dock = DockStyle.Left;
+            iconContainer.Width = 44;
+            iconContainer.Height = 44;
+            iconContainer.Radius = 12;
+            iconContainer.Back = Color.FromArgb(22, 119, 255);
+            iconContainer.BorderWidth = 0F;
+            iconContainer.Shadow = 8;
+            iconContainer.ShadowOpacity = 0.3F;
+            iconContainer.ShadowColor = Color.FromArgb(22, 119, 255);
+
             sidebarBrandIconLabel = new AntdUI.Label();
-            sidebarBrandIconLabel.Dock = DockStyle.Left;
-            sidebarBrandIconLabel.Width = 32;
+            sidebarBrandIconLabel.Dock = DockStyle.Fill;
             sidebarBrandIconLabel.Text = "AI";
-            sidebarBrandIconLabel.Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold);
-            sidebarBrandIconLabel.ForeColor = Color.FromArgb(64, 169, 255);
+            sidebarBrandIconLabel.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            sidebarBrandIconLabel.ForeColor = Color.White;
             sidebarBrandIconLabel.BackColor = Color.Transparent;
             sidebarBrandIconLabel.TextAlign = ContentAlignment.MiddleCenter;
 
@@ -124,14 +134,16 @@ namespace AiCleanVolume.Desktop
             sidebarBrandTextLabel.Dock = DockStyle.Fill;
             sidebarBrandTextLabel.Width = 156;
             sidebarBrandTextLabel.Text = AppDisplayName;
-            sidebarBrandTextLabel.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold);
+            sidebarBrandTextLabel.Font = new Font("Segoe UI", 15F, FontStyle.Bold);
             sidebarBrandTextLabel.ForeColor = Color.White;
             sidebarBrandTextLabel.BackColor = Color.Transparent;
             sidebarBrandTextLabel.AutoEllipsis = true;
             sidebarBrandTextLabel.TextAlign = ContentAlignment.MiddleLeft;
+            sidebarBrandTextLabel.Padding = new Padding(12, 0, 0, 0);
 
+            iconContainer.Controls.Add(sidebarBrandIconLabel);
             brandPanel.Controls.Add(sidebarBrandTextLabel);
-            brandPanel.Controls.Add(sidebarBrandIconLabel);
+            brandPanel.Controls.Add(iconContainer);
             return brandPanel;
         }
 
@@ -163,16 +175,16 @@ namespace AiCleanVolume.Desktop
             menu.Dock = DockStyle.Fill;
             menu.Mode = AntdUI.TMenuMode.Inline;
             menu.Unique = true;
-            menu.Radius = 8;
+            menu.Radius = 12;
             menu.Indent = false;
-            menu.Gap = 12;
-            menu.IconGap = 10;
-            menu.itemMargin = 5;
-            menu.IconRatio = 1.08F;
-            menu.Padding = new Padding(2, 6, 2, 6);
-            menu.ForeColor = Color.FromArgb(166, 187, 210);
+            menu.Gap = 16;
+            menu.IconGap = 12;
+            menu.itemMargin = 6;
+            menu.IconRatio = 1.15F;
+            menu.Padding = new Padding(4, 8, 4, 8);
+            menu.ForeColor = Color.FromArgb(180, 200, 225);
             menu.BackColor = Color.Transparent;
-            menu.BackHover = Color.FromArgb(255, 255, 255, 15);
+            menu.BackHover = Color.FromArgb(255, 255, 255, 20);
             menu.BackActive = Color.FromArgb(22, 119, 255);
             menu.ForeActive = Color.White;
             menu.ColorScheme = AntdUI.TAMode.Dark;
@@ -192,24 +204,24 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel footerPanel = CreateFlatPanel();
             footerPanel.Dock = DockStyle.Bottom;
-            footerPanel.Height = 64;
-            footerPanel.Padding = new Padding(10, 10, 10, 10);
+            footerPanel.Height = 72;
+            footerPanel.Padding = new Padding(12, 12, 12, 12);
             footerPanel.BackColor = Color.Transparent;
 
             settingsNavButton = new AntdUI.Button();
             settingsNavButton.Dock = DockStyle.Fill;
-            settingsNavButton.Width = 42;
-            settingsNavButton.Height = 42;
+            settingsNavButton.Width = 48;
+            settingsNavButton.Height = 48;
             settingsNavButton.IconSvg = "SettingOutlined";
             settingsNavButton.Text = null;
             settingsNavButton.DisplayStyle = AntdUI.TButtonDisplayStyle.Image;
-            settingsNavButton.IconRatio = 0.86F;
-            settingsNavButton.Radius = 10;
+            settingsNavButton.IconRatio = 0.92F;
+            settingsNavButton.Radius = 12;
             settingsNavButton.Type = AntdUI.TTypeMini.Default;
             settingsNavButton.BorderWidth = 0F;
             settingsNavButton.Ghost = true;
-            settingsNavButton.WaveSize = 2;
-            settingsNavButton.ForeColor = Color.FromArgb(166, 187, 210);
+            settingsNavButton.WaveSize = 3;
+            settingsNavButton.ForeColor = Color.FromArgb(180, 200, 225);
             settingsNavButton.BackColor = Color.Transparent;
             settingsNavButton.DefaultBorderColor = Color.Transparent;
             settingsNavButton.Click += SettingsNavButton_Click;
@@ -223,10 +235,10 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel toolbarHost = CreateFlatPanel();
             toolbarHost.Dock = DockStyle.Top;
             toolbarHost.BackColor = PageBackground;
-            toolbarHost.Height = 138;
-            toolbarHost.Padding = new Padding(0, 0, 0, 6);
+            toolbarHost.Height = 148;
+            toolbarHost.Padding = new Padding(0, 0, 0, 8);
 
-            AntdUI.Panel toolbarCard = CreateCompactSurfacePanel(8);
+            AntdUI.Panel toolbarCard = CreateCompactSurfacePanel(12);
             toolbarCard.Dock = DockStyle.Fill;
 
             AntdUI.GridPanel toolbarLayout = CreateGridPanel("fill 1 420");
@@ -238,7 +250,7 @@ namespace AiCleanVolume.Desktop
             divider.Dock = DockStyle.Fill;
             divider.Vertical = true;
             divider.ColorSplit = BorderLightColor;
-            divider.Margin = new Padding(12, 4, 12, 8);
+            divider.Margin = new Padding(16, 4, 16, 8);
 
             Control statusPanel = CreateScanStatusPanel();
             Control summaryPanel = CreateDriveSummaryPanel();
