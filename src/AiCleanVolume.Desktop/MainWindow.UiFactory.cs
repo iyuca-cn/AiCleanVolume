@@ -241,7 +241,7 @@ namespace AiCleanVolume.Desktop
             table.BorderWidth = 1F;
             table.BorderCellWidth = 1F;
             table.BorderColor = BorderLightColor;
-            table.ColumnBack = FillSecondary;
+            table.ColumnBack = AntdUI.Style.Db.TagDefaultBg;
             table.ColumnFore = TextSecondaryColor;
             table.RowHoverBg = AntdUI.Style.Db.HoverBg;
             table.RowSelectedBg = PrimarySoftColor;

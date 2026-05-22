@@ -223,7 +223,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel toolbarHost = CreateFlatPanel();
             toolbarHost.Dock = DockStyle.Top;
             toolbarHost.BackColor = PageBackground;
-            toolbarHost.Height = 118;
+            toolbarHost.Height = 138;
             toolbarHost.Padding = new Padding(0, 0, 0, 6);
 
             AntdUI.Panel toolbarCard = CreateCompactSurfacePanel(8);
@@ -242,7 +242,7 @@ namespace AiCleanVolume.Desktop
 
             Control statusPanel = CreateScanStatusPanel();
             Control summaryPanel = CreateDriveSummaryPanel();
-            AntdUI.GridPanel leftLayout = CreateGridPanel("44:fill;34:fill");
+            AntdUI.GridPanel leftLayout = CreateGridPanel("58%:fill;42%:fill");
             leftLayout.Dock = DockStyle.Fill;
             AddGridControl(leftLayout, filtersPanel, 0);
             AddGridControl(leftLayout, statusPanel, 1);
