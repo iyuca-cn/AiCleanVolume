@@ -688,11 +688,10 @@ namespace AiCleanVolume.Desktop
             apiKeyInput.Text = NormalizeValue(profile.ApiKey);
             modelInput.Text = NormalizeValue(profile.Model);
             maxSuggestionsInput.Text = (profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions).ToString();
-            systemPromptInput.Text = NormalizeValue(profile.SystemPrompt);
+            pendingSystemPrompt = NormalizeValue(profile.SystemPrompt);
             modelCookieMappingsInput.Text = FormatModelCookieMappings(profile.ModelCookieMappings, profile.Model);
             UpdateAiAccessModeUi();
             SelectAiProviderPresetForSettings(endpointInput.Text, modelInput.Text);
-            SelectAiPromptPresetForPrompt(systemPromptInput.Text);
         }
 
         private string PromptForAiProfileName(string defaultName)

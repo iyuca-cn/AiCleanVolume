@@ -27,12 +27,11 @@ namespace AiCleanVolume.Desktop
             apiKeyInput.Text = settings.Ai.ApiKey;
             modelInput.Text = settings.Ai.Model;
             maxSuggestionsInput.Text = settings.Ai.MaxSuggestions.ToString();
-            systemPromptInput.Text = settings.Ai.SystemPrompt;
+            pendingSystemPrompt = settings.Ai.SystemPrompt;
             modelCookieMappingsInput.Text = FormatModelCookieMappings(settings.Ai.ModelCookieMappings, settings.Ai.Model);
             UpdateAiAccessModeUi();
             PopulateAiProfiles();
             SelectAiProviderPresetForSettings(settings.Ai.Endpoint, settings.Ai.Model);
-            SelectAiPromptPresetForPrompt(settings.Ai.SystemPrompt);
             minSizeInput.Text = settings.Scan.MinSizeMb.ToString();
             limitInput.Text = settings.Scan.PerLevelLimit.ToString();
             if (suggestionMinSizeInput != null) suggestionMinSizeInput.Text = "128";
@@ -75,11 +74,6 @@ namespace AiCleanVolume.Desktop
             }
         }
 
-        private void PopulateAiPromptPresets()
-        {
-            PopulateAiPromptPresets(aiPromptPresetSelect);
-        }
-
         private static void PopulateAiPromptPresets(AntdUI.Select select)
         {
             if (select == null) return;
@@ -109,20 +103,12 @@ namespace AiCleanVolume.Desktop
             }
         }
 
-        private void SelectAiPromptPresetForPrompt(string prompt)
+        private static void SelectAiPromptPresetForPrompt(AntdUI.Select select, string prompt)
         {
-            if (aiPromptPresetSelect == null) return;
+            if (select == null) return;
 
             AiPromptPreset preset = FindAiPromptPresetByPrompt(prompt);
-            syncingAiPromptPreset = true;
-            try
-            {
-                aiPromptPresetSelect.SelectedValue = preset == null ? CustomAiPromptPresetKey : preset.Key;
-            }
-            finally
-            {
-                syncingAiPromptPreset = false;
-            }
+            select.SelectedValue = preset == null ? CustomAiPromptPresetKey : preset.Key;
         }
 
         private static AiProviderPreset FindAiProviderPreset(string endpoint, string model)
@@ -346,7 +332,7 @@ namespace AiCleanVolume.Desktop
             settings.Ai.ApiKey = apiKeyInput.Text.Trim();
             settings.Ai.Model = modelInput.Text.Trim();
             settings.Ai.MaxSuggestions = ParsePositiveInt(maxSuggestionsInput.Text, 30);
-            settings.Ai.SystemPrompt = systemPromptInput.Text.Trim();
+            settings.Ai.SystemPrompt = NormalizeValue(pendingSystemPrompt);
             settings.Ai.ModelCookieMappings = ParseModelCookieMappings(modelCookieMappingsInput.Text, settings.Ai.Model);
             settings.Sandbox.UseRecycleBin = recycleSwitch.Checked;
             settings.Sandbox.FullyPrivilegedMode = IsFullyPrivilegedChecked();
@@ -362,33 +348,122 @@ namespace AiCleanVolume.Desktop
             return ai != null && !string.IsNullOrWhiteSpace(ai.Endpoint) && !string.IsNullOrWhiteSpace(ai.Model);
         }
 
-        private void AiPromptPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
+        private void ShowSuggestionPromptEditor()
         {
-            if (loadingStartupUi) return;
-            if (syncingAiPromptPreset || e.Value == null) return;
+            if (settings == null || settings.Ai == null) return;
 
-            string key = e.Value.ToString();
-            if (string.Equals(key, CustomAiPromptPresetKey, StringComparison.OrdinalIgnoreCase)) return;
+            AntdUI.Panel content = CreateFlatPanel();
+            content.Width = 680;
+            content.Height = 402;
+            content.Padding = new Padding(0, 4, 0, 0);
+            content.BackColor = Color.Transparent;
 
-            AiPromptPreset preset = FindAiPromptPreset(key);
-            if (preset == null || systemPromptInput == null) return;
+            AntdUI.GridPanel form = CreateGridPanel("44:92 fill;328:92 fill");
+            form.Dock = DockStyle.Fill;
+            form.BackColor = Color.Transparent;
 
-            syncingAiPromptPreset = true;
-            try
+            AntdUI.Select presetSelect = CreateSettingsSelect();
+            PopulateAiPromptPresets(presetSelect);
+            AntdUI.Input promptInput = CreateInput("系统提示词");
+            promptInput.Multiline = true;
+            promptInput.AutoScroll = true;
+            promptInput.MaxLength = int.MaxValue;
+
+            bool syncingPreset = true;
+            promptInput.Text = GetCurrentSystemPromptText();
+            SelectAiPromptPresetForPrompt(presetSelect, promptInput.Text);
+            syncingPreset = false;
+
+            presetSelect.SelectedValueChanged += delegate(object sender, AntdUI.ObjectNEventArgs e)
             {
-                systemPromptInput.Text = preset.BuildPrompt(GetPromptDriveRoot());
-            }
-            finally
+                if (syncingPreset || e.Value == null) return;
+
+                string key = e.Value.ToString();
+                if (string.Equals(key, CustomAiPromptPresetKey, StringComparison.OrdinalIgnoreCase)) return;
+
+                AiPromptPreset preset = FindAiPromptPreset(key);
+                if (preset == null) return;
+
+                syncingPreset = true;
+                try
+                {
+                    promptInput.Text = preset.BuildPrompt(GetPromptDriveRoot());
+                }
+                finally
+                {
+                    syncingPreset = false;
+                }
+            };
+
+            promptInput.TextChanged += delegate
             {
-                syncingAiPromptPreset = false;
+                if (syncingPreset) return;
+                syncingPreset = true;
+                try
+                {
+                    SelectAiPromptPresetForPrompt(presetSelect, promptInput.Text);
+                }
+                finally
+                {
+                    syncingPreset = false;
+                }
+            };
+
+            AddWideProfileField(form, "AI 预设", presetSelect, 0);
+            AddWideProfileField(form, "系统提示词", promptInput, 1);
+            content.Controls.Add(form);
+
+            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "AI 提示词", content, AntdUI.TType.Info);
+            config.OkText = "保存";
+            config.CancelText = "取消";
+            config.OkType = AntdUI.TTypeMini.Primary;
+            config.Width = 740;
+            config.MaskClosable = false;
+            config.Resizable = true;
+            config.MinimumSize = new Size(640, 430);
+            config.OnOk = delegate
+            {
+                string prompt = NormalizeValue(promptInput.Text);
+                if (string.IsNullOrWhiteSpace(prompt))
+                {
+                    ShowWarning("提示", "系统提示词不能为空。");
+                    return false;
+                }
+
+                try
+                {
+                    SaveSettingsFromUi();
+                    pendingSystemPrompt = prompt;
+                    settings.Ai.SystemPrompt = prompt;
+                    settings.EnsureDefaults();
+                    pendingSystemPrompt = settings.Ai.SystemPrompt;
+                    settingsStore.Save(settings);
+                    Log("AI 提示词已保存。");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Log("保存 AI 提示词失败：" + ex.Message);
+                    ShowError("保存失败", ex.Message);
+                    return false;
+                }
+            };
+
+            if (AntdUI.Modal.open(config) == DialogResult.OK)
+            {
+                ShowInfo("完成", "AI 提示词已保存。");
             }
         }
 
-        private void SystemPromptInput_TextChanged(object sender, EventArgs e)
+        private string GetCurrentSystemPromptText()
         {
-            if (loadingStartupUi) return;
-            if (syncingAiPromptPreset || systemPromptInput == null) return;
-            SelectAiPromptPresetForPrompt(systemPromptInput.Text);
+            string prompt = NormalizeValue(pendingSystemPrompt);
+            if (string.IsNullOrWhiteSpace(prompt) && settings != null && settings.Ai != null)
+            {
+                prompt = NormalizeValue(settings.Ai.SystemPrompt);
+            }
+
+            return string.IsNullOrWhiteSpace(prompt) ? DefaultAiSystemPrompt : prompt;
         }
 
         private static IList<string> ParseLines(string text)

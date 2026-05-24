@@ -440,6 +440,10 @@ namespace AiCleanVolume.Desktop
             selectAllSuggestionsButton = CreateSuggestionActionButton("全选", AntdUI.TTypeMini.Primary);
             selectAllSuggestionsButton.Click += delegate { SetSuggestionSelection(true); };
 
+            suggestionPromptButton = CreateToolbarActionButton("提示词", AntdUI.TTypeMini.Default);
+            suggestionPromptButton.IconSvg = "EditOutlined";
+            suggestionPromptButton.Click += delegate { ShowSuggestionPromptEditor(); };
+
             privilegedQuickCheckbox = CreateCheckbox("完全权限模式（仅管理员运行时生效）");
             privilegedQuickCheckbox.CheckedChanged += PrivilegedCheckbox_CheckedChanged;
 
@@ -463,12 +467,13 @@ namespace AiCleanVolume.Desktop
             AddGridControl(topRow, suggestionLimitInput, 5);
             AddGridControl(topRow, privilegedQuickCheckbox, 6);
 
-            AntdUI.GridPanel actionRow = CreateGridPanel("92 92 92 96 fill 74 74 74");
+            AntdUI.GridPanel actionRow = CreateGridPanel("104 104 104 104 112 fill 74 74 74");
             actionRow.Dock = DockStyle.Fill;
             actionRow.BackColor = Color.Transparent;
             regularCleanButton.Margin = new Padding(0, 2, 8, 2);
             superCleanButton.Margin = new Padding(0, 2, 8, 2);
             analyzeButton.Margin = new Padding(0, 2, 8, 2);
+            suggestionPromptButton.Margin = new Padding(0, 2, 8, 2);
             deleteButton.Margin = new Padding(0, 2, 8, 2);
             selectAllSuggestionsButton.Margin = new Padding(0, 4, 8, 4);
             clearAllSuggestionsButton.Margin = new Padding(0, 4, 8, 4);
@@ -476,11 +481,12 @@ namespace AiCleanVolume.Desktop
             AddGridControl(actionRow, regularCleanButton, 0);
             AddGridControl(actionRow, superCleanButton, 1);
             AddGridControl(actionRow, analyzeButton, 2);
-            AddGridControl(actionRow, deleteButton, 3);
-            AddGridControl(actionRow, CreateGridSpacer(), 4);
-            AddGridControl(actionRow, selectAllSuggestionsButton, 5);
-            AddGridControl(actionRow, clearAllSuggestionsButton, 6);
-            AddGridControl(actionRow, invertSuggestionsButton, 7);
+            AddGridControl(actionRow, suggestionPromptButton, 3);
+            AddGridControl(actionRow, deleteButton, 4);
+            AddGridControl(actionRow, CreateGridSpacer(), 5);
+            AddGridControl(actionRow, selectAllSuggestionsButton, 6);
+            AddGridControl(actionRow, clearAllSuggestionsButton, 7);
+            AddGridControl(actionRow, invertSuggestionsButton, 8);
 
             AntdUI.GridPanel toolbarLayout = CreateGridPanel("40:fill;40:fill");
             toolbarLayout.Dock = DockStyle.Fill;
@@ -533,13 +539,6 @@ namespace AiCleanVolume.Desktop
             aiProviderPresetSelect.SelectedValueChanged += AiProviderPresetSelect_SelectedValueChanged;
             endpointInput.TextChanged += AiEndpointOrModelInput_TextChanged;
             modelInput.TextChanged += AiEndpointOrModelInput_TextChanged;
-            aiPromptPresetSelect = CreateSettingsSelect();
-            PopulateAiPromptPresets();
-            aiPromptPresetSelect.SelectedValueChanged += AiPromptPresetSelect_SelectedValueChanged;
-            systemPromptInput = CreateInput("系统提示词");
-            systemPromptInput.Multiline = true;
-            systemPromptInput.AutoScroll = true;
-            systemPromptInput.TextChanged += SystemPromptInput_TextChanged;
             modelCookieMappingsInput = CreateInput("直接粘贴当前模型的一整行 Cookie；也兼容 model=Cookie");
             modelCookieMappingsInput.Multiline = false;
             modelCookieMappingsInput.AutoScroll = false;

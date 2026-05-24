@@ -263,31 +263,13 @@ namespace AiCleanVolume.Desktop
 
         private void RefreshPromptForCurrentLocation()
         {
-            if (systemPromptInput == null) return;
+            if (settings == null || settings.Ai == null) return;
 
-            AiPromptPreset preset = null;
-            if (aiPromptPresetSelect != null && aiPromptPresetSelect.SelectedValue != null)
-            {
-                string key = aiPromptPresetSelect.SelectedValue.ToString();
-                if (!string.Equals(key, CustomAiPromptPresetKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    preset = FindAiPromptPreset(key);
-                }
-            }
-
-            if (preset == null) preset = FindAiPromptPresetByPrompt(systemPromptInput.Text);
+            AiPromptPreset preset = FindAiPromptPresetByPrompt(GetCurrentSystemPromptText());
             if (preset == null) return;
 
-            syncingAiPromptPreset = true;
-            try
-            {
-                if (aiPromptPresetSelect != null) aiPromptPresetSelect.SelectedValue = preset.Key;
-                systemPromptInput.Text = preset.BuildPrompt(GetPromptDriveRoot());
-            }
-            finally
-            {
-                syncingAiPromptPreset = false;
-            }
+            pendingSystemPrompt = preset.BuildPrompt(GetPromptDriveRoot());
+            settings.Ai.SystemPrompt = pendingSystemPrompt;
         }
 
         private string GetPromptDriveRoot()

@@ -97,6 +97,7 @@ namespace AiCleanVolume.Desktop
             analyzeButton.Loading = busy && activePageId == PageSuggestions;
             regularCleanButton.Loading = busy && activePageId == PageSuggestions;
             superCleanButton.Loading = busy && activePageId == PageSuggestions;
+            if (suggestionPromptButton != null) suggestionPromptButton.Enabled = !busy;
             deleteButton.Enabled = !busy;
             saveSettingsButton.Enabled = !busy;
             if (testAiSettingsButton != null) testAiSettingsButton.Enabled = !busy;

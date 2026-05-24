@@ -6,7 +6,8 @@ namespace AiCleanVolume.Core.Models
     public sealed class AiSettings
     {
         private const string LegacySystemPrompt = "你是 Windows C 盘清理助手。只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON。";
-        public const string DefaultSystemPrompt = "你是 Windows C 盘清理助手。请你只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。";
+        private const string PreviousDefaultSystemPrompt = "你是 Windows C 盘清理助手。请你只建议删除可再生成的缓存、临时文件、日志、崩溃转储、安装残留。不要建议删除系统目录、用户文档、应用程序主体或不确定的数据。输出严格 JSON，为那种[path1,path2]，这些表示可以删除的。";
+        public const string DefaultSystemPrompt = "你是 Windows 磁盘清理审核助手。只允许从候选清单中选择明确可再生成、删除后可自动恢复或可重新下载的缓存、临时文件、日志、崩溃转储和安装残留。禁止选择系统核心目录、应用程序主体、用户文档、桌面、下载目录中的个人文件、源码、配置、数据库、证书、密钥、同步盘和任何用途不确定的数据。风险不确定时不要选择。只输出严格 JSON 字符串数组，例如[\"path1\",\"path2\"]，数组元素必须完全等于候选 path，不要输出解释、Markdown 或额外字段。";
         public const string StandardApiAccessMode = "standard_api";
         public const string TwoApiAccessMode = "two_api";
         public const string DefaultModel = "gpt-5.4";
@@ -39,7 +40,9 @@ namespace AiCleanVolume.Core.Models
             if (string.IsNullOrWhiteSpace(Endpoint)) Endpoint = "https://api.openai.com";
             if (string.IsNullOrWhiteSpace(Model)) Model = DefaultModel;
             if (MaxSuggestions <= 0) MaxSuggestions = 30;
-            if (string.IsNullOrWhiteSpace(SystemPrompt) || string.Equals(SystemPrompt, LegacySystemPrompt, StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(SystemPrompt) ||
+                string.Equals(SystemPrompt, LegacySystemPrompt, StringComparison.Ordinal) ||
+                string.Equals(SystemPrompt, PreviousDefaultSystemPrompt, StringComparison.Ordinal))
             {
                 SystemPrompt = DefaultSystemPrompt;
             }

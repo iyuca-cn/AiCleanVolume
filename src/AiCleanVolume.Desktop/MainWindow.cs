@@ -173,6 +173,8 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Button testAiSettingsButton;
 
+        private AntdUI.Button suggestionPromptButton;
+
         private AntdUI.Button selectAllSuggestionsButton;
 
         private AntdUI.Button clearAllSuggestionsButton;
@@ -261,10 +263,6 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Select aiProviderPresetSelect;
 
-        private AntdUI.Select aiPromptPresetSelect;
-
-        private AntdUI.Input systemPromptInput;
-
         private AntdUI.Input modelCookieMappingsInput;
 
         private AntdUI.Input allowRootsInput;
@@ -317,8 +315,6 @@ namespace AiCleanVolume.Desktop
 
         private bool sidebarCollapsed;
 
-        private bool syncingAiPromptPreset;
-
         private bool syncingAiProviderPreset;
 
         private bool syncingAiProfilePromptPreset;
@@ -340,6 +336,8 @@ namespace AiCleanVolume.Desktop
         private int sidebarResizeStartX;
 
         private int sidebarResizeStartWidth;
+
+        private string pendingSystemPrompt;
 
         private readonly HashSet<string> expandedStoragePaths;
 
