@@ -363,7 +363,7 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateScanStatusPanel()
         {
-            AntdUI.GridPanel panel = CreateGridPanel("126 fill");
+            AntdUI.GridPanel panel = CreateGridPanel("126 112 fill");
             panel.Dock = DockStyle.Fill;
             panel.BackColor = Color.Transparent;
             panel.Padding = new Padding(0, 8, 0, 0);
@@ -376,9 +376,18 @@ namespace AiCleanVolume.Desktop
             scanStatusLabel.TextAlign = ContentAlignment.MiddleLeft;
             scanStatusLabel.Text = "等待开始扫描";
 
+            scanElapsedLabel = new AntdUI.Label();
+            scanElapsedLabel.Dock = DockStyle.Fill;
+            scanElapsedLabel.Font = new Font("Microsoft YaHei UI", 9F);
+            scanElapsedLabel.ForeColor = TextSecondaryColor;
+            scanElapsedLabel.BackColor = Color.Transparent;
+            scanElapsedLabel.TextAlign = ContentAlignment.MiddleLeft;
+            scanElapsedLabel.Text = "用时 0.0 秒";
+            scanElapsedLabel.Margin = new Padding(8, 0, 0, 0);
+
             scanProgress = new AntdUI.Progress();
             scanProgress.Dock = DockStyle.Fill;
-            scanProgress.Margin = new Padding(8, 7, 4, 9);
+            scanProgress.Margin = new Padding(0, 7, 4, 9);
             scanProgress.Shape = AntdUI.TShapeProgress.Round;
             scanProgress.Radius = 8;
             scanProgress.Value = 0F;
@@ -386,7 +395,8 @@ namespace AiCleanVolume.Desktop
             scanProgress.UseSystemText = false;
 
             AddGridControl(panel, scanStatusLabel, 0);
-            AddGridControl(panel, scanProgress, 1);
+            AddGridControl(panel, scanElapsedLabel, 1);
+            AddGridControl(panel, scanProgress, 2);
             return panel;
         }
 

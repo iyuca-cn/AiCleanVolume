@@ -87,6 +87,10 @@ namespace AiCleanVolume.Desktop
 
         private const int SidebarCollapsedWidth = 64;
 
+        private const int NtfsScanProgressIntervalMs = 20;
+
+        private const int DefaultScanProgressIntervalMs = 200;
+
         private readonly SettingsStore settingsStore;
 
         private readonly IScanProvider scanProvider;
@@ -279,7 +283,15 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Label scanStatusLabel;
 
+        private AntdUI.Label scanElapsedLabel;
+
         private AntdUI.Progress scanProgress;
+
+        private Timer scanProgressTimer;
+
+        private DateTime scanProgressStartedAt;
+
+        private string scanProgressActiveText;
 
         private FormWindowState lastWindowState;
 

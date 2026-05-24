@@ -97,7 +97,7 @@ namespace AiCleanVolume.Desktop
             storageTreeDeleteDirty = false;
             string progressText = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用..." : statusText;
             string workerCaption = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用…" : statusText;
-            UpdateScanProgressState(progressText, 0.56F, true, AntdUI.TType.None);
+            StartScanProgress(progressText, scanStartedAt, ResolveScanProgressInterval(request.Location));
             Log("扫描开始：" + DescribeScanRequest(request));
 
             RunBackground(workerCaption, delegate
@@ -113,12 +113,17 @@ namespace AiCleanVolume.Desktop
                 List<StorageEntryRow> rows = new List<StorageEntryRow> { new StorageEntryRow(result, true) };
                 storageTable.DataSource = rows;
                 UpdateDriveSummaryForLocation(result.Path);
-                UpdateScanProgressState("扫描完成 " + elapsed.TotalSeconds.ToString("0.00") + " 秒", 1F, false, AntdUI.TType.Success);
+                StopScanProgress();
+                UpdateScanProgressState("扫描完成", 1F, false, AntdUI.TType.Success);
+                UpdateScanElapsedState(elapsed);
                 Log("扫描完成：" + result.Path + "，" + DescribeSizeMode(request.SortMode) + " " + StorageFormatting.FormatBytes(result.Bytes) + "，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒，子项 " + (result.Children == null ? 0 : result.Children.Count) + "。");
                 if (onCompleted != null) onCompleted();
             }, delegate
             {
+                TimeSpan elapsed = DateTime.UtcNow - scanStartedAt;
+                StopScanProgress();
                 UpdateScanProgressState("扫描失败", 1F, false, AntdUI.TType.Error);
+                UpdateScanElapsedState(elapsed);
             });
         }
 
@@ -438,6 +443,78 @@ namespace AiCleanVolume.Desktop
             scanProgress.Value = value;
             scanProgress.State = state == AntdUI.TType.None && loading ? AntdUI.TType.Info : state;
             scanProgress.Loading = loading;
+        }
+
+        private void UpdateScanElapsedState(TimeSpan elapsed)
+        {
+            if (scanElapsedLabel != null) scanElapsedLabel.Text = "用时 " + FormatElapsedSeconds(elapsed);
+        }
+
+        private void StartScanProgress(string activeText, DateTime startedAt, int interval)
+        {
+            scanProgressStartedAt = startedAt;
+            scanProgressActiveText = string.IsNullOrWhiteSpace(activeText) ? "正在扫描空间占用..." : activeText;
+
+            if (scanProgressTimer == null)
+            {
+                scanProgressTimer = new Timer();
+                scanProgressTimer.Tick += ScanProgressTimer_Tick;
+            }
+
+            scanProgressTimer.Interval = interval;
+            RefreshActiveScanProgress();
+            scanProgressTimer.Start();
+        }
+
+        private void StopScanProgress()
+        {
+            if (scanProgressTimer != null) scanProgressTimer.Stop();
+        }
+
+        private void ScanProgressTimer_Tick(object sender, EventArgs e)
+        {
+            RefreshActiveScanProgress();
+        }
+
+        private void RefreshActiveScanProgress()
+        {
+            TimeSpan elapsed = DateTime.UtcNow - scanProgressStartedAt;
+            float progressValue = CalculateActiveScanProgress(elapsed);
+            UpdateScanProgressState(scanProgressActiveText, progressValue, true, AntdUI.TType.None);
+            UpdateScanElapsedState(elapsed);
+        }
+
+        private static float CalculateActiveScanProgress(TimeSpan elapsed)
+        {
+            double seconds = Math.Max(0D, elapsed.TotalSeconds);
+            double value = 0.05D + 0.90D * (1D - Math.Exp(-seconds / 8D));
+            if (value < 0.05D) value = 0.05D;
+            if (value > 0.95D) value = 0.95D;
+            return (float)value;
+        }
+
+        private static string FormatElapsedSeconds(TimeSpan elapsed)
+        {
+            return elapsed.TotalSeconds.ToString("0.0") + " 秒";
+        }
+
+        private static int ResolveScanProgressInterval(string location)
+        {
+            DriveInfo drive = TryResolveDriveInfo(location);
+            if (drive == null) return DefaultScanProgressIntervalMs;
+
+            try
+            {
+                if (drive.IsReady && string.Equals(drive.DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase))
+                {
+                    return NtfsScanProgressIntervalMs;
+                }
+            }
+            catch
+            {
+            }
+
+            return DefaultScanProgressIntervalMs;
         }
 
         private static string FormatBytesWithPercent(long bytes, long totalBytes)

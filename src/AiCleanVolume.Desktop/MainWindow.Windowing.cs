@@ -58,7 +58,11 @@ namespace AiCleanVolume.Desktop
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing && backgroundWorker != null) backgroundWorker.Dispose();
+            if (disposing)
+            {
+                if (scanProgressTimer != null) scanProgressTimer.Dispose();
+                if (backgroundWorker != null) backgroundWorker.Dispose();
+            }
             base.Dispose(disposing);
         }
 
