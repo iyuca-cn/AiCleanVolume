@@ -251,11 +251,7 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Input aiProfileMaxSuggestionsInput;
 
-        private AntdUI.Select aiProfilePromptPresetSelect;
-
         private AntdUI.Input aiProfileCookieMappingsInput;
-
-        private AntdUI.Input aiProfileSystemPromptInput;
 
         private AntdUI.Label aiProfilePageTitle;
 
@@ -316,8 +312,6 @@ namespace AiCleanVolume.Desktop
         private bool sidebarCollapsed;
 
         private bool syncingAiProviderPreset;
-
-        private bool syncingAiProfilePromptPreset;
 
         private bool syncingAiProfileProviderPreset;
 

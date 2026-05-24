@@ -33,26 +33,23 @@ namespace AiCleanVolume.Desktop
             scrollHost.BackColor = PageBackground;
             scrollHost.Padding = new Padding(0, 0, 4, 12);
 
-            AntdUI.GridPanel content = CreateGridPanel("88:fill;196:fill;196:fill;390:fill");
+            AntdUI.GridPanel content = CreateGridPanel("88:fill;196:fill;240:fill");
             content.Dock = DockStyle.Top;
             content.BackColor = PageBackground;
-            content.Height = 870;
+            content.Height = 524;
             content.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
             scrollHost.Resize += delegate { content.Width = Math.Max(720, scrollHost.ClientSize.Width - 8); };
 
             AntdUI.Panel header = CreateAiProfileCreateHeader();
             Control basicSection = CreateAiProfileBasicSection();
             Control endpointSection = CreateAiProfileEndpointSection();
-            Control promptSection = CreateAiProfilePromptSection();
             header.Margin = new Padding(0, 0, 0, 12);
             basicSection.Margin = new Padding(0, 0, 0, 12);
-            endpointSection.Margin = new Padding(0, 0, 0, 12);
-            promptSection.Margin = new Padding(0);
+            endpointSection.Margin = new Padding(0);
 
             AddGridControl(content, header, 0);
             AddGridControl(content, basicSection, 1);
             AddGridControl(content, endpointSection, 2);
-            AddGridControl(content, promptSection, 3);
             scrollHost.Controls.Add(content);
 
             AntdUI.Panel footer = CreateAiProfileCreateFooter();
@@ -128,14 +125,19 @@ namespace AiCleanVolume.Desktop
         private Control CreateAiProfileEndpointSection()
         {
             AntdUI.Panel body;
-            AntdUI.Panel section = CreateSettingsGroupPanel("接口参数", "配置 OpenAI 兼容接口地址、密钥和模型。", out body);
+            AntdUI.Panel section = CreateSettingsGroupPanel("接口参数", "配置 OpenAI 兼容接口地址、密钥、模型和 Cookie。", out body);
 
-            AntdUI.GridPanel form = CreateTwoColumnProfileForm(2);
+            AntdUI.GridPanel form = CreateGridPanel("44:92 fill 92 fill;44:92 fill 92 fill;44:92 fill");
+            form.Dock = DockStyle.Fill;
+            form.BackColor = Color.Transparent;
             aiProfileProviderPresetSelect = CreateSettingsSelect();
             PopulateAiProviderPresets(aiProfileProviderPresetSelect);
             aiProfileEndpointInput = CreateInput("https://api.openai.com");
             aiProfileApiKeyInput = CreateInput("sk-...");
             aiProfileModelInput = CreateInput(AiSettings.DefaultModel);
+            aiProfileCookieMappingsInput = CreateInput("直接粘贴当前模型的一整行 Cookie；也兼容 model=Cookie");
+            aiProfileCookieMappingsInput.Multiline = false;
+            aiProfileCookieMappingsInput.AutoScroll = false;
 
             aiProfileProviderPresetSelect.SelectedValueChanged += AiProfileProviderPresetSelect_SelectedValueChanged;
             aiProfileEndpointInput.TextChanged += AiProfileEndpointOrModelInput_TextChanged;
@@ -145,35 +147,7 @@ namespace AiCleanVolume.Desktop
             AddProfileField(form, "接口地址", aiProfileEndpointInput, 2, 0);
             AddProfileField(form, "SK / API Key", aiProfileApiKeyInput, 0, 1);
             AddProfileField(form, "模型", aiProfileModelInput, 2, 1);
-
-            body.Controls.Add(form);
-            return section;
-        }
-
-        private Control CreateAiProfilePromptSection()
-        {
-            AntdUI.Panel body;
-            AntdUI.Panel section = CreateSettingsGroupPanel("提示词与 Cookie", "多行内容使用完整宽度，避免长文本挤压。", out body);
-
-            AntdUI.GridPanel form = CreateGridPanel("44:92 fill;104:92 fill;148:92 fill");
-            form.Dock = DockStyle.Fill;
-            form.BackColor = Color.Transparent;
-
-            aiProfilePromptPresetSelect = CreateSettingsSelect();
-            PopulateAiPromptPresets(aiProfilePromptPresetSelect);
-            aiProfileCookieMappingsInput = CreateInput("直接粘贴当前模型的一整行 Cookie；也兼容 model=Cookie");
-            aiProfileCookieMappingsInput.Multiline = true;
-            aiProfileCookieMappingsInput.AutoScroll = true;
-            aiProfileSystemPromptInput = CreateInput("系统提示词");
-            aiProfileSystemPromptInput.Multiline = true;
-            aiProfileSystemPromptInput.AutoScroll = true;
-
-            aiProfilePromptPresetSelect.SelectedValueChanged += AiProfilePromptPresetSelect_SelectedValueChanged;
-            aiProfileSystemPromptInput.TextChanged += AiProfileSystemPromptInput_TextChanged;
-
-            AddWideProfileField(form, "AI 预设", aiProfilePromptPresetSelect, 0);
-            AddWideProfileField(form, "模型 Cookie", aiProfileCookieMappingsInput, 1);
-            AddWideProfileField(form, "系统提示词", aiProfileSystemPromptInput, 2);
+            AddWideProfileFieldAtIndex(form, "模型 Cookie", aiProfileCookieMappingsInput, 8);
 
             body.Controls.Add(form);
             return section;
@@ -233,6 +207,15 @@ namespace AiCleanVolume.Desktop
             label.Margin = new Padding(0, 0, 8, 8);
             control.Margin = new Padding(0, 0, 0, 8);
             int index = row * 2;
+            AddGridControl(form, label, index);
+            AddGridControl(form, control, index + 1);
+        }
+
+        private static void AddWideProfileFieldAtIndex(AntdUI.GridPanel form, string caption, Control control, int index)
+        {
+            AntdUI.Label label = CreateCaption(caption);
+            label.Margin = new Padding(0, 0, 8, 8);
+            control.Margin = new Padding(0, 0, 0, 8);
             AddGridControl(form, label, index);
             AddGridControl(form, control, index + 1);
         }

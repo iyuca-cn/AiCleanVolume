@@ -32,22 +32,6 @@ namespace AiCleanVolume.Desktop
             }
         }
 
-        private void SelectAiProfilePromptPresetForPrompt(string prompt)
-        {
-            if (aiProfilePromptPresetSelect == null) return;
-
-            AiPromptPreset preset = FindAiPromptPresetByPrompt(prompt);
-            syncingAiProfilePromptPreset = true;
-            try
-            {
-                aiProfilePromptPresetSelect.SelectedValue = preset == null ? CustomAiPromptPresetKey : preset.Key;
-            }
-            finally
-            {
-                syncingAiProfilePromptPreset = false;
-            }
-        }
-
         private static string BuildAiProfileDisplayName(AiProfile profile)
         {
             if (profile == null) return string.Empty;
@@ -174,10 +158,8 @@ namespace AiCleanVolume.Desktop
             aiProfileModelInput.Text = string.IsNullOrWhiteSpace(model) ? AiSettings.DefaultModel : NormalizeValue(model);
             aiProfileMaxSuggestionsInput.Text = settings == null || settings.Ai == null ? "30" : settings.Ai.MaxSuggestions.ToString();
             aiProfileCookieMappingsInput.Text = settings == null || settings.Ai == null ? string.Empty : FormatModelCookieMappings(settings.Ai.ModelCookieMappings, settings.Ai.Model);
-            aiProfileSystemPromptInput.Text = settings == null || settings.Ai == null ? DefaultAiSystemPrompt : NormalizeValue(settings.Ai.SystemPrompt);
             UpdateAiProfileAccessModeUi();
             SelectAiProfileProviderPresetForValues(aiProfileEndpointInput.Text, aiProfileModelInput.Text);
-            SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
         }
 
         private void SaveCurrentAiProfileWithPrompt()
@@ -244,7 +226,7 @@ namespace AiCleanVolume.Desktop
                 ApiKey = aiProfileApiKeyInput == null ? string.Empty : NormalizeValue(aiProfileApiKeyInput.Text),
                 Model = model,
                 MaxSuggestions = ParsePositiveInt(aiProfileMaxSuggestionsInput == null ? null : aiProfileMaxSuggestionsInput.Text, 30),
-                SystemPrompt = aiProfileSystemPromptInput == null ? string.Empty : NormalizeValue(aiProfileSystemPromptInput.Text),
+                SystemPrompt = ResolveAiProfilePageSystemPrompt(),
                 ModelCookieMappings = new List<AiModelCookieMapping>()
             };
 
@@ -263,6 +245,17 @@ namespace AiCleanVolume.Desktop
 
             if (string.IsNullOrWhiteSpace(profile.Name)) profile.Name = AiSettings.BuildProfileAutoName(profile.Model, profile.SavedAt);
             return profile;
+        }
+
+        private string ResolveAiProfilePageSystemPrompt()
+        {
+            if (editingAiProfileIndex >= 0 && settings != null && settings.Ai != null && settings.Ai.Profiles != null && editingAiProfileIndex < settings.Ai.Profiles.Count)
+            {
+                string profilePrompt = NormalizeValue(settings.Ai.Profiles[editingAiProfileIndex].SystemPrompt);
+                return string.IsNullOrWhiteSpace(profilePrompt) ? GetCurrentSystemPromptText() : profilePrompt;
+            }
+
+            return GetCurrentSystemPromptText();
         }
 
         private void CancelAiProfileCreatePage()
@@ -722,35 +715,6 @@ namespace AiCleanVolume.Desktop
             return AntdUI.Modal.open(config) == DialogResult.OK ? NormalizeValue(input.Text) : null;
         }
 
-        private void AiProfilePromptPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
-        {
-            if (loadingStartupUi) return;
-            if (syncingAiProfilePromptPreset || e.Value == null) return;
-
-            string key = e.Value.ToString();
-            if (string.Equals(key, CustomAiPromptPresetKey, StringComparison.OrdinalIgnoreCase)) return;
-
-            AiPromptPreset preset = FindAiPromptPreset(key);
-            if (preset == null || aiProfileSystemPromptInput == null) return;
-
-            syncingAiProfilePromptPreset = true;
-            try
-            {
-                aiProfileSystemPromptInput.Text = preset.BuildPrompt(GetPromptDriveRoot());
-            }
-            finally
-            {
-                syncingAiProfilePromptPreset = false;
-            }
-        }
-
-        private void AiProfileSystemPromptInput_TextChanged(object sender, EventArgs e)
-        {
-            if (loadingStartupUi) return;
-            if (syncingAiProfilePromptPreset || aiProfileSystemPromptInput == null) return;
-            SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
-        }
-
         private void EditAiProfile(int index)
         {
             if (settings == null || settings.Ai == null || settings.Ai.Profiles == null) return;
@@ -773,10 +737,8 @@ namespace AiCleanVolume.Desktop
             aiProfileModelInput.Text = NormalizeValue(profile.Model);
             aiProfileMaxSuggestionsInput.Text = (profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions).ToString();
             aiProfileCookieMappingsInput.Text = FormatModelCookieMappings(profile.ModelCookieMappings, profile.Model);
-            aiProfileSystemPromptInput.Text = NormalizeValue(profile.SystemPrompt);
             UpdateAiProfileAccessModeUi();
             SelectAiProfileProviderPresetForValues(aiProfileEndpointInput.Text, aiProfileModelInput.Text);
-            SelectAiProfilePromptPresetForPrompt(aiProfileSystemPromptInput.Text);
         }
 
         private void DeleteAiProfile(int index)
