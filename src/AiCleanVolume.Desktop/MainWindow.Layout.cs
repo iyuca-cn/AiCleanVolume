@@ -254,7 +254,7 @@ namespace AiCleanVolume.Desktop
 
             Control statusPanel = CreateScanStatusPanel();
             Control summaryPanel = CreateDriveSummaryPanel();
-            AntdUI.GridPanel leftLayout = CreateGridPanel("58%:fill;42%:fill");
+            AntdUI.GridPanel leftLayout = CreateGridPanel("84:fill;32:fill");
             leftLayout.Dock = DockStyle.Fill;
             AddGridControl(leftLayout, filtersPanel, 0);
             AddGridControl(leftLayout, statusPanel, 1);
@@ -270,7 +270,7 @@ namespace AiCleanVolume.Desktop
 
         private Control CreateScanFiltersPanel()
         {
-            AntdUI.GridPanel host = CreateGridPanel("42:fill;32:fill");
+            AntdUI.GridPanel host = CreateGridPanel("42:42 192 86 42 112 44 88 44 88 fill;42:42 fill");
             host.Dock = DockStyle.Fill;
             host.BackColor = Color.Transparent;
 
@@ -300,33 +300,21 @@ namespace AiCleanVolume.Desktop
             int sortSelectWidth = MeasureSelectWidth(sortSelect.Font, sortOptionTexts);
             sortSelect.Width = sortSelectWidth;
 
-            AntdUI.GridPanel topRow = CreateGridPanel("42 192 86 42 " + sortSelectWidth.ToString() + " 42 fill");
-            topRow.Dock = DockStyle.Fill;
-            topRow.BackColor = Color.Transparent;
-
-            AddGridControl(topRow, CreateToolbarCaption("选择:"), 0);
-            AddGridControl(topRow, driveSelect, 1);
-            AddGridControl(topRow, scanButton, 2);
-            AddGridControl(topRow, CreateToolbarCaption("模式:"), 3);
-            AddGridControl(topRow, sortSelect, 4);
-            AddGridControl(topRow, CreateToolbarCaption("位置:"), 5);
-            AddGridControl(topRow, pathInput, 6);
-
             minSizeInput = CreateInput("-1 表示不限");
             limitInput = CreateInput("-1 表示不限");
 
-            AntdUI.GridPanel bottomRow = CreateGridPanel("42 58 42 58 fill");
-            bottomRow.Dock = DockStyle.Fill;
-            bottomRow.BackColor = Color.Transparent;
-
-            AddGridControl(bottomRow, CreateToolbarCaption("最小:"), 0);
-            AddGridControl(bottomRow, minSizeInput, 1);
-            AddGridControl(bottomRow, CreateToolbarCaption("限制:"), 2);
-            AddGridControl(bottomRow, limitInput, 3);
-            AddGridControl(bottomRow, CreateGridSpacer(), 4);
-
-            AddGridControl(host, topRow, 0);
-            AddGridControl(host, bottomRow, 1);
+            AddGridControl(host, CreateToolbarCaption("选择:"), 0);
+            AddGridControl(host, driveSelect, 1);
+            AddGridControl(host, scanButton, 2);
+            AddGridControl(host, CreateToolbarCaption("模式:"), 3);
+            AddGridControl(host, sortSelect, 4);
+            AddGridControl(host, CreateToolbarCaption("最小:"), 5);
+            AddGridControl(host, minSizeInput, 6);
+            AddGridControl(host, CreateToolbarCaption("限制:"), 7);
+            AddGridControl(host, limitInput, 8);
+            AddGridControl(host, CreateGridSpacer(), 9);
+            AddGridControl(host, CreateToolbarCaption("位置:"), 10);
+            AddGridControl(host, pathInput, 11);
             return host;
         }
 
@@ -378,7 +366,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.GridPanel panel = CreateGridPanel("126 fill");
             panel.Dock = DockStyle.Fill;
             panel.BackColor = Color.Transparent;
-            panel.Padding = new Padding(0, 4, 0, 0);
+            panel.Padding = new Padding(0, 8, 0, 0);
 
             scanStatusLabel = new AntdUI.Label();
             scanStatusLabel.Dock = DockStyle.Fill;
@@ -390,7 +378,7 @@ namespace AiCleanVolume.Desktop
 
             scanProgress = new AntdUI.Progress();
             scanProgress.Dock = DockStyle.Fill;
-            scanProgress.Margin = new Padding(8, 8, 4, 10);
+            scanProgress.Margin = new Padding(8, 7, 4, 9);
             scanProgress.Shape = AntdUI.TShapeProgress.Round;
             scanProgress.Radius = 8;
             scanProgress.Value = 0F;

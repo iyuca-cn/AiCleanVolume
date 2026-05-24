@@ -425,19 +425,15 @@ namespace AiCleanVolume.Desktop
             scanPage = CreatePageContainer();
             scanPage.Controls.Add(CreateStoragePanel());
             scanPage.Controls.Add(CreateScanToolbarPanel());
-            scanPage.Controls.Add(CreatePageHeader(GetPageTitle(PageScan), GetPageDescription(PageScan)));
 
             suggestionsPage = CreatePageContainer();
             suggestionsPage.Controls.Add(CreateSuggestionPanel());
-            suggestionsPage.Controls.Add(CreatePageHeader(GetPageTitle(PageSuggestions), GetPageDescription(PageSuggestions)));
 
             logPage = CreatePageContainer();
             logPage.Controls.Add(CreateLogPanel());
-            logPage.Controls.Add(CreatePageHeader(GetPageTitle(PageLog), GetPageDescription(PageLog)));
 
             settingsPage = CreatePageContainer();
             settingsPage.Controls.Add(CreateSettingsPanel());
-            settingsPage.Controls.Add(CreatePageHeader(GetPageTitle(PageSettings), GetPageDescription(PageSettings)));
 
             aiProfileCreatePage = CreatePageContainer();
             aiProfileCreatePage.Controls.Add(CreateAiProfileCreatePage());
