@@ -525,7 +525,6 @@ namespace AiCleanVolume.Desktop
             apiKeyInput = CreateInput("sk-...");
             modelInput = CreateInput(AiSettings.DefaultModel);
             maxSuggestionsInput = CreateInput("30");
-            aiProfileSelect = CreateSettingsSelect();
             applyAiProfileButton = CreateSettingsActionButton("应用选中", AntdUI.TTypeMini.Primary);
             applyAiProfileButton.IconSvg = "CheckOutlined";
             applyAiProfileButton.Click += delegate { ApplySelectedAiProfile(); };
@@ -550,15 +549,17 @@ namespace AiCleanVolume.Desktop
             allowRootsInput.Multiline = true;
             allowRootsInput.AutoScroll = true;
 
-            AntdUI.StackPanel scrollHost = CreateVerticalScrollPanel();
+            settingsScrollHost = CreateVerticalScrollPanel();
+            AntdUI.StackPanel scrollHost = settingsScrollHost;
             scrollHost.Dock = DockStyle.Fill;
             scrollHost.AutoScroll = true;
             scrollHost.BackColor = PageBackground;
             scrollHost.Padding = new Padding(0, 0, 4, 8);
 
-            AntdUI.GridPanel layout = CreateGridPanel("46:fill;82:fill;520:fill;266:fill");
+            settingsContentLayout = CreateGridPanel("62:fill;96:fill;520:fill;266:fill");
+            AntdUI.GridPanel layout = settingsContentLayout;
             layout.Dock = DockStyle.Top;
-            layout.Height = 914;
+            layout.Height = 944;
             layout.BackColor = PageBackground;
             layout.Width = Math.Max(720, scrollHost.ClientSize.Width - 8);
             scrollHost.Resize += delegate
@@ -571,9 +572,9 @@ namespace AiCleanVolume.Desktop
             Control profilesSection = CreateAiProfileSection();
             Control sandboxSection = CreateSandboxSection();
             Control actionBar = CreateSettingsActionBar();
-            actionBar.Margin = new Padding(0, 0, 0, 8);
-            overviewSection.Margin = new Padding(0, 0, 0, 12);
-            profilesSection.Margin = new Padding(0, 0, 0, 12);
+            actionBar.Margin = new Padding(0, 6, 0, 8);
+            overviewSection.Margin = new Padding(0, 6, 0, 12);
+            profilesSection.Margin = new Padding(0, 6, 0, 12);
             sandboxSection.Margin = new Padding(0);
 
             AddGridControl(layout, actionBar, 0);
@@ -585,6 +586,44 @@ namespace AiCleanVolume.Desktop
 
             panel.Controls.Add(scrollHost);
             return panel;
+        }
+
+        private void RefreshSettingsPageLayout(bool resetScroll)
+        {
+            if (settingsScrollHost == null) return;
+
+            if (settingsPage != null) settingsPage.SuspendLayout();
+            if (settingsContentLayout != null)
+            {
+                settingsContentLayout.Width = Math.Max(720, settingsScrollHost.ClientSize.Width - 12);
+                settingsContentLayout.Height = 944;
+                settingsContentLayout.PerformLayout();
+            }
+
+            ResizeAiProfileCards();
+
+            if (resetScroll && settingsScrollHost.ScrollBar != null && settingsScrollHost.ScrollBar.ValueY != 0)
+            {
+                settingsScrollHost.ScrollBar.ValueY = 0;
+            }
+
+            settingsScrollHost.PerformLayout();
+            if (settingsPage != null) settingsPage.PerformLayout();
+            if (settingsPage != null) settingsPage.ResumeLayout(true);
+            InvalidateSettingsPageControls(settingsPage);
+            if (settingsContentLayout != null) settingsContentLayout.Invalidate(true);
+            settingsScrollHost.Invalidate(true);
+            if (settingsPage != null) settingsPage.Update();
+        }
+
+        private static void InvalidateSettingsPageControls(Control control)
+        {
+            if (control == null) return;
+            control.Invalidate(true);
+            foreach (Control child in control.Controls)
+            {
+                InvalidateSettingsPageControls(child);
+            }
         }
 
         private Control CreateSettingsActionBar()

@@ -61,6 +61,7 @@ namespace AiCleanVolume.Desktop.Controls
                 if (suspendRedraw)
                 {
                     SendMessage(Handle, WmSetRedraw, new IntPtr(1), IntPtr.Zero);
+                    PerformLayout();
                     Invalidate(true);
                     Update();
                 }

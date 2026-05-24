@@ -151,6 +151,10 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Panel aiProfileCreatePage;
 
+        private AntdUI.StackPanel settingsScrollHost;
+
+        private AntdUI.GridPanel settingsContentLayout;
+
         private AntdUI.Button scanButton;
 
         private AntdUI.Button analyzeButton;
@@ -214,8 +218,6 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Input modelInput;
 
         private AntdUI.Input maxSuggestionsInput;
-
-        private AntdUI.Select aiProfileSelect;
 
         private AntdUI.StackPanel aiProfileListPanel;
 
@@ -289,9 +291,9 @@ namespace AiCleanVolume.Desktop
 
         private bool startupRevealQueued;
 
-        private bool startupUiBindingQueued;
+        private bool startupPostShowRefreshCompleted;
 
-        private bool startupUiBindingCompleted;
+        private bool initialUiBound;
 
         private bool loadingStartupUi;
 
@@ -316,6 +318,8 @@ namespace AiCleanVolume.Desktop
         private bool storageTreeDeleteDirty;
 
         private int editingAiProfileIndex = -1;
+
+        private int selectedAiProfileIndex = -1;
 
         private int sidebarWidth;
 
@@ -353,7 +357,6 @@ namespace AiCleanVolume.Desktop
 
             InitializeComponent();
             ConfigureTables();
-            ApplyInitialUiPlaceholders();
         }
 
         private void InitializeComponent()
@@ -486,35 +489,25 @@ namespace AiCleanVolume.Desktop
             };
         }
 
-        private void ApplyInitialUiPlaceholders()
+        private void BindInitialUiBeforeFirstFrame()
         {
+            if (initialUiBound) return;
+            initialUiBound = true;
             loadingStartupUi = true;
+            SuspendLayout();
+            if (pageHost != null) pageHost.SuspendLayout();
             try
             {
-                string defaultDrive = ResolveDefaultDrive();
-                if (driveSelect != null)
-                {
-                    driveSelect.Items.Clear();
-                    driveSelect.Items.Add(new AntdUI.SelectItem(defaultDrive, defaultDrive));
-                    driveSelect.SelectedValue = defaultDrive;
-                }
-
-                if (suggestionDriveSelect != null)
-                {
-                    suggestionDriveSelect.Items.Clear();
-                    suggestionDriveSelect.Items.Add(new AntdUI.SelectItem(defaultDrive, defaultDrive));
-                    suggestionDriveSelect.SelectedValue = defaultDrive;
-                }
-
-                if (pathInput != null) pathInput.Text = defaultDrive;
-                SetDriveSummaryValue(selectedDriveValueLabel, defaultDrive);
-                SetDriveSummaryValue(totalSpaceValueLabel, "-");
-                SetDriveSummaryValue(usedSpaceValueLabel, "-");
-                SetDriveSummaryValue(availableSpaceValueLabel, "-");
-                SetDriveSummaryValue(reservedSpaceValueLabel, "-");
+                LoadSettingsToUi();
+                LoadDrives();
+                UpdateDriveSummaryForLocation(ResolveSelectedLocation());
+                RefreshPromptForCurrentLocation();
+                RefreshSettingsPageLayout(true);
             }
             finally
             {
+                if (pageHost != null) pageHost.ResumeLayout(true);
+                ResumeLayout(true);
                 loadingStartupUi = false;
             }
         }

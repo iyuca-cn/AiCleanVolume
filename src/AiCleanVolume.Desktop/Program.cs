@@ -14,9 +14,10 @@ namespace AiCleanVolume.Desktop
             Application.SetCompatibleTextRenderingDefault(false);
             AntdUI.Config.IsLight = true;
             AntdUI.Config.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-            AntdUI.Config.TextRenderingHighQuality = true;
+            AntdUI.Config.TextRenderingHighQuality = false;
             AntdUI.Config.ShadowEnabled = true;
             AntdUI.Config.Animation = true;
+            AntdUI.Config.DisableAnimation(nameof(AntdUI.Table), nameof(AntdUI.Menu), nameof(AntdUI.ScrollBar));
             AntdUI.Config.SetCorrectionTextRendering("Microsoft YaHei UI", "微软雅黑", "宋体");
             AntdUI.Config.Theme()
                 .Light("#ffffff", "#1f1f1f")

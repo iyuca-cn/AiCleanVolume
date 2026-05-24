@@ -194,7 +194,6 @@ namespace AiCleanVolume.Desktop
             if (previousPageId == pageId) return;
             bool compactStorageTree = previousPageId == PageScan && pageId != PageScan;
 
-            SuspendControlRedraw(this);
             SuspendPageSwitchLayout();
             try
             {
@@ -223,7 +222,8 @@ namespace AiCleanVolume.Desktop
             finally
             {
                 ResumePageSwitchLayout();
-                ResumeControlRedraw(this);
+                if (pageId == PageSettings) RefreshSettingsPageLayout(true);
+                Invalidate(true);
             }
         }
 

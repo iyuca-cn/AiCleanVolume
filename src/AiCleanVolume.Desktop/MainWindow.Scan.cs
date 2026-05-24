@@ -31,8 +31,6 @@ namespace AiCleanVolume.Desktop
             driveSelect.SelectedValue = defaultDrive;
             if (suggestionDriveSelect != null) suggestionDriveSelect.SelectedValue = defaultDrive;
             pathInput.Text = defaultDrive;
-            UpdateDriveSummaryForLocation(defaultDrive);
-            RefreshPromptForCurrentLocation();
         }
 
         private void DriveSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)

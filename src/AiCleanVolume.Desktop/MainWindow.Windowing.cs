@@ -39,25 +39,21 @@ namespace AiCleanVolume.Desktop
             base.OnLoad(e);
             ApplySidebarWidth(ResolveInitialSidebarWidth());
             ApplyNormalWindowBounds(true);
+            PerformLayout();
+            BindInitialUiBeforeFirstFrame();
             lastWindowState = WindowState;
         }
 
         protected override void OnHandleCreated(EventArgs e)
         {
-            if (!startupRedrawCompleted)
-            {
-                SuspendControlRedraw(this);
-                startupRedrawSuspended = true;
-            }
-
             base.OnHandleCreated(e);
         }
 
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            CompleteStartupPostShowRefresh();
             QueueStartupReveal();
-            QueueStartupUiBinding();
         }
 
         protected override void Dispose(bool disposing)
@@ -82,7 +78,7 @@ namespace AiCleanVolume.Desktop
             if (control == null || !control.IsHandleCreated) return;
             SendMessage(control.Handle, WmSetRedraw, new IntPtr(1), IntPtr.Zero);
             control.Invalidate(invalidateChildren);
-            if (updateImmediately) control.Update();
+            if (updateImmediately) RedrawWindow(control.Handle, IntPtr.Zero, IntPtr.Zero, RestoreRedrawFlags);
         }
 
         [DllImport("user32.dll")]
@@ -222,33 +218,10 @@ namespace AiCleanVolume.Desktop
             }
         }
 
-        private void QueueStartupUiBinding()
+        private void CompleteStartupPostShowRefresh()
         {
-            if (startupUiBindingCompleted || startupUiBindingQueued || IsDisposed) return;
-            startupUiBindingQueued = true;
-            BeginInvoke((MethodInvoker)delegate
-            {
-                startupUiBindingQueued = false;
-                CompleteStartupUiBinding();
-            });
-        }
-
-        private void CompleteStartupUiBinding()
-        {
-            if (startupUiBindingCompleted || IsDisposed) return;
-            startupUiBindingCompleted = true;
-
-            loadingStartupUi = true;
-            try
-            {
-                LoadSettingsToUi();
-                LoadDrives();
-            }
-            finally
-            {
-                loadingStartupUi = false;
-            }
-
+            if (startupPostShowRefreshCompleted || IsDisposed) return;
+            startupPostShowRefreshCompleted = true;
             UpdateDriveSummaryForLocation(ResolveSelectedLocation());
             RefreshPromptForCurrentLocation();
             Log("应用已启动。若 AI 未启用，将自动回退到本地启发式规则。");

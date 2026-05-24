@@ -117,34 +117,27 @@ namespace AiCleanVolume.Desktop
 
         private void PopulateAiProfiles()
         {
-            if (aiProfileSelect == null)
+            PopulateAiProfiles(selectedAiProfileIndex);
+        }
+
+        private void PopulateAiProfiles(int preferredIndex)
+        {
+            if (settings == null || settings.Ai == null)
             {
+                selectedAiProfileIndex = -1;
                 RefreshAiProfileCards();
                 return;
             }
 
-            string selectedValue = aiProfileSelect.SelectedValue == null ? null : aiProfileSelect.SelectedValue.ToString();
-            aiProfileSelect.Items.Clear();
             settings.Ai.Profiles = AiSettings.NormalizeProfiles(settings.Ai.Profiles);
             if (settings.Ai.Profiles.Count == 0)
             {
-                aiProfileSelect.Items.Add(new AntdUI.SelectItem("暂无历史配置", string.Empty));
-                aiProfileSelect.SelectedValue = string.Empty;
+                selectedAiProfileIndex = -1;
                 RefreshAiProfileCards();
                 return;
             }
 
-            for (int index = 0; index < settings.Ai.Profiles.Count; index++)
-            {
-                AiProfile profile = settings.Ai.Profiles[index];
-                aiProfileSelect.Items.Add(new AntdUI.SelectItem(BuildAiProfileDisplayName(profile), index.ToString()));
-            }
-            int selectedIndex;
-            if (!int.TryParse(selectedValue, out selectedIndex) || selectedIndex < 0 || selectedIndex >= settings.Ai.Profiles.Count)
-            {
-                selectedValue = "0";
-            }
-            aiProfileSelect.SelectedValue = selectedValue;
+            selectedAiProfileIndex = ClampAiProfileIndex(preferredIndex);
             RefreshAiProfileCards();
         }
 
@@ -153,7 +146,7 @@ namespace AiCleanVolume.Desktop
             AiProfile profile = CreateCurrentAiProfile(null);
             profile.Name = AiSettings.BuildProfileAutoName(profile.Model, profile.SavedAt);
             UpsertAiProfile(profile, false);
-            PopulateAiProfiles();
+            PopulateAiProfiles(0);
         }
 
         private void OpenAiProfileCreatePage()
@@ -199,7 +192,7 @@ namespace AiCleanVolume.Desktop
                 AiProfile profile = CreateCurrentAiProfile(name);
                 UpsertAiProfile(profile, true);
                 settingsStore.Save(settings);
-                PopulateAiProfiles();
+                PopulateAiProfiles(0);
                 Log("AI 配置方案已保存：" + profile.Name + "。");
                 ShowInfo("完成", "AI 配置方案已保存。");
             }
@@ -222,8 +215,7 @@ namespace AiCleanVolume.Desktop
                 int selectedIndex = editing ? targetIndex : 0;
                 editingAiProfileIndex = -1;
                 SetActivePage(PageSettings);
-                PopulateAiProfiles();
-                SelectAiProfile(selectedIndex);
+                PopulateAiProfiles(selectedIndex);
                 ResetAiProfileListScroll();
                 RefreshAiProfileListLayout();
                 string verb = editing ? "已更新" : "已新增";
@@ -294,9 +286,8 @@ namespace AiCleanVolume.Desktop
 
         private AiProfile ResolveSelectedAiProfile()
         {
-            if (aiProfileSelect == null || aiProfileSelect.SelectedValue == null || settings == null || settings.Ai == null || settings.Ai.Profiles == null) return null;
-            int index;
-            if (!int.TryParse(aiProfileSelect.SelectedValue.ToString(), out index)) return null;
+            if (settings == null || settings.Ai == null || settings.Ai.Profiles == null) return null;
+            int index = ClampAiProfileIndex(selectedAiProfileIndex);
             if (index < 0 || index >= settings.Ai.Profiles.Count) return null;
             return settings.Ai.Profiles[index];
         }
@@ -311,11 +302,13 @@ namespace AiCleanVolume.Desktop
                 aiProfileListPanel.Controls.Clear();
                 if (settings == null || settings.Ai == null || settings.Ai.Profiles == null || settings.Ai.Profiles.Count == 0)
                 {
+                    selectedAiProfileIndex = -1;
                     aiProfileListPanel.Controls.Add(CreateEmptyAiProfileCard());
                     return;
                 }
 
-                int selectedIndex = GetSelectedAiProfileIndex();
+                int selectedIndex = ClampAiProfileIndex(selectedAiProfileIndex);
+                selectedAiProfileIndex = selectedIndex;
                 for (int index = 0; index < settings.Ai.Profiles.Count; index++)
                 {
                     aiProfileListPanel.Controls.Add(CreateAiProfileCard(settings.Ai.Profiles[index], index, index == selectedIndex));
@@ -557,22 +550,18 @@ namespace AiCleanVolume.Desktop
 
         private void SelectAiProfile(int index)
         {
-            if (aiProfileSelect == null || settings == null || settings.Ai == null || settings.Ai.Profiles == null) return;
-            if (index < 0 || index >= settings.Ai.Profiles.Count) return;
-            string selectedValue = index.ToString();
-            bool selectionChanged = aiProfileSelect.SelectedValue == null || !string.Equals(aiProfileSelect.SelectedValue.ToString(), selectedValue, StringComparison.Ordinal);
-            if (selectionChanged)
-            {
-                aiProfileSelect.SelectedValue = selectedValue;
-            }
+            int nextIndex = ClampAiProfileIndex(index);
+            if (nextIndex < 0) return;
+            bool selectionChanged = selectedAiProfileIndex != nextIndex;
+            selectedAiProfileIndex = nextIndex;
             if (selectionChanged) RefreshAiProfileCards();
         }
 
-        private int GetSelectedAiProfileIndex()
+        private int ClampAiProfileIndex(int index)
         {
-            if (aiProfileSelect == null || aiProfileSelect.SelectedValue == null) return 0;
-            int index;
-            if (!int.TryParse(aiProfileSelect.SelectedValue.ToString(), out index)) return 0;
+            if (settings == null || settings.Ai == null || settings.Ai.Profiles == null || settings.Ai.Profiles.Count == 0) return -1;
+            if (index < 0) return 0;
+            if (index >= settings.Ai.Profiles.Count) return settings.Ai.Profiles.Count - 1;
             return index;
         }
 
@@ -810,7 +799,16 @@ namespace AiCleanVolume.Desktop
             profiles.RemoveAt(index);
             settings.Ai.Profiles = profiles;
             settingsStore.Save(settings);
-            PopulateAiProfiles();
+            int preferredIndex = selectedAiProfileIndex;
+            if (index < selectedAiProfileIndex)
+            {
+                preferredIndex = selectedAiProfileIndex - 1;
+            }
+            else if (index == selectedAiProfileIndex)
+            {
+                preferredIndex = Math.Min(index, profiles.Count - 1);
+            }
+            PopulateAiProfiles(preferredIndex);
             Log("已删除 AI 配置方案：" + name + "。");
         }
     }

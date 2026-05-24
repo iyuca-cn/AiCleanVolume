@@ -25,9 +25,7 @@ namespace AiCleanVolume.Desktop
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
             panel.BorderColor = Color.FromArgb(230, 230, 230);
-            panel.Shadow = 12;
-            panel.ShadowOpacity = 0.06F;
-            panel.ShadowOffsetY = 2;
+            panel.Shadow = 0;
             return panel;
         }
 
@@ -163,9 +161,7 @@ namespace AiCleanVolume.Desktop
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
             panel.BorderColor = Color.FromArgb(230, 230, 230);
-            panel.Shadow = 10;
-            panel.ShadowOpacity = 0.05F;
-            panel.ShadowOffsetY = 2;
+            panel.Shadow = 0;
             return panel;
         }
 
