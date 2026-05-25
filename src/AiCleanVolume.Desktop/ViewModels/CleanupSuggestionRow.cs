@@ -1,5 +1,11 @@
-using AiCleanVolume.Core.Models;
-using AiCleanVolume.Core.Services;
+using AiCleanVolume.Core.Domain.Cleanup;
+using AiCleanVolume.Core.Domain.Sandbox;
+using AiCleanVolume.Core.Domain.Settings;
+using AiCleanVolume.Core.Domain.Storage;
+using AiCleanVolume.Core.Application.CleanupPlanning;
+using AiCleanVolume.Core.Application.Deletion;
+using AiCleanVolume.Core.Application.Scanning;
+using AiCleanVolume.Core.Kernel.Ports;
 
 namespace AiCleanVolume.Desktop.ViewModels
 {

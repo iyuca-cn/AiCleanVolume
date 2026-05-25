@@ -18,8 +18,12 @@
 
 ## 目录
 
-- `src/AiCleanVolume.Core`：微内核接口、领域模型、候选规划、沙盒规则、本地启发式
-- `src/AiCleanVolume.Desktop`：WinForms + AntdUI 界面、扫描器适配、AI 适配、设置存储
+- `src/AiCleanVolume.Core/Domain`：存放存储树、清理建议、沙盒评估和设置等纯领域对象
+- `src/AiCleanVolume.Core/Kernel/Ports`：微内核端口，定义扫描、AI 建议、删除、资源管理器、权限和设置存储接口
+- `src/AiCleanVolume.Core/Application`：扫描格式化、候选规划、本地启发式、沙盒评估和删除用例编排
+- `src/AiCleanVolume.Desktop/Composition`：桌面组合根，集中装配主窗口和基础设施依赖
+- `src/AiCleanVolume.Desktop/Infrastructure`：扫描 CLI、OpenAI 兼容接口、JSON 设置存储和 Windows 删除/资源管理器/权限适配
+- `src/AiCleanVolume.Desktop/Presentation`：WinForms + AntdUI 主窗口、共享 UI 工具和后台操作辅助
 - `third_party/folder-size-ranker-cli`：扫描 CLI
 - `third_party/AntdUI-v2.3.0`：AntdUI 源码
 

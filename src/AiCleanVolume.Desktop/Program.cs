@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Drawing.Text;
 using System.Windows.Forms;
+using AiCleanVolume.Desktop.Composition;
 
 namespace AiCleanVolume.Desktop
 {
@@ -25,7 +26,7 @@ namespace AiCleanVolume.Desktop
                 .Header("#ffffff", "#141414")
                 .FormBorderColor();
             AntdUI.Style.SetPrimary(Color.FromArgb(22, 119, 255));
-            Application.Run(new MainWindow());
+            Application.Run(DesktopCompositionRoot.CreateMainWindow());
         }
     }
 }
