@@ -1,65 +1,92 @@
-# AI Clean Volume
+# AI Clean Volume - 智能磁盘清理工具
 
-基于 `.NET Framework 4.0 / 4.8 + AntdUI` 的 Windows 磁盘清理桌面工具原型。
+一款简单好用的 Windows 电脑磁盘清理软件，帮你快速找出占空间的大文件，还能用 AI 帮你判断哪些可以安全删除。
 
-## 已实现
+## 这个软件能做什么？
 
-- 使用 `folder-size-ranker-cli` 扫描指定盘符或目录，并以树表方式展示空间占用
-- 使用 `AntdUI.PageHeader` 作为自定义标题栏
-- 清理建议页同时支持 `常规清理`（本地规则）和 `AI 识别`
-- 支持 `OpenAI 兼容` 接口做清理建议；未启用 AI 时自动回退到本地启发式规则
-- 支持 `标准 API` 与 `2API` 两种 AI 接入模式；`2API` 按模型匹配 Cookie 发送 `X-Provider-Cookie`
-- 清理列表采用类似清理软件的列表风格，默认勾选，支持双击或按钮打开对应路径
-- 删除前经过沙盒评估：命中允许位置直接放行，否则要求用户确认
-- 支持“完全权限模式”复选框；仅在当前进程管理员运行时真正绕过沙盒
-- 支持回收站删除与永久删除切换
-- 支持 `ChatGPT / OpenAI`、`DeepSeek` 接口预设，以及 AI 系统提示词预设和自定义提示词
-- 支持 `appsettings.json` 持久化 AI 与沙盒配置
+### 🧹 磁盘扫描
+- 扫描你的电脑硬盘，找出哪些文件和文件夹最占空间
+- 用树状列表展示，一目了然看到空间都去哪了
 
-## 目录
+### 🤖 AI 智能建议
+- 可以连接 AI（比如 ChatGPT、DeepSeek）帮你分析哪些文件可以清理
+- 如果不想用 AI，软件也会根据本地规则给出清理建议
 
-- `src/AiCleanVolume.Core/Domain`：存放存储树、清理建议、沙盒评估和设置等纯领域对象
-- `src/AiCleanVolume.Core/Kernel/Ports`：微内核端口，定义扫描、AI 建议、删除、资源管理器、权限和设置存储接口
-- `src/AiCleanVolume.Core/Application`：扫描格式化、候选规划、本地启发式、沙盒评估和删除用例编排
-- `src/AiCleanVolume.Desktop/Composition`：桌面组合根，集中装配主窗口和基础设施依赖
-- `src/AiCleanVolume.Desktop/Infrastructure`：扫描 CLI、OpenAI 兼容接口、JSON 设置存储和 Windows 删除/资源管理器/权限适配
-- `src/AiCleanVolume.Desktop/Presentation`：WinForms + AntdUI 主窗口、共享 UI 工具和后台操作辅助
-- `third_party/folder-size-ranker-cli`：扫描 CLI
-- `third_party/AntdUI-v2.3.0`：AntdUI 源码
+### 🗑️ 安全删除
+- 删除前会先评估文件是否安全删除
+- 可以选择"移到回收站"或"永久删除"
+- 支持"完全权限模式"，能处理更多系统文件
 
-## 运行
+### ⚙️ 灵活配置
+- 支持多种 AI 接口：标准 API 和 2API 两种模式
+- 可以保存你的配置，下次打开自动加载
 
-1. 编译：
+## 如何使用？
 
-   ```pwsh
-   dotnet build E:\work\ai-clean-volume\AiCleanVolume.sln -c Debug
-   ```
+### 第一步：编译程序
 
-2. 运行 `.NET Framework 4.0` 版本：
+如果你是开发者，可以这样编译：
 
-   ```pwsh
-   .\src\AiCleanVolume.Desktop\bin\Debug\net40\AiCleanVolume.exe
-   ```
+```powershell
+dotnet build E:\work\ai-clean-volume\AiCleanVolume.sln -c Debug
+```
 
-   运行 `.NET Framework 4.8` 版本：
+### 第二步：运行程序
 
-   ```pwsh
-   .\src\AiCleanVolume.Desktop\bin\Debug\net48\AiCleanVolume.exe
-   ```
+编译完成后，可以运行两个版本：
 
-3. 如需 AI：
-   - 打开右侧配置区
-   - 启用 `AI`
-   - 选择 `接入类型`
-  - `标准 API`：填入 `接口地址 / API Key / 模型`
-  - `2API`：填入 `接口地址 / 模型`，并在 `模型 Cookie` 中按 `模型=完整 Cookie` 每行配置一条映射
-  - `接口地址` 兼容三种写法：根地址（如 `http://127.0.0.1:3000`）、`.../v1`、完整 `.../v1/chat/completions`
-  - 点击 `保存配置`
+**普通版（.NET Framework 4.0）：**
+```powershell
+.\src\AiCleanVolume.Desktop\bin\Debug\net40\AiCleanVolume.exe
+```
 
-## 说明
+**新版（.NET Framework 4.8）：**
+```powershell
+.\src\AiCleanVolume.Desktop\bin\Debug\net48\AiCleanVolume.exe
+```
 
-- 扫描 NTFS 盘时，`folder-size-ranker-cli` 可能需要管理员权限。
-- 当前 OpenAI 兼容实现走 `/v1/chat/completions`。
-- `2API` 模式不会发送 `Authorization`，而是根据当前模型精确匹配 `模型 Cookie` 配置并发送 `X-Provider-Cookie`。
-- 项目会同时生成 `.NET Framework 4.0` 与 `.NET Framework 4.8` 两套产物；`net40` 版本使用框架自带 `HttpWebRequest`，`net48` 版本使用 `RestSharp 106.15.0`，避免继续引用存在高危漏洞告警的 `RestSharp 105.2.3`。
-- 本地为兼容当前 SDK，对 `third_party/AntdUI-v2.3.0/src/AntdUI/AntdUI.csproj` 去掉了 `net10.0-windows` 目标框架。
+### 第三步：配置 AI（可选）
+
+如果你想用 AI 帮你分析清理建议：
+
+1. 点击软件右侧的配置区
+2. 打开 AI 开关
+3. 选择接入类型：
+   - **标准 API**：填入接口地址、API Key 和模型名称
+   - **2API**：填入接口地址和模型名称，然后在"模型 Cookie"里配置每行一条映射（格式：`模型=完整Cookie`）
+4. 接口地址支持多种写法：
+   - 根地址：`http://127.0.0.1:3000`
+   - 带版本：`http://127.0.0.1:3000/v1`
+   - 完整地址：`http://127.0.0.1:3000/v1/chat/completions`
+5. 点击"保存配置"即可
+
+## 项目结构（开发者看这里）
+
+```
+src/AiCleanVolume.Core/          # 核心逻辑
+  ├── Domain/                    # 存储树、清理建议、沙盒评估等核心数据
+  └── Kernel/Ports/              # 各种接口定义（扫描、AI、删除等）
+
+src/AiCleanVolume.Desktop/       # 桌面程序
+  ├── Composition/               # 程序组装，把各个部件连起来
+  ├── Infrastructure/            # 具体实现（扫描工具、AI接口、删除操作等）
+  └── Presentation/              # 界面显示和用户交互
+
+third_party/                     # 第三方工具
+  ├── folder-size-ranker-cli/    # 磁盘扫描工具
+  └── AntdUI-v2.3.0/            # 界面组件库
+```
+
+## 注意事项
+
+- 扫描 NTFS 格式的硬盘时，扫描工具可能需要管理员权限
+- AI 功能使用的是 OpenAI 兼容接口（`/v1/chat/completions`）
+- 2API 模式不会发送 API Key，而是根据模型名称匹配对应的 Cookie
+- 软件会同时生成 .NET 4.0 和 .NET 4.8 两个版本，4.8 版本用的网络库更安全
+- 项目使用 MIT 开源许可证，可以自由使用和修改
+
+## 遇到问题？
+
+1. **扫描没反应？** 试试以管理员身份运行程序
+2. **AI 不工作？** 检查接口地址和 API Key 是否正确
+3. **删除文件失败？** 可能是权限不够，试试开启"完全权限模式"
