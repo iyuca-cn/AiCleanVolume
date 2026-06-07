@@ -22,5 +22,14 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Scan
         public Timer ScanProgressTimer { get; set; }
         public DateTime ScanProgressStartedAt { get; set; }
         public string ScanProgressActiveText { get; set; }
+        public string LastScanProgressText { get; set; }
+        public float LastScanProgressValue { get; set; }
+        public bool HasLastScanProgressValue { get; set; }
+        public bool LastScanProgressLoading { get; set; }
+        public bool HasLastScanProgressLoading { get; set; }
+        public AntdUI.TType LastScanProgressState { get; set; }
+        public bool HasLastScanProgressState { get; set; }
+        public string LastScanElapsedText { get; set; }
+        public DateTime LastScanElapsedRenderedAt { get; set; }
     }
 }

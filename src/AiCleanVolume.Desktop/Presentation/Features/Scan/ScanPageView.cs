@@ -238,6 +238,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Scan
             ScanProgress.Value = 0F;
             ScanProgress.State = AntdUI.TType.Success;
             ScanProgress.UseSystemText = false;
+            ScanProgress.Animation = ScanPageText.ActiveProgressAnimationMs;
 
             AntdControlFactory.AddGridControl(panel, ScanStatusLabel, 0);
             AntdControlFactory.AddGridControl(panel, ScanElapsedLabel, 1);

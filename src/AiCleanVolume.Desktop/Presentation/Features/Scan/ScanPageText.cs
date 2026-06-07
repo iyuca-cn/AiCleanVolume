@@ -8,9 +8,11 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Scan
 {
     public static class ScanPageText
     {
-        private const int NtfsScanProgressIntervalMs = 20;
+        public const int ActiveProgressIntervalMs = 100;
 
-        private const int DefaultScanProgressIntervalMs = 200;
+        public const int ActiveProgressAnimationMs = 60;
+
+        public const int ElapsedTextIntervalMs = 100;
 
         public static string DescribeRequest(ScanRequest request)
         {
@@ -44,21 +46,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Scan
 
         public static int ResolveProgressInterval(string location)
         {
-            DriveInfo drive = TryResolveDriveInfo(location);
-            if (drive == null) return DefaultScanProgressIntervalMs;
-
-            try
-            {
-                if (drive.IsReady && string.Equals(drive.DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase))
-                {
-                    return NtfsScanProgressIntervalMs;
-                }
-            }
-            catch
-            {
-            }
-
-            return DefaultScanProgressIntervalMs;
+            return ActiveProgressIntervalMs;
         }
 
         public static string FormatBytesWithPercent(long bytes, long totalBytes)

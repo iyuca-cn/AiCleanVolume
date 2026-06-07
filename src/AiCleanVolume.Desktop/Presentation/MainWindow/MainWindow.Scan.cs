@@ -419,24 +419,70 @@ namespace AiCleanVolume.Desktop
 
         private void UpdateScanProgressState(string text, float value, bool loading, AntdUI.TType state)
         {
-            if (scanStatusLabel != null) scanStatusLabel.Text = text;
+            UpdateScanProgressState(text, value, loading, state, true, true);
+        }
+
+        private void UpdateScanProgressState(string text, float value, bool loading, AntdUI.TType state, bool force)
+        {
+            UpdateScanProgressState(text, value, loading, state, force, false);
+        }
+
+        private void UpdateScanProgressState(string text, float value, bool loading, AntdUI.TType state, bool force, bool immediateValue)
+        {
             if (value < 0F) value = 0F;
             if (value > 1F) value = 1F;
+            AntdUI.TType progressState = state == AntdUI.TType.None && loading ? AntdUI.TType.Info : state;
+
+            if (scanStatusLabel != null && (force || !string.Equals(scanState.LastScanProgressText, text, StringComparison.Ordinal)))
+            {
+                scanStatusLabel.Text = text;
+                scanState.LastScanProgressText = text;
+            }
+
             if (scanProgress == null) return;
-            scanProgress.Value = value;
-            scanProgress.State = state == AntdUI.TType.None && loading ? AntdUI.TType.Info : state;
-            scanProgress.Loading = loading;
+
+            if (force || !scanState.HasLastScanProgressValue || Math.Abs(scanState.LastScanProgressValue - value) >= 0.001F)
+            {
+                SetScanProgressValue(value, immediateValue);
+                scanState.LastScanProgressValue = value;
+                scanState.HasLastScanProgressValue = true;
+            }
+
+            if (force || !scanState.HasLastScanProgressState || scanState.LastScanProgressState != progressState)
+            {
+                scanProgress.State = progressState;
+                scanState.LastScanProgressState = progressState;
+                scanState.HasLastScanProgressState = true;
+            }
+
+            if (force || !scanState.HasLastScanProgressLoading || scanState.LastScanProgressLoading != loading)
+            {
+                scanProgress.Loading = loading;
+                scanState.LastScanProgressLoading = loading;
+                scanState.HasLastScanProgressLoading = true;
+            }
         }
 
         private void UpdateScanElapsedState(TimeSpan elapsed)
         {
-            if (scanElapsedLabel != null) scanElapsedLabel.Text = "用时 " + ScanPageText.FormatElapsedSeconds(elapsed);
+            UpdateScanElapsedState(elapsed, true);
+        }
+
+        private void UpdateScanElapsedState(TimeSpan elapsed, bool force)
+        {
+            string text = "用时 " + ScanPageText.FormatElapsedSeconds(elapsed);
+            if (!force && string.Equals(scanState.LastScanElapsedText, text, StringComparison.Ordinal)) return;
+            if (scanElapsedLabel != null) scanElapsedLabel.Text = text;
+            scanState.LastScanElapsedText = text;
+            scanState.LastScanElapsedRenderedAt = DateTime.UtcNow;
         }
 
         private void StartScanProgress(string activeText, DateTime startedAt, int interval)
         {
             scanProgressStartedAt = startedAt;
             scanProgressActiveText = string.IsNullOrWhiteSpace(activeText) ? "正在扫描空间占用..." : activeText;
+            ResetScanProgressRenderState();
+            ResetScanProgressBarValue();
 
             if (scanProgressTimer == null)
             {
@@ -445,7 +491,7 @@ namespace AiCleanVolume.Desktop
             }
 
             scanProgressTimer.Interval = interval;
-            RefreshActiveScanProgress();
+            RefreshActiveScanProgress(true);
             scanProgressTimer.Start();
         }
 
@@ -456,15 +502,61 @@ namespace AiCleanVolume.Desktop
 
         private void ScanProgressTimer_Tick(object sender, EventArgs e)
         {
-            RefreshActiveScanProgress();
+            RefreshActiveScanProgress(false);
         }
 
-        private void RefreshActiveScanProgress()
+        private void RefreshActiveScanProgress(bool force)
         {
-            TimeSpan elapsed = DateTime.UtcNow - scanProgressStartedAt;
+            DateTime now = DateTime.UtcNow;
+            TimeSpan elapsed = now - scanProgressStartedAt;
             float progressValue = ScanPageText.CalculateActiveProgress(elapsed);
-            UpdateScanProgressState(scanProgressActiveText, progressValue, true, AntdUI.TType.None);
-            UpdateScanElapsedState(elapsed);
+            UpdateScanProgressState(scanProgressActiveText, progressValue, false, AntdUI.TType.Info, force);
+            if (force || ShouldRefreshScanElapsed(now)) UpdateScanElapsedState(elapsed, force);
+        }
+
+        private bool ShouldRefreshScanElapsed(DateTime now)
+        {
+            if (scanState.LastScanElapsedRenderedAt == DateTime.MinValue) return true;
+            return (now - scanState.LastScanElapsedRenderedAt).TotalMilliseconds >= ScanPageText.ElapsedTextIntervalMs;
+        }
+
+        private void ResetScanProgressRenderState()
+        {
+            scanState.LastScanProgressText = null;
+            scanState.LastScanProgressValue = 0F;
+            scanState.HasLastScanProgressValue = false;
+            scanState.LastScanProgressLoading = false;
+            scanState.HasLastScanProgressLoading = false;
+            scanState.LastScanProgressState = AntdUI.TType.None;
+            scanState.HasLastScanProgressState = false;
+            scanState.LastScanElapsedText = null;
+            scanState.LastScanElapsedRenderedAt = DateTime.MinValue;
+        }
+
+        private void ResetScanProgressBarValue()
+        {
+            SetScanProgressValue(0F, true);
+        }
+
+        private void SetScanProgressValue(float value, bool immediate)
+        {
+            if (scanProgress == null) return;
+            if (!immediate)
+            {
+                scanProgress.Value = value;
+                return;
+            }
+
+            int animation = scanProgress.Animation;
+            scanProgress.Animation = 0;
+            try
+            {
+                scanProgress.Value = value;
+            }
+            finally
+            {
+                scanProgress.Animation = animation;
+            }
         }
 
         private static void SetDriveSummaryValue(AntdUI.Label label, string text)
