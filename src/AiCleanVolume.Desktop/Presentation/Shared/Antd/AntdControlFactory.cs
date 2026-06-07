@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using AiCleanVolume.Desktop.Controls;
+using AiCleanVolume.Desktop.Presentation.Shared;
 
 namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
 {
@@ -50,15 +51,15 @@ namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
 
         public static void ConfigureTableSurface(AntdUI.Table table)
         {
-            table.Bordered = true;
-            table.Radius = 8;
-            table.BorderWidth = 1F;
+            table.Bordered = false;
+            table.Radius = 10;
+            table.BorderWidth = 0F;
             table.BorderCellWidth = 1F;
-            table.BorderColor = Color.FromArgb(230, 230, 230);
-            table.ColumnBack = Color.FromArgb(250, 250, 250);
-            table.ColumnFore = Color.FromArgb(80, 80, 80);
-            table.RowHoverBg = Color.FromArgb(245, 247, 250);
-            table.RowSelectedBg = Color.FromArgb(230, 244, 255);
+            table.BorderColor = Palette.Divider;
+            table.ColumnBack = Palette.TableHeader;
+            table.ColumnFore = Palette.TableHeaderText;
+            table.RowHoverBg = Palette.RowHover;
+            table.RowSelectedBg = Palette.RowSelected;
         }
 
         public static AntdUI.Button CreateSuggestionActionButton(string text, AntdUI.TTypeMini type)
@@ -69,7 +70,7 @@ namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
             button.Type = type;
             button.Width = 76;
             button.Height = 30;
-            button.Radius = 6;
+            button.Radius = 8;
             button.BorderWidth = 1F;
             button.WaveSize = 2;
             button.Ghost = type == AntdUI.TTypeMini.Default;
@@ -132,13 +133,13 @@ namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
             select.Dock = DockStyle.Fill;
             select.DropDownArrow = true;
             select.ListAutoWidth = true;
-            select.DropDownRadius = 6;
-            select.Radius = 6;
+            select.DropDownRadius = 8;
+            select.Radius = 8;
             select.BorderWidth = 1F;
-            select.BorderColor = Color.FromArgb(210, 210, 210);
-            select.BorderHover = Color.FromArgb(22, 119, 255);
-            select.BorderActive = Color.FromArgb(22, 119, 255);
-            select.BackColor = Color.White;
+            select.BorderColor = Palette.Border;
+            select.BorderHover = Palette.Accent;
+            select.BorderActive = Palette.Accent;
+            select.BackColor = Palette.Surface;
             select.Font = font;
             return select;
         }
@@ -167,12 +168,12 @@ namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
             input.Dock = DockStyle.Fill;
             input.PlaceholderText = placeholder;
             input.Font = new Font("Segoe UI", 10F);
-            input.Radius = 6;
+            input.Radius = 8;
             input.BorderWidth = 1F;
-            input.BorderColor = Color.FromArgb(210, 210, 210);
-            input.BorderHover = Color.FromArgb(22, 119, 255);
-            input.BorderActive = Color.FromArgb(22, 119, 255);
-            input.BackColor = Color.White;
+            input.BorderColor = Palette.Border;
+            input.BorderHover = Palette.Accent;
+            input.BorderActive = Palette.Accent;
+            input.BackColor = Palette.Surface;
             return input;
         }
 
@@ -182,7 +183,7 @@ namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
             checkbox.Dock = DockStyle.Fill;
             checkbox.Text = text;
             checkbox.Font = new Font("Segoe UI", 9.5F);
-            checkbox.ForeColor = Color.FromArgb(50, 50, 50);
+            checkbox.ForeColor = Palette.TextSecondary;
             checkbox.BackColor = Color.Transparent;
             return checkbox;
         }
@@ -194,7 +195,7 @@ namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Text = text;
             label.Font = new Font("Segoe UI", 9.5F);
-            label.ForeColor = Color.FromArgb(80, 80, 80);
+            label.ForeColor = Palette.TextSecondary;
             label.BackColor = Color.Transparent;
             return label;
         }
@@ -211,24 +212,24 @@ namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Dock = DockStyle.Fill;
-            panel.Radius = 6;
+            panel.Radius = 8;
             panel.Padding = new Padding(12, 8, 12, 8);
-            panel.Back = Color.FromArgb(250, 250, 250);
-            panel.BorderWidth = 1F;
-            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.Back = Palette.CardFill;
+            panel.BorderWidth = 0F;
+            panel.Shadow = 0;
 
             AntdUI.Label titleLabel = new AntdUI.Label();
             titleLabel.Dock = DockStyle.Top;
             titleLabel.Height = 18;
             titleLabel.Text = title;
             titleLabel.Font = new Font("Segoe UI", 9F);
-            titleLabel.ForeColor = Color.FromArgb(120, 120, 120);
+            titleLabel.ForeColor = Palette.TextMuted;
             titleLabel.BackColor = Color.Transparent;
 
             valueLabel = new AntdUI.Label();
             valueLabel.Dock = DockStyle.Fill;
             valueLabel.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            valueLabel.ForeColor = Color.FromArgb(30, 30, 30);
+            valueLabel.ForeColor = Palette.TextPrimary;
             valueLabel.BackColor = Color.Transparent;
             valueLabel.TextAlign = ContentAlignment.MiddleLeft;
             valueLabel.Text = "-";

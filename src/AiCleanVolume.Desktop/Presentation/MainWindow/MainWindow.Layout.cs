@@ -96,7 +96,7 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel dividerPanel = CreateFlatPanel();
             dividerPanel.Dock = DockStyle.Bottom;
             dividerPanel.Height = 1;
-            dividerPanel.BackColor = Color.FromArgb(240, 240, 240);
+            dividerPanel.BackColor = Palette.Divider;
 
             navigationMenu = CreateSidebarMenu();
             sidebarBrandPanel = CreateSidebarBrandPanel();
@@ -192,10 +192,10 @@ namespace AiCleanVolume.Desktop
             menu.itemMargin = 4;
             menu.IconRatio = 1.1F;
             menu.Padding = new Padding(4, 8, 4, 8);
-            menu.ForeColor = Color.FromArgb(80, 80, 80);
+            menu.ForeColor = Palette.TextSecondary;
             menu.BackColor = Color.Transparent;
-            menu.BackHover = Color.FromArgb(245, 247, 250);
-            menu.BackActive = Color.FromArgb(22, 119, 255);
+            menu.BackHover = Palette.RowHover;
+            menu.BackActive = Palette.Accent;
             menu.ForeActive = Color.White;
             menu.ColorScheme = AntdUI.TAMode.Light;
             menu.ScrollBarBlock = true;

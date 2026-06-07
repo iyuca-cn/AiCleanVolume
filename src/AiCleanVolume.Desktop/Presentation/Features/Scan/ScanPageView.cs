@@ -269,7 +269,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Scan
             panel.Radius = 8;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
-            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.BorderColor = Palette.Border;
             panel.Shadow = 0;
             return panel;
         }
@@ -283,9 +283,9 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Scan
             select.DropDownRadius = 6;
             select.Radius = 6;
             select.BorderWidth = 1F;
-            select.BorderColor = Color.FromArgb(210, 210, 210);
-            select.BorderHover = Color.FromArgb(22, 119, 255);
-            select.BorderActive = Color.FromArgb(22, 119, 255);
+            select.BorderColor = Palette.Border;
+            select.BorderHover = Palette.Accent;
+            select.BorderActive = Palette.Accent;
             select.BackColor = Color.White;
             select.Font = font;
             return select;

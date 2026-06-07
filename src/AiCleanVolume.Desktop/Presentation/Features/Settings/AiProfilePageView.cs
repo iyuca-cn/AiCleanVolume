@@ -231,7 +231,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Settings
             panel.Radius = 8;
             panel.Back = AntdUI.Style.Db.BgContainer;
             panel.BorderWidth = 1F;
-            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.BorderColor = Palette.Border;
             panel.Shadow = 0;
             return panel;
         }
@@ -264,7 +264,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Settings
             label.Text = text;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            label.ForeColor = Color.FromArgb(30, 30, 30);
+            label.ForeColor = Palette.TextPrimary;
             label.BackColor = Color.Transparent;
             return label;
         }
@@ -276,7 +276,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Settings
             label.Text = text;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Font = new Font("Segoe UI", 9F);
-            label.ForeColor = Color.FromArgb(120, 120, 120);
+            label.ForeColor = Palette.TextMuted;
             label.BackColor = Color.Transparent;
             return label;
         }

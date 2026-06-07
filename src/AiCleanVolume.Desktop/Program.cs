@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Text;
 using System.Windows.Forms;
 using AiCleanVolume.Desktop.Composition;
+using AiCleanVolume.Desktop.Presentation.Shared;
 
 namespace AiCleanVolume.Desktop
 {
@@ -16,17 +17,47 @@ namespace AiCleanVolume.Desktop
             AntdUI.Config.IsLight = true;
             AntdUI.Config.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
             AntdUI.Config.TextRenderingHighQuality = false;
-            AntdUI.Config.ShadowEnabled = true;
+            AntdUI.Config.ShadowEnabled = false;
             AntdUI.Config.Animation = true;
             AntdUI.Config.DisableAnimation(nameof(AntdUI.Table), nameof(AntdUI.Menu), nameof(AntdUI.ScrollBar));
             AntdUI.Config.SetCorrectionTextRendering("Microsoft YaHei UI", "微软雅黑", "宋体");
             AntdUI.Config.Theme()
-                .Light("#ffffff", "#1f1f1f")
+                .Light(ToHex(Palette.Page), ToHex(Palette.TextPrimary))
                 .Dark("#141414", "#f0f0f0")
-                .Header("#ffffff", "#141414")
+                .Header(ToHex(Palette.Surface), "#141414")
                 .FormBorderColor();
-            AntdUI.Style.SetPrimary(Color.FromArgb(22, 119, 255));
+            ApplyMinimalTheme();
             Application.Run(DesktopCompositionRoot.CreateMainWindow());
+        }
+
+        // 把极简色板同步到 AntdUI 主题令牌，凡是读取 Style.Db.* 的控件都会跟随。
+        private static void ApplyMinimalTheme()
+        {
+            AntdUI.Style.SetPrimary(Palette.Accent);
+
+            AntdUI.Style.Set(AntdUI.Colour.BgBase, Palette.Page);
+            AntdUI.Style.Set(AntdUI.Colour.BgLayout, Palette.Page);
+            AntdUI.Style.Set(AntdUI.Colour.BgContainer, Palette.Surface);
+            AntdUI.Style.Set(AntdUI.Colour.BgElevated, Palette.Surface);
+
+            AntdUI.Style.Set(AntdUI.Colour.Text, Palette.TextPrimary);
+            AntdUI.Style.Set(AntdUI.Colour.TextBase, Palette.TextPrimary);
+            AntdUI.Style.Set(AntdUI.Colour.TextSecondary, Palette.TextSecondary);
+            AntdUI.Style.Set(AntdUI.Colour.TextTertiary, Palette.TextMuted);
+
+            AntdUI.Style.Set(AntdUI.Colour.BorderColor, Palette.Border);
+            AntdUI.Style.Set(AntdUI.Colour.BorderSecondary, Palette.Divider);
+            AntdUI.Style.Set(AntdUI.Colour.Split, Palette.Divider);
+
+            AntdUI.Style.Set(AntdUI.Colour.PrimaryBg, Palette.AccentSoft);
+            AntdUI.Style.Set(AntdUI.Colour.PrimaryBorder, Palette.AccentSoftBorder);
+            AntdUI.Style.Set(AntdUI.Colour.FillSecondary, Palette.CardFill);
+            AntdUI.Style.Set(AntdUI.Colour.FillTertiary, Palette.CardFill);
+        }
+
+        private static string ToHex(Color color)
+        {
+            return "#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2");
         }
     }
 }

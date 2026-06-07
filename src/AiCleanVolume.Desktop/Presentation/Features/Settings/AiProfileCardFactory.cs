@@ -56,9 +56,8 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Settings
             avatar.Text = AiSettingsText.BuildProfileAvatarText(profile);
             avatar.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
             avatar.ForeColor = PrimaryColor;
-            avatar.BackColor = Color.FromArgb(235, 245, 255);
-            avatar.BorderWidth = 1F;
-            avatar.BorderColor = Color.FromArgb(200, 225, 255);
+            avatar.BackColor = Palette.AccentSoft;
+            avatar.BorderWidth = 0F;
             avatar.Radius = 18;
             avatarCell.Controls.Add(avatar);
 
@@ -169,14 +168,9 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Settings
             card.Margin = new Padding(0, 0, 0, 10);
             card.Padding = new Padding(14, 10, 14, 10);
             card.Radius = 12;
-            card.Back = selected ? Color.FromArgb(240, 248, 255) : SurfaceColor;
-            card.BorderWidth = 1F;
-            card.BorderColor = selected ? Color.FromArgb(120, 180, 255) : BorderDefaultColor;
-            card.Shadow = 6;
-            card.ShadowOpacity = 0.04F;
-            card.ShadowOpacityHover = 0.12F;
-            card.ShadowOpacityAnimation = true;
-            card.ShadowOffsetY = 2;
+            card.Back = selected ? Palette.AccentSoft : Palette.CardFill;
+            card.BorderWidth = 0F;
+            card.Shadow = 0;
             return card;
         }
 
@@ -213,9 +207,9 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Settings
             button.Margin = new Padding(8, 0, 0, 0);
             if (selected)
             {
-                button.DefaultBorderColor = Color.FromArgb(160, 200, 255);
-                button.ForeColor = Color.FromArgb(22, 100, 220);
-                button.BackColor = Color.FromArgb(235, 245, 255);
+                button.DefaultBorderColor = Palette.AccentSoftBorder;
+                button.ForeColor = Palette.Accent;
+                button.BackColor = Color.White;
             }
             return button;
         }
@@ -240,7 +234,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Settings
             label.Text = text;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Font = new Font("Segoe UI", 9F);
-            label.ForeColor = Color.FromArgb(120, 120, 120);
+            label.ForeColor = Palette.TextMuted;
             label.BackColor = Color.Transparent;
             return label;
         }

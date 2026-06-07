@@ -32,10 +32,9 @@ namespace AiCleanVolume.Desktop
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Dock = DockStyle.Fill;
             panel.Padding = new Padding(padding);
-            panel.Radius = 8;
-            panel.Back = SurfaceColor;
-            panel.BorderWidth = 1F;
-            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.Radius = 10;
+            panel.Back = Palette.CardFill;
+            panel.BorderWidth = 0F;
             panel.Shadow = 0;
             return panel;
         }
@@ -68,7 +67,7 @@ namespace AiCleanVolume.Desktop
             label.Text = text;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            label.ForeColor = Color.FromArgb(30, 30, 30);
+            label.ForeColor = Palette.TextPrimary;
             label.BackColor = Color.Transparent;
             return label;
         }
@@ -80,7 +79,7 @@ namespace AiCleanVolume.Desktop
             label.Text = text;
             label.TextAlign = ContentAlignment.MiddleLeft;
             label.Font = new Font("Segoe UI", 9F);
-            label.ForeColor = Color.FromArgb(120, 120, 120);
+            label.ForeColor = Palette.TextMuted;
             label.BackColor = Color.Transparent;
             return label;
         }
@@ -162,10 +161,9 @@ namespace AiCleanVolume.Desktop
         {
             AntdUI.Panel panel = new AntdUI.Panel();
             panel.Padding = new Padding(padding);
-            panel.Radius = 8;
-            panel.Back = SurfaceColor;
-            panel.BorderWidth = 1F;
-            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.Radius = 10;
+            panel.Back = Palette.CardFill;
+            panel.BorderWidth = 0F;
             panel.Shadow = 0;
             return panel;
         }

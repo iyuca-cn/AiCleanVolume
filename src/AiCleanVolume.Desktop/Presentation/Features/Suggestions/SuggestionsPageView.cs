@@ -157,7 +157,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Suggestions
             panel.Radius = 8;
             panel.Back = SurfaceColor;
             panel.BorderWidth = 1F;
-            panel.BorderColor = Color.FromArgb(230, 230, 230);
+            panel.BorderColor = Palette.Border;
             panel.Shadow = 0;
             return panel;
         }
