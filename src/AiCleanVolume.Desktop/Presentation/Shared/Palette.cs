@@ -2,16 +2,16 @@ using System.Drawing;
 
 namespace AiCleanVolume.Desktop.Presentation.Shared
 {
-    // 极简主题色板：靛蓝强调 + 暖灰底 + 微底色块卡片 + 近黑文字，去硬边框去阴影。
+    // 极简主题色板：纯蓝强调 + 暖灰底 + 微底色块卡片 + 近黑文字，去硬边框去阴影。
     // 这里集中定义所有界面用色，AntdUI 主题令牌在 Program.cs 中按此同步覆盖。
     internal static class Palette
     {
-        // 强调色（靛蓝紫）
-        public static readonly Color Accent = Color.FromArgb(0x5B, 0x5B, 0xD6);          // #5B5BD6
-        public static readonly Color AccentHover = Color.FromArgb(0x6E, 0x6E, 0xE0);     // #6E6EE0
-        public static readonly Color AccentActive = Color.FromArgb(0x47, 0x47, 0xC2);    // #4747C2
-        public static readonly Color AccentSoft = Color.FromArgb(0xEC, 0xEC, 0xFB);      // #ECECFB 选中/标签底
-        public static readonly Color AccentSoftBorder = Color.FromArgb(0xD6, 0xD6, 0xF5);// #D6D6F5
+        // 强调色（纯蓝）
+        public static readonly Color Accent = Color.FromArgb(0x1E, 0x88, 0xE5);          // #1E88E5
+        public static readonly Color AccentHover = Color.FromArgb(0x42, 0xA5, 0xF5);     // #42A5F5
+        public static readonly Color AccentActive = Color.FromArgb(0x15, 0x65, 0xC0);    // #1565C0
+        public static readonly Color AccentSoft = Color.FromArgb(0xE3, 0xF2, 0xFD);      // #E3F2FD 选中/标签底
+        public static readonly Color AccentSoftBorder = Color.FromArgb(0xBB, 0xDE, 0xFB);// #BBDEFB
 
         // 背景层级
         public static readonly Color Page = Color.FromArgb(0xFC, 0xFC, 0xFD);            // #FCFCFD 暖灰底
