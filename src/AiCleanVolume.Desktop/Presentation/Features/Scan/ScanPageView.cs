@@ -232,11 +232,14 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Scan
 
             ScanProgress = new AntdUI.Progress();
             ScanProgress.Dock = DockStyle.Fill;
-            ScanProgress.Margin = new Padding(0, 7, 4, 9);
+            ScanProgress.Margin = new Padding(0, 6, 4, 8);
             ScanProgress.Shape = AntdUI.TShapeProgress.Round;
-            ScanProgress.Radius = 8;
+            ScanProgress.Radius = 12;
             ScanProgress.Value = 0F;
-            ScanProgress.State = AntdUI.TType.Success;
+            ScanProgress.State = AntdUI.TType.None;
+            ScanProgress.Fill = Palette.Accent;
+            ScanProgress.Back = Palette.AccentSoft;
+            ScanProgress.ValueRatio = 0.55F;
             ScanProgress.UseSystemText = false;
             ScanProgress.Animation = ScanPageText.ActiveProgressAnimationMs;
 
