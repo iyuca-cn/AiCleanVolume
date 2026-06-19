@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using AiCleanVolume.Core.Domain.Cleanup;
 using AiCleanVolume.Core.Domain.Sandbox;
 using AiCleanVolume.Core.Domain.Settings;
@@ -15,6 +16,25 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
 {
     public sealed class RecycleBinDeletionService : IDeletionService
     {
+        private const int MaxAttempts = 8;
+        private const int BaseRetryDelayMs = 50;
+        private const int MaxRetryDelayMs = 750;
+
+        private const uint FILE_ATTRIBUTE_NORMAL = 0x80;
+        private const uint FILE_ATTRIBUTE_DIRECTORY = 0x10;
+        private const uint FILE_ATTRIBUTE_REPARSE_POINT = 0x400;
+        private const uint INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF;
+
+        private const int ERROR_FILE_NOT_FOUND = 2;
+        private const int ERROR_PATH_NOT_FOUND = 3;
+        private const int ERROR_ACCESS_DENIED = 5;
+        private const int ERROR_NO_MORE_FILES = 18;
+        private const int ERROR_SHARING_VIOLATION = 32;
+        private const int ERROR_LOCK_VIOLATION = 33;
+        private const int ERROR_DIR_NOT_EMPTY = 145;
+
+        private static readonly IntPtr InvalidHandle = new IntPtr(-1);
+
         public CleanupResult Delete(CleanupSuggestion suggestion, bool useRecycleBin)
         {
             CleanupResult result = new CleanupResult();
@@ -29,15 +49,28 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
                     return result;
                 }
 
+                string path = NormalizeInputPath(suggestion.Path);
+
                 if (suggestion.IsDirectory)
                 {
-                    DeleteDirectoryByWinApi(suggestion.Path);
-                    result.Success = true;
-                    result.Message = "已通过 WinAPI 删除目录。";
+                    DeletionTally tally = new DeletionTally();
+                    DeleteDirectoryByWinApi(path, tally);
+                    if (tally.FailedCount == 0)
+                    {
+                        result.Success = true;
+                        result.Message = "已删除文件夹（文件 " + tally.DeletedFiles + " 个，子目录 " + tally.DeletedDirectories + " 个）。";
+                    }
+                    else
+                    {
+                        result.Success = false;
+                        int done = tally.DeletedFiles + tally.DeletedDirectories;
+                        result.Message = "部分删除：已删除 " + done + " 项，" + tally.FailedCount + " 项无法删除（其余能删的已删除）。"
+                            + Environment.NewLine + tally.FirstFailureMessage;
+                    }
                     return result;
                 }
 
-                DeleteFileByWinApi(suggestion.Path);
+                DeleteFileByWinApi(path);
                 result.Success = true;
                 result.Message = "已通过 WinAPI 删除文件。";
                 return result;
@@ -51,45 +84,228 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
             }
         }
 
-        private static void DeleteDirectoryByWinApi(string path)
+        // 尽力删除（best-effort）：遇到删不掉的子项时记录并继续删除其余项，而不是中断整个删除。
+        private static void DeleteDirectoryByWinApi(string path, DeletionTally tally)
         {
-            if (!Directory.Exists(path)) throw new DirectoryNotFoundException("目录不存在。" + path);
-
-            File.SetAttributes(path, FileAttributes.Normal);
-            string[] files = Directory.GetFiles(path, "*", SearchOption.TopDirectoryOnly);
-            for (int i = 0; i < files.Length; i++)
+            string extended = ToExtendedPath(path);
+            uint attributes = GetFileAttributesW(extended);
+            if (attributes == INVALID_FILE_ATTRIBUTES)
             {
-                DeleteFileByWinApi(files[i]);
+                int error = Marshal.GetLastWin32Error();
+                if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) return;
+                tally.Record(FriendlyMessage(true, path, error));
+                return;
             }
 
-            string[] directories = Directory.GetDirectories(path, "*", SearchOption.TopDirectoryOnly);
-            for (int i = 0; i < directories.Length; i++)
+            // 重解析点（目录联接 / 符号链接）：只删除链接本身，绝不递归进入目标，避免误删链接指向的真实数据。
+            if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
             {
-                DeleteDirectoryByWinApi(directories[i]);
+                try { RemoveDirectoryByWinApi(path); tally.DeletedDirectories++; }
+                catch (Exception ex) { tally.Record(ex.Message); }
+                return;
             }
 
-            File.SetAttributes(path, FileAttributes.Normal);
-            if (!RemoveDirectory(path)) ThrowLastWin32Error("删除目录失败", path);
+            SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
+
+            WIN32_FIND_DATA find;
+            IntPtr handle = FindFirstFileW(extended + "\\*", out find);
+            if (handle == InvalidHandle)
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (error != ERROR_FILE_NOT_FOUND && error != ERROR_NO_MORE_FILES && error != ERROR_PATH_NOT_FOUND)
+                {
+                    tally.Record(FriendlyMessage(true, path, error));
+                    return;
+                }
+            }
+            else
+            {
+                try
+                {
+                    do
+                    {
+                        string name = find.cFileName;
+                        if (name == "." || name == "..") continue;
+
+                        string childPath = path + "\\" + name;
+                        if ((find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+                        {
+                            DeleteDirectoryByWinApi(childPath, tally);
+                        }
+                        else
+                        {
+                            try { DeleteFileByWinApi(childPath); tally.DeletedFiles++; }
+                            catch (Exception ex) { tally.Record(ex.Message); }
+                        }
+                    }
+                    while (FindNextFileW(handle, out find));
+                }
+                finally
+                {
+                    FindClose(handle);
+                }
+            }
+
+            // 删除目录自身：只有当其中所有子项都已删除时才能成功。
+            try { RemoveDirectoryByWinApi(path); tally.DeletedDirectories++; }
+            catch (Exception ex)
+            {
+                // 若已有子项删除失败，则本目录非空属必然结果，残留项已计入，不再重复计数；
+                // 否则说明是目录自身被占用，记录该错误。
+                if (tally.FailedCount == 0) tally.Record(ex.Message);
+            }
         }
 
         private static void DeleteFileByWinApi(string path)
         {
-            if (!File.Exists(path)) throw new FileNotFoundException("文件不存在。", path);
+            string extended = ToExtendedPath(path);
+            SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
 
-            File.SetAttributes(path, FileAttributes.Normal);
-            if (!DeleteFile(path)) ThrowLastWin32Error("删除文件失败", path);
+            int lastError = 0;
+            for (int attempt = 1; attempt <= MaxAttempts; attempt++)
+            {
+                if (DeleteFileW(extended)) return;
+
+                lastError = Marshal.GetLastWin32Error();
+                if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND) return;
+                if (attempt == MaxAttempts || !IsRetriableError(lastError)) break;
+
+                SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
+                Thread.Sleep(BackoffDelayMs(attempt));
+            }
+
+            ThrowFriendly(false, path, lastError);
         }
 
-        private static void ThrowLastWin32Error(string action, string path)
+        private static void RemoveDirectoryByWinApi(string path)
         {
-            int error = Marshal.GetLastWin32Error();
-            throw new IOException(action + "：" + path + "。" + new Win32Exception(error).Message, error);
+            string extended = ToExtendedPath(path);
+            SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
+
+            int lastError = 0;
+            for (int attempt = 1; attempt <= MaxAttempts; attempt++)
+            {
+                if (RemoveDirectoryW(extended)) return;
+
+                lastError = Marshal.GetLastWin32Error();
+                if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND) return;
+                if (attempt == MaxAttempts || !IsRetriableError(lastError)) break;
+
+                Thread.Sleep(BackoffDelayMs(attempt));
+            }
+
+            ThrowFriendly(true, path, lastError);
+        }
+
+        private static bool IsRetriableError(int error)
+        {
+            // 文件/目录句柄被杀软实时监控、Windows 搜索索引、网盘同步、缩略图等临时占用时会出现这些短暂错误，
+            // 占用方释放后重试通常即可成功（资源管理器内部同样会重试，所以有时它能删而本程序当下删不掉）。
+            return error == ERROR_ACCESS_DENIED
+                || error == ERROR_SHARING_VIOLATION
+                || error == ERROR_LOCK_VIOLATION
+                || error == ERROR_DIR_NOT_EMPTY;
+        }
+
+        private static int BackoffDelayMs(int attempt)
+        {
+            long delay = (long)BaseRetryDelayMs << (attempt - 1);
+            return delay > MaxRetryDelayMs ? MaxRetryDelayMs : (int)delay;
+        }
+
+        private static string FriendlyMessage(bool isDirectory, string path, int error)
+        {
+            string target = isDirectory ? "文件夹" : "文件";
+            string reason;
+            switch (error)
+            {
+                case ERROR_SHARING_VIOLATION:
+                case ERROR_LOCK_VIOLATION:
+                    reason = target + "被其他程序占用，多次重试仍无法删除。请关闭杀毒软件 / Windows 搜索索引 / 网盘同步等可能占用它的程序后重试。";
+                    break;
+                case ERROR_ACCESS_DENIED:
+                    reason = "没有删除该" + target + "的权限。请以管理员身份运行，或在设置中开启“完全权限模式”后重试。";
+                    break;
+                case ERROR_DIR_NOT_EMPTY:
+                    reason = target + "非空：其中可能有文件正被占用而未能删除。请关闭占用程序后重试。";
+                    break;
+                default:
+                    reason = "删除" + target + "失败：" + new Win32Exception(error).Message;
+                    break;
+            }
+            return reason + Environment.NewLine + "路径：" + path;
+        }
+
+        private static void ThrowFriendly(bool isDirectory, string path, int error)
+        {
+            throw new IOException(FriendlyMessage(isDirectory, path, error), error);
+        }
+
+        private static string NormalizeInputPath(string path)
+        {
+            string normalized = path.Trim().Trim('"').Replace('/', '\\');
+            // 去掉尾部分隔符，但保留盘符根（如 "C:\"）。
+            if (normalized.Length > 3) normalized = normalized.TrimEnd('\\');
+            return normalized;
+        }
+
+        private static string ToExtendedPath(string path)
+        {
+            if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) return path;
+            if (path.StartsWith(@"\\", StringComparison.Ordinal)) return @"\\?\UNC\" + path.Substring(2);
+            return @"\\?\" + path;
+        }
+
+        private sealed class DeletionTally
+        {
+            public int DeletedFiles;
+            public int DeletedDirectories;
+            public int FailedCount;
+            public string FirstFailureMessage;
+
+            public void Record(string message)
+            {
+                FailedCount++;
+                if (FirstFailureMessage == null) FirstFailureMessage = message;
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct WIN32_FIND_DATA
+        {
+            public uint dwFileAttributes;
+            public System.Runtime.InteropServices.ComTypes.FILETIME ftCreationTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME ftLastAccessTime;
+            public System.Runtime.InteropServices.ComTypes.FILETIME ftLastWriteTime;
+            public uint nFileSizeHigh;
+            public uint nFileSizeLow;
+            public uint dwReserved0;
+            public uint dwReserved1;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string cFileName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 14)]
+            public string cAlternateFileName;
         }
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern bool DeleteFile(string lpFileName);
+        private static extern IntPtr FindFirstFileW(string lpFileName, out WIN32_FIND_DATA lpFindFileData);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern bool RemoveDirectory(string lpPathName);
+        private static extern bool FindNextFileW(IntPtr hFindFile, out WIN32_FIND_DATA lpFindFileData);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool FindClose(IntPtr hFindFile);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern uint GetFileAttributesW(string lpFileName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool SetFileAttributesW(string lpFileName, uint dwFileAttributes);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool DeleteFileW(string lpFileName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool RemoveDirectoryW(string lpPathName);
     }
 }
