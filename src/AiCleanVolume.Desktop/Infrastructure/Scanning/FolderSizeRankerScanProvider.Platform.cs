@@ -18,7 +18,7 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 {
     public sealed partial class FolderSizeRankerScanProvider : IScanProvider
     {
-        private static StorageItem TryScanWithPlatformApi(ScanRequest request, string cliError)
+        private static StorageItem TryScanWithPlatformApi(ScanRequest request, string scanError)
         {
             if (!Directory.Exists(request.Location)) return null;
             try
@@ -29,7 +29,7 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException("folder-size-ranker-cli 执行失败：" + cliError + Environment.NewLine + "平台 API 降级扫描也失败：" + ex.Message, ex);
+                throw new InvalidOperationException("native 扫描失败：" + scanError + Environment.NewLine + "平台 API 降级扫描也失败：" + ex.Message, ex);
             }
         }
 

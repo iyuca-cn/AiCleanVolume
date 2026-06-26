@@ -9,6 +9,8 @@ namespace AiCleanVolume.Core.Domain.Storage
             PerLevelLimit = -1;
             LoadDepth = -1;
             SessionNodeId = -1;
+            ChildStart = 0;
+            ChildCount = 512;
         }
 
         public string Location { get; set; }
@@ -18,5 +20,7 @@ namespace AiCleanVolume.Core.Domain.Storage
         public int LoadDepth { get; set; }
         public string SessionIdentity { get; set; }
         public int SessionNodeId { get; set; }
+        public int ChildStart { get; set; }
+        public int ChildCount { get; set; }
     }
 }

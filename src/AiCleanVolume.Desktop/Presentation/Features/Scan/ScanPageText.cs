@@ -22,6 +22,7 @@ namespace AiCleanVolume.Desktop.Presentation.Features.Scan
                 "，limit=" + request.PerLevelLimit +
                 "，mode=" + DescribeSizeMode(request.SortMode) +
                 "，loadDepth=" + request.LoadDepth +
+                "，window=" + request.ChildStart + "+" + request.ChildCount +
                 "，session=" + request.SessionIdentity + "/" + request.SessionNodeId;
         }
 

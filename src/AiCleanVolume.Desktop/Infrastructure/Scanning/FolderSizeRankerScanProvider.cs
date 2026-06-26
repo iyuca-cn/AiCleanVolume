@@ -11,6 +11,7 @@ using AiCleanVolume.Core.Application.CleanupPlanning;
 using AiCleanVolume.Core.Application.Deletion;
 using AiCleanVolume.Core.Application.Scanning;
 using AiCleanVolume.Core.Kernel.Ports;
+using AiCleanVolume.NativeBridge;
 using Newtonsoft.Json;
 
 
@@ -18,22 +19,18 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 {
     public sealed partial class FolderSizeRankerScanProvider : IScanProvider
     {
-        private readonly string executablePath;
-
         private readonly object syncRoot = new object();
 
         private ScanSession currentTreeSession;
 
         public FolderSizeRankerScanProvider()
         {
-            executablePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "folder-size-ranker-cli.exe");
         }
 
         public StorageItem Scan(ScanRequest request)
         {
             if (request == null) throw new ArgumentNullException("request");
             if (string.IsNullOrWhiteSpace(request.Location)) throw new InvalidOperationException("扫描位置不能为空。");
-            if (!File.Exists(executablePath)) throw new FileNotFoundException("未找到 folder-size-ranker-cli.exe。", executablePath);
 
             request.Location = NormalizeLocation(request.Location);
             return request.LoadDepth >= 0 ? ScanPartial(request) : ScanFull(request);
@@ -63,6 +60,10 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
             clone.TotalDirectoryCount = source.TotalDirectoryCount;
             clone.SessionIdentity = source.SessionIdentity;
             clone.SessionNodeId = source.SessionNodeId;
+            clone.ChildStart = source.ChildStart;
+            clone.ChildCount = source.ChildCount;
+            clone.LoadedChildCount = source.LoadedChildCount;
+            clone.TotalChildCount = source.TotalChildCount;
             for (int i = 0; i < source.Children.Count; i++)
             {
                 clone.Children.Add(CloneTree(source.Children[i]));
@@ -73,58 +74,27 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 
         private StorageItem ScanFull(ScanRequest request)
         {
-            ProcessStartInfo startInfo = CreateStartInfo(request);
-            using (Process process = Process.Start(startInfo))
-            {
-                ScanSession session = null;
-                Exception parseError = null;
-
-                try
-                {
-                    using (JsonTextReader reader = new JsonTextReader(process.StandardOutput))
-                    {
-                        session = BuildCompactSession(reader, request.Location, BuildTreeTemplateKey(request));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    parseError = ex;
-                }
-
-                string error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-                if (process.ExitCode != 0)
-                {
-                    StorageItem fallback = TryScanWithPlatformApi(request, error);
-                    if (fallback != null) return fallback;
-                    throw new InvalidOperationException("folder-size-ranker-cli 执行失败：" + error);
-                }
-
-                if (parseError != null) throw new InvalidOperationException("扫描结果解析失败：" + parseError.Message, parseError);
-                if (session == null) throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
-                return MaterializeDirectory(session, session.RootNodeId, int.MaxValue, true);
-            }
+            ScanSession session = EnsureTreeSession(request);
+            return MaterializeDirectory(session, session.RootNodeId, 1, true, session.RootPath, request.ChildStart, ResolveChildCount(request));
         }
 
         private StorageItem ScanPartial(ScanRequest request)
         {
-            try
+            ScanSession session = EnsureTreeSession(request);
+            int nodeId = ResolveNodeId(session, request);
+            if (nodeId < 0)
             {
-                ScanSession session = EnsureTreeSession(request);
-                int nodeId = ResolveNodeId(session, request);
-                if (nodeId < 0)
-                {
-                    throw new InvalidOperationException("目录树会话未包含路径：" + request.Location);
-                }
+                throw new InvalidOperationException("目录树会话未包含路径：" + request.Location);
+            }
 
-                return MaterializeDirectory(session, nodeId, request.LoadDepth, IsSamePath(session.RootPath, request.Location));
-            }
-            catch (CliExecutionException ex)
-            {
-                StorageItem fallback = TryScanWithPlatformApi(request, ex.Message);
-                if (fallback != null) return fallback;
-                throw;
-            }
+            return MaterializeDirectory(
+                session,
+                nodeId,
+                request.LoadDepth,
+                IsSamePath(session.RootPath, request.Location),
+                request.Location,
+                request.ChildStart,
+                ResolveChildCount(request));
         }
 
         private ScanSession EnsureTreeSession(ScanRequest request)
@@ -156,34 +126,25 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 
         private ScanSession BuildTreeSession(ScanRequest request, string templateKey)
         {
-            ProcessStartInfo startInfo = CreateStartInfo(request);
-            using (Process process = Process.Start(startInfo))
+            NativeScanOptions options = CreateNativeOptions(request);
+            NativeMftScanSession nativeSession = null;
+            try
             {
-                ScanSession session = null;
-                Exception parseError = null;
+                nativeSession = NativeMftScanSession.Scan(options);
+                NativeNodeInfo rootNode = nativeSession.GetRootNode();
 
-                try
-                {
-                    using (JsonTextReader reader = new JsonTextReader(process.StandardOutput))
-                    {
-                        session = BuildCompactSession(reader, request.Location, templateKey);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    parseError = ex;
-                }
-
-                string error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-                if (process.ExitCode != 0)
-                {
-                    throw new CliExecutionException(error);
-                }
-
-                if (parseError != null) throw new InvalidOperationException("扫描结果解析失败：" + parseError.Message, parseError);
-                if (session == null) throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
+                ScanSession session = new ScanSession();
+                session.RootPath = NormalizeLocation(string.IsNullOrWhiteSpace(rootNode.Path) ? request.Location : rootNode.Path);
+                session.TemplateKey = templateKey;
+                session.SessionIdentity = Guid.NewGuid().ToString("N");
+                session.RootNodeId = rootNode.NodeId;
+                session.NativeSession = nativeSession;
+                nativeSession = null;
                 return session;
+            }
+            finally
+            {
+                if (nativeSession != null) nativeSession.Dispose();
             }
         }
     }

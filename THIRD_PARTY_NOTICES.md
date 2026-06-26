@@ -9,10 +9,15 @@
 | 组件 | 版本 / 快照 | 用途 | 来源 | 许可证 | 本仓库中的许可证文件 |
 | --- | --- | --- | --- | --- | --- |
 | AntdUI | 2.3.0 | WinForms UI 组件库，编译产出 `AntdUI.dll` | https://github.com/AntdUI/AntdUI | Apache License 2.0 | `third_party/AntdUI-v2.3.0/LICENSE` |
-| folder-size-ranker-cli | vendored executable snapshot | 扫描磁盘目录大小的 CLI，构建后复制到桌面程序输出目录 | https://github.com/iyuca-cn/folder-size-ranker-cli | MIT | `third_party/folder-size-ranker-cli/LICENSE` |
-| yyjson | vendored in `folder-size-ranker-cli` | `folder-size-ranker-cli` 的 JSON 输出依赖 | https://github.com/ibireme/yyjson | MIT | `third_party/folder-size-ranker-cli/YYJSON-LICENSE` |
 | Newtonsoft.Json | 13.0.3 | 运行时 JSON 序列化 / 反序列化 | https://www.newtonsoft.com/json | MIT | `licenses/Newtonsoft.Json-13.0.3-LICENSE.txt` |
 | RestSharp | 106.15.0 (`net48`) | 运行时 HTTP / REST 客户端 | https://github.com/restsharp/RestSharp | Apache License 2.0 | `licenses/RestSharp-106.15.0-LICENSE.txt` |
+
+## 随仓库保留但不随桌面程序运行时分发的组件
+
+| 组件 | 版本 / 快照 | 用途 | 来源 | 许可证 | 本仓库中的许可证文件 |
+| --- | --- | --- | --- | --- | --- |
+| folder-size-ranker-cli | vendored executable snapshot | CLI 上游快照与兼容性参考；桌面端扫描不再复制或启动该 exe | https://github.com/iyuca-cn/folder-size-ranker-cli | MIT | `third_party/folder-size-ranker-cli/LICENSE` |
+| yyjson | vendored in `folder-size-ranker-cli` | CLI JSON 输出依赖；不属于桌面端 native bridge 运行时依赖 | https://github.com/ibireme/yyjson | MIT | `third_party/folder-size-ranker-cli/YYJSON-LICENSE` |
 
 ## 仅构建期依赖
 
@@ -25,7 +30,7 @@
 
 - 分发源代码或二进制时，请一并保留本文件与上表列出的许可证文件。
 - Apache 2.0 组件除许可证文本外，如上游后续增加 `NOTICE` 文件，也应一并保留。
-- `folder-size-ranker-cli.exe` 在其上游仓库中静态纳入了 `yyjson` 源码实现，因此单独分发该 exe 时，也应一并分发 `YYJSON-LICENSE`。
+- `folder-size-ranker-cli.exe` 不再复制到桌面端输出目录；如单独分发该 CLI exe，也应一并分发 `YYJSON-LICENSE`。
 - 本文件是归档索引，不替代各上游项目的原始许可证文本；具体权利义务以上游许可证原文为准。
 
 ## 核对依据

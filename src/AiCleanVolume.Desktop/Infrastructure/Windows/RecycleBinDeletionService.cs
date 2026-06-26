@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
 using AiCleanVolume.Core.Domain.Cleanup;
 using AiCleanVolume.Core.Domain.Sandbox;
 using AiCleanVolume.Core.Domain.Settings;
@@ -16,10 +15,6 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
 {
     public sealed class RecycleBinDeletionService : IDeletionService
     {
-        private const int MaxAttempts = 8;
-        private const int BaseRetryDelayMs = 50;
-        private const int MaxRetryDelayMs = 750;
-
         private const uint FILE_ATTRIBUTE_NORMAL = 0x80;
         private const uint FILE_ATTRIBUTE_DIRECTORY = 0x10;
         private const uint FILE_ATTRIBUTE_REPARSE_POINT = 0x400;
@@ -156,61 +151,32 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
             }
         }
 
+        // 单次尝试删除：被占用等原因失败时直接抛出，由上层记录并跳过该项，绝不重试，确保一次删除完成。
         private static void DeleteFileByWinApi(string path)
         {
             string extended = ToExtendedPath(path);
             SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
 
-            int lastError = 0;
-            for (int attempt = 1; attempt <= MaxAttempts; attempt++)
-            {
-                if (DeleteFileW(extended)) return;
+            if (DeleteFileW(extended)) return;
 
-                lastError = Marshal.GetLastWin32Error();
-                if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND) return;
-                if (attempt == MaxAttempts || !IsRetriableError(lastError)) break;
-
-                SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
-                Thread.Sleep(BackoffDelayMs(attempt));
-            }
+            int lastError = Marshal.GetLastWin32Error();
+            if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND) return;
 
             ThrowFriendly(false, path, lastError);
         }
 
+        // 单次尝试删除目录自身：同样不重试，失败即跳过。
         private static void RemoveDirectoryByWinApi(string path)
         {
             string extended = ToExtendedPath(path);
             SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
 
-            int lastError = 0;
-            for (int attempt = 1; attempt <= MaxAttempts; attempt++)
-            {
-                if (RemoveDirectoryW(extended)) return;
+            if (RemoveDirectoryW(extended)) return;
 
-                lastError = Marshal.GetLastWin32Error();
-                if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND) return;
-                if (attempt == MaxAttempts || !IsRetriableError(lastError)) break;
-
-                Thread.Sleep(BackoffDelayMs(attempt));
-            }
+            int lastError = Marshal.GetLastWin32Error();
+            if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND) return;
 
             ThrowFriendly(true, path, lastError);
-        }
-
-        private static bool IsRetriableError(int error)
-        {
-            // 文件/目录句柄被杀软实时监控、Windows 搜索索引、网盘同步、缩略图等临时占用时会出现这些短暂错误，
-            // 占用方释放后重试通常即可成功（资源管理器内部同样会重试，所以有时它能删而本程序当下删不掉）。
-            return error == ERROR_ACCESS_DENIED
-                || error == ERROR_SHARING_VIOLATION
-                || error == ERROR_LOCK_VIOLATION
-                || error == ERROR_DIR_NOT_EMPTY;
-        }
-
-        private static int BackoffDelayMs(int attempt)
-        {
-            long delay = (long)BaseRetryDelayMs << (attempt - 1);
-            return delay > MaxRetryDelayMs ? MaxRetryDelayMs : (int)delay;
         }
 
         private static string FriendlyMessage(bool isDirectory, string path, int error)
@@ -221,7 +187,7 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
             {
                 case ERROR_SHARING_VIOLATION:
                 case ERROR_LOCK_VIOLATION:
-                    reason = target + "被其他程序占用，多次重试仍无法删除。请关闭杀毒软件 / Windows 搜索索引 / 网盘同步等可能占用它的程序后重试。";
+                    reason = target + "被其他程序占用，已跳过。可关闭杀毒软件 / Windows 搜索索引 / 网盘同步等可能占用它的程序后重试。";
                     break;
                 case ERROR_ACCESS_DENIED:
                     reason = "没有删除该" + target + "的权限。请以管理员身份运行，或在设置中开启“完全权限模式”后重试。";

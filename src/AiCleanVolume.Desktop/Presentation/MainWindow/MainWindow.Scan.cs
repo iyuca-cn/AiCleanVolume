@@ -221,6 +221,10 @@ namespace AiCleanVolume.Desktop
             target.TotalDirectoryCount = source.TotalDirectoryCount;
             target.SessionIdentity = source.SessionIdentity;
             target.SessionNodeId = source.SessionNodeId;
+            target.ChildStart = source.ChildStart;
+            target.ChildCount = source.ChildCount;
+            target.LoadedChildCount = source.LoadedChildCount;
+            target.TotalChildCount = source.TotalChildCount;
             target.Children.Clear();
             for (int i = 0; i < source.Children.Count; i++) target.Children.Add(source.Children[i]);
         }
@@ -326,6 +330,8 @@ namespace AiCleanVolume.Desktop
             request.LoadDepth = loadDepth;
             request.SessionIdentity = template.SessionIdentity;
             request.SessionNodeId = template.SessionNodeId;
+            request.ChildStart = template.ChildStart;
+            request.ChildCount = template.ChildCount;
             return request;
         }
 

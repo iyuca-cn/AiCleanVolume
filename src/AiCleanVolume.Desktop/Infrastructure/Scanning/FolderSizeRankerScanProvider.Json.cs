@@ -11,6 +11,7 @@ using AiCleanVolume.Core.Application.CleanupPlanning;
 using AiCleanVolume.Core.Application.Deletion;
 using AiCleanVolume.Core.Application.Scanning;
 using AiCleanVolume.Core.Kernel.Ports;
+using AiCleanVolume.NativeBridge;
 using Newtonsoft.Json;
 
 
@@ -18,144 +19,19 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 {
     public sealed partial class FolderSizeRankerScanProvider : IScanProvider
     {
-        private static ScanSession BuildCompactSession(JsonTextReader reader, string requestedLocation, string templateKey)
+        private static NativeScanOptions CreateNativeOptions(ScanRequest request)
         {
-            if (!reader.Read() || reader.TokenType != JsonToken.StartObject)
-            {
-                throw new InvalidOperationException("扫描结果为空或 JSON 无法解析。");
-            }
-
-            ScanSession session = new ScanSession();
-            session.RootPath = NormalizeLocation(requestedLocation);
-            session.TemplateKey = templateKey;
-            session.SessionIdentity = Guid.NewGuid().ToString("N");
-            session.Directories = new List<DirectoryNodeState>();
-            session.RootNodeId = ParseDirectoryNode(reader, session, -1, true);
-            if (string.IsNullOrWhiteSpace(session.RootPath)) throw new InvalidOperationException("扫描结果根路径为空。");
-            return session;
+            NativeScanOptions options = new NativeScanOptions();
+            options.Location = request.Location;
+            options.SortMode = request.SortMode == ScanSortMode.Logical ? 0 : 1;
+            options.MinSizeBytes = request.MinSizeBytes;
+            options.PerLevelLimit = request.PerLevelLimit;
+            return options;
         }
 
-        private static int ParseDirectoryNode(JsonTextReader reader, ScanSession session, int parentNodeId, bool isRoot)
+        private static int ResolveChildCount(ScanRequest request)
         {
-            DirectoryNodeState node = new DirectoryNodeState();
-            node.NodeId = session.Directories.Count;
-            node.ParentNodeId = parentNodeId;
-            node.Name = string.Empty;
-            node.DirectFiles = EmptyFiles;
-            node.DirectChildNodeIds = EmptyChildIds;
-            session.Directories.Add(node);
-
-            List<int> directChildNodeIds = null;
-            FileNodeState[] directFiles = EmptyFiles;
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonToken.PropertyName)
-                {
-                    string propertyName = reader.Value == null ? string.Empty : reader.Value.ToString();
-                    if (!reader.Read()) throw new InvalidOperationException("扫描结果不完整。");
-
-                    switch (propertyName)
-                    {
-                        case "root_path":
-                            if (isRoot) session.RootPath = NormalizeLocation(ReadStringValue(reader.Value));
-                            else reader.Skip();
-                            break;
-                        case "path":
-                            ApplyPathProperty(session, node, ReadStringValue(reader.Value), isRoot);
-                            break;
-                        case "name":
-                            node.Name = ReadStringValue(reader.Value);
-                            break;
-                        case "bytes":
-                            node.Bytes = ReadInt64(reader.Value);
-                            break;
-                        case "files":
-                            directFiles = ParseCompactFiles(reader);
-                            break;
-                        case "children":
-                            directChildNodeIds = ParseCompactChildren(reader, session, node.NodeId);
-                            break;
-                        default:
-                            reader.Skip();
-                            break;
-                    }
-                }
-                else if (reader.TokenType == JsonToken.EndObject)
-                {
-                    break;
-                }
-            }
-
-            node.DirectFiles = directFiles ?? EmptyFiles;
-            node.DirectChildNodeIds = directChildNodeIds == null ? EmptyChildIds : directChildNodeIds.ToArray();
-            node.DirectFileCount = node.DirectFiles.Length;
-
-            int totalFiles = node.DirectFileCount;
-            int totalDirs = 0;
-            for (int i = 0; i < node.DirectChildNodeIds.Length; i++)
-            {
-                DirectoryNodeState child = session.Directories[node.DirectChildNodeIds[i]];
-                totalFiles += child.TotalFileCount;
-                totalDirs += 1 + child.TotalDirectoryCount;
-            }
-
-            node.TotalFileCount = totalFiles;
-            node.TotalDirectoryCount = totalDirs;
-            return node.NodeId;
-        }
-
-        private static FileNodeState[] ParseCompactFiles(JsonTextReader reader)
-        {
-            if (reader.TokenType == JsonToken.Null) return EmptyFiles;
-            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果文件数组格式错误。");
-
-            List<FileNodeState> files = new List<FileNodeState>();
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonToken.EndArray) break;
-                if (reader.TokenType != JsonToken.StartObject)
-                {
-                    reader.Skip();
-                    continue;
-                }
-
-                files.Add(ParseFileState(reader));
-            }
-
-            return files.Count == 0 ? EmptyFiles : files.ToArray();
-        }
-
-        private static List<int> ParseCompactChildren(JsonTextReader reader, ScanSession session, int parentNodeId)
-        {
-            if (reader.TokenType == JsonToken.Null) return null;
-            if (reader.TokenType != JsonToken.StartArray) throw new InvalidOperationException("扫描结果目录数组格式错误。");
-
-            List<int> childNodeIds = new List<int>();
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonToken.EndArray) break;
-                if (reader.TokenType != JsonToken.StartObject)
-                {
-                    reader.Skip();
-                    continue;
-                }
-
-                childNodeIds.Add(ParseDirectoryNode(reader, session, parentNodeId, false));
-            }
-
-            return childNodeIds;
-        }
-
-        private static void ApplyPathProperty(ScanSession session, DirectoryNodeState node, string path, bool isRoot)
-        {
-            if (isRoot)
-            {
-                session.RootPath = NormalizeLocation(path);
-                return;
-            }
-
-            node.Name = StorageFormatting.GetDisplayName(path, true);
+            return request.ChildCount > 0 ? request.ChildCount : DefaultChildWindowSize;
         }
 
         private static int ResolveNodeId(ScanSession session, ScanRequest request)
@@ -164,9 +40,7 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 
             if (!string.IsNullOrWhiteSpace(request.SessionIdentity) &&
                 string.Equals(session.SessionIdentity, request.SessionIdentity, StringComparison.Ordinal) &&
-                request.SessionNodeId >= 0 &&
-                session.Directories != null &&
-                request.SessionNodeId < session.Directories.Count)
+                request.SessionNodeId >= 0)
             {
                 return request.SessionNodeId;
             }
@@ -175,57 +49,101 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
             return -1;
         }
 
-        private static StorageItem MaterializeDirectory(ScanSession session, int nodeId, int remainingDepth, bool isRoot)
+        private static StorageItem MaterializeDirectory(
+            ScanSession session,
+            int nodeId,
+            int remainingDepth,
+            bool isRoot,
+            string directoryPath,
+            int childStart,
+            int childCount)
         {
-            return MaterializeDirectory(session, nodeId, remainingDepth, isRoot, BuildDirectoryPath(session, nodeId));
-        }
-
-        private static StorageItem MaterializeDirectory(ScanSession session, int nodeId, int remainingDepth, bool isRoot, string directoryPath)
-        {
-            DirectoryNodeState node = session.Directories[nodeId];
-            StorageItem item = CreateStorageDirectoryItem(session, node, directoryPath, remainingDepth > 0, isRoot);
+            NativeNodeInfo node = session.NativeSession.GetNode(nodeId);
+            string path = isRoot
+                ? (string.IsNullOrWhiteSpace(node.Path) ? session.RootPath : node.Path)
+                : (string.IsNullOrWhiteSpace(directoryPath) ? BuildDirectoryPath(session, nodeId) : directoryPath);
+            StorageItem item = CreateStorageDirectoryItem(session, node, path, remainingDepth > 0, isRoot);
             if (remainingDepth <= 0) return item;
 
-            for (int i = 0; i < node.DirectFiles.Length; i++)
-            {
-                item.Children.Add(CreateStorageFileItem(node.DirectFiles[i], directoryPath));
-            }
+            NativeChildPage page = session.NativeSession.GetChildren(nodeId, childStart, childCount);
+            item.ChildStart = childStart;
+            item.ChildCount = childCount;
+            item.LoadedChildCount = page.Items == null ? 0 : page.Items.Length;
+            item.TotalChildCount = page.TotalCount;
 
-            int nextDepth = remainingDepth == int.MaxValue ? int.MaxValue : remainingDepth - 1;
-            for (int i = 0; i < node.DirectChildNodeIds.Length; i++)
+            if (page.Items != null)
             {
-                DirectoryNodeState child = session.Directories[node.DirectChildNodeIds[i]];
-                string childPath = CombinePath(directoryPath, child.Name);
-                if (remainingDepth == 1)
+                int nextDepth = remainingDepth == int.MaxValue ? int.MaxValue : remainingDepth - 1;
+                for (int i = 0; i < page.Items.Length; i++)
                 {
-                    item.Children.Add(CreateStorageDirectoryItem(session, child, childPath, false, false));
-                    continue;
-                }
+                    NativeChildInfo child = page.Items[i];
+                    if (!child.IsDirectory)
+                    {
+                        item.Children.Add(CreateStorageFileItem(child, path));
+                        continue;
+                    }
 
-                item.Children.Add(MaterializeDirectory(session, child.NodeId, nextDepth, false, childPath));
+                    string childPath = CombinePath(path, child.Name);
+                    if (remainingDepth == 1)
+                    {
+                        item.Children.Add(CreateStorageDirectoryItem(session, child, childPath, false));
+                        continue;
+                    }
+
+                    item.Children.Add(MaterializeDirectory(session, child.NodeId, nextDepth, false, childPath, 0, childCount));
+                }
             }
 
+            item.ChildrenLoaded = true;
             return item;
         }
 
-        private static StorageItem CreateStorageDirectoryItem(ScanSession session, DirectoryNodeState node, string path, bool childrenLoaded, bool isRoot)
+        private static StorageItem CreateStorageDirectoryItem(
+            ScanSession session,
+            NativeNodeInfo node,
+            string path,
+            bool childrenLoaded,
+            bool isRoot)
         {
             StorageItem item = new StorageItem();
             item.Path = path;
             item.Name = isRoot ? path : (string.IsNullOrEmpty(node.Name) ? StorageFormatting.GetDisplayName(path, true) : node.Name);
             item.Bytes = node.Bytes;
             item.IsDirectory = true;
-            item.HasChildren = node.DirectFileCount > 0 || node.TotalDirectoryCount > 0;
+            item.HasChildren = node.HasChildren;
             item.ChildrenLoaded = childrenLoaded;
             item.DirectFileCount = node.DirectFileCount;
             item.TotalFileCount = node.TotalFileCount;
             item.TotalDirectoryCount = node.TotalDirectoryCount;
             item.SessionIdentity = session == null ? null : session.SessionIdentity;
             item.SessionNodeId = node.NodeId;
+            item.TotalChildCount = node.DirectFileCount + node.DirectChildDirectoryCount;
             return item;
         }
 
-        private static StorageItem CreateStorageFileItem(FileNodeState state, string parentPath)
+        private static StorageItem CreateStorageDirectoryItem(
+            ScanSession session,
+            NativeChildInfo node,
+            string path,
+            bool childrenLoaded)
+        {
+            StorageItem item = new StorageItem();
+            item.Path = path;
+            item.Name = string.IsNullOrEmpty(node.Name) ? StorageFormatting.GetDisplayName(path, true) : node.Name;
+            item.Bytes = node.Bytes;
+            item.IsDirectory = true;
+            item.HasChildren = node.HasChildren;
+            item.ChildrenLoaded = childrenLoaded;
+            item.DirectFileCount = node.DirectFileCount;
+            item.TotalFileCount = node.TotalFileCount;
+            item.TotalDirectoryCount = node.TotalDirectoryCount;
+            item.SessionIdentity = session == null ? null : session.SessionIdentity;
+            item.SessionNodeId = node.NodeId;
+            item.TotalChildCount = node.DirectFileCount + node.DirectChildDirectoryCount;
+            return item;
+        }
+
+        private static StorageItem CreateStorageFileItem(NativeChildInfo state, string parentPath)
         {
             StorageItem item = new StorageItem();
             item.Name = state.Name;
@@ -237,6 +155,7 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
             item.DirectFileCount = 0;
             item.TotalFileCount = 1;
             item.TotalDirectoryCount = 0;
+            item.SessionNodeId = -1;
             return item;
         }
 
@@ -246,9 +165,9 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 
             Stack<string> segments = new Stack<string>();
             int currentNodeId = nodeId;
-            while (session.Directories != null && currentNodeId >= 0 && currentNodeId < session.Directories.Count)
+            while (currentNodeId >= 0)
             {
-                DirectoryNodeState node = session.Directories[currentNodeId];
+                NativeNodeInfo node = session.NativeSession.GetNode(currentNodeId);
                 if (node.NodeId == session.RootNodeId) break;
                 if (!string.IsNullOrEmpty(node.Name)) segments.Push(node.Name);
                 currentNodeId = node.ParentNodeId;
@@ -257,53 +176,6 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
             string path = session.RootPath;
             while (segments.Count > 0) path = CombinePath(path, segments.Pop());
             return path;
-        }
-
-        private static FileNodeState ParseFileState(JsonTextReader reader)
-        {
-            FileNodeState item = new FileNodeState();
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonToken.PropertyName)
-                {
-                    string propertyName = reader.Value == null ? string.Empty : reader.Value.ToString();
-                    if (!reader.Read()) throw new InvalidOperationException("扫描结果不完整。");
-
-                    switch (propertyName)
-                    {
-                        case "name":
-                            item.Name = ReadStringValue(reader.Value);
-                            break;
-                        case "path":
-                            item.Name = StorageFormatting.GetDisplayName(ReadStringValue(reader.Value), false);
-                            break;
-                        case "bytes":
-                            item.Bytes = ReadInt64(reader.Value);
-                            break;
-                        default:
-                            reader.Skip();
-                            break;
-                    }
-                }
-                else if (reader.TokenType == JsonToken.EndObject)
-                {
-                    break;
-                }
-            }
-
-            return item;
-        }
-
-        private static string ReadStringValue(object value)
-        {
-            return value == null ? string.Empty : value.ToString();
-        }
-
-        private static long ReadInt64(object value)
-        {
-            if (value == null) return 0;
-            return Convert.ToInt64(value);
         }
     }
 }

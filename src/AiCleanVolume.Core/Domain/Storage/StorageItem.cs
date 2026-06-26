@@ -9,6 +9,10 @@ namespace AiCleanVolume.Core.Domain.Storage
             Children = new List<StorageItem>();
             ChildrenLoaded = true;
             SessionNodeId = -1;
+            ChildStart = 0;
+            ChildCount = 0;
+            LoadedChildCount = 0;
+            TotalChildCount = 0;
         }
 
         public string Path { get; set; }
@@ -23,5 +27,9 @@ namespace AiCleanVolume.Core.Domain.Storage
         public IList<StorageItem> Children { get; private set; }
         public string SessionIdentity { get; set; }
         public int SessionNodeId { get; set; }
+        public int ChildStart { get; set; }
+        public int ChildCount { get; set; }
+        public int LoadedChildCount { get; set; }
+        public int TotalChildCount { get; set; }
     }
 }

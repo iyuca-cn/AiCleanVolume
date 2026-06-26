@@ -6,6 +6,8 @@
     <LangVersion>7.3</LangVersion>
     <AssemblyName>AiCleanVolume</AssemblyName>
     <RootNamespace>AiCleanVolume.Desktop</RootNamespace>
+    <Platforms>AnyCPU;x64</Platforms>
+    <PlatformTarget Condition="'$(Platform)' == 'x64'">x64</PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,14 +30,14 @@
 
   <ItemGroup>
     <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="AiCleanVolume.NativeBridge" Condition="'$(TargetFramework)' == 'net48'">
+      <HintPath>bin\x64\$(Configuration)\net48\AiCleanVolume.NativeBridge.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
     <None Include="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="..\..\third_party\folder-size-ranker-cli\folder-size-ranker-cli.exe">
-      <Link>folder-size-ranker-cli.exe</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

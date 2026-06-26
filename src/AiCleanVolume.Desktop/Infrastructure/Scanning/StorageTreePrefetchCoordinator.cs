@@ -152,7 +152,7 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
                 StorageItem result;
                 try
                 {
-                    result = scanProvider.Scan(CreateScanRequest(workItem.Path, template));
+                    result = scanProvider.Scan(CreateScanRequest(workItem, template));
                 }
                 catch (Exception ex)
                 {
@@ -194,7 +194,7 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
                 string normalized = Normalize(directories[i].Path);
                 if (cache.ContainsKey(normalized)) continue;
                 if (!scheduled.Add(normalized)) continue;
-                queue.Enqueue(new PrefetchWorkItem(directories[i].Path, depth));
+                queue.Enqueue(new PrefetchWorkItem(directories[i].Path, directories[i].SessionIdentity, directories[i].SessionNodeId, depth));
             }
         }
 
@@ -229,6 +229,8 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
             request.LoadDepth = template.LoadDepth;
             request.SessionIdentity = template.SessionIdentity;
             request.SessionNodeId = template.SessionNodeId;
+            request.ChildStart = template.ChildStart;
+            request.ChildCount = template.ChildCount;
             return request;
         }
 
@@ -237,6 +239,14 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
             ScanRequest request = CloneTemplate(template);
             request.Location = location;
             request.LoadDepth = 1;
+            return request;
+        }
+
+        private static ScanRequest CreateScanRequest(PrefetchWorkItem workItem, ScanRequest template)
+        {
+            ScanRequest request = CreateScanRequest(workItem.Path, template);
+            request.SessionIdentity = string.IsNullOrWhiteSpace(workItem.SessionIdentity) ? template.SessionIdentity : workItem.SessionIdentity;
+            request.SessionNodeId = workItem.SessionNodeId >= 0 ? workItem.SessionNodeId : template.SessionNodeId;
             return request;
         }
 
@@ -252,13 +262,17 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 
         private sealed class PrefetchWorkItem
         {
-            public PrefetchWorkItem(string path, int depth)
+            public PrefetchWorkItem(string path, string sessionIdentity, int sessionNodeId, int depth)
             {
                 Path = path;
+                SessionIdentity = sessionIdentity;
+                SessionNodeId = sessionNodeId;
                 Depth = depth;
             }
 
             public string Path { get; private set; }
+            public string SessionIdentity { get; private set; }
+            public int SessionNodeId { get; private set; }
             public int Depth { get; private set; }
         }
     }

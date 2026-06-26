@@ -28,21 +28,17 @@
 如果你是开发者，可以这样编译：
 
 ```powershell
-dotnet build E:\work\ai-clean-volume\AiCleanVolume.sln -c Debug
+msbuild E:\work\mft\mftscan-core.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64
+msbuild E:\work\ai-clean-volume\src\AiCleanVolume.NativeBridge\AiCleanVolume.NativeBridge.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64
+dotnet build E:\work\ai-clean-volume\src\AiCleanVolume.Desktop\AiCleanVolume.Desktop.csproj -c Debug -f net48 -p:Platform=x64
 ```
 
 ### 第二步：运行程序
 
-编译完成后，可以运行两个版本：
+编译完成后，运行 .NET Framework 4.8 x64 版本：
 
-**普通版（.NET Framework 4.0）：**
 ```powershell
-.\src\AiCleanVolume.Desktop\bin\Debug\net40\AiCleanVolume.exe
-```
-
-**新版（.NET Framework 4.8）：**
-```powershell
-.\src\AiCleanVolume.Desktop\bin\Debug\net48\AiCleanVolume.exe
+.\src\AiCleanVolume.Desktop\bin\x64\Debug\net48\AiCleanVolume.exe
 ```
 
 ### 第三步：配置 AI（可选）
@@ -69,20 +65,22 @@ src/AiCleanVolume.Core/          # 核心逻辑
 
 src/AiCleanVolume.Desktop/       # 桌面程序
   ├── Composition/               # 程序组装，把各个部件连起来
-  ├── Infrastructure/            # 具体实现（扫描工具、AI接口、删除操作等）
+  ├── Infrastructure/            # 具体实现（native 扫描、AI接口、删除操作等）
   └── Presentation/              # 界面显示和用户交互
 
+src/AiCleanVolume.NativeBridge/  # C++/CLI 扫描桥接，静态链接 mftscan-core
+
 third_party/                     # 第三方工具
-  ├── folder-size-ranker-cli/    # 磁盘扫描工具
+  ├── folder-size-ranker-cli/    # CLI 上游快照，不再复制到桌面端输出目录
   └── AntdUI-v2.3.0/            # 界面组件库
 ```
 
 ## 注意事项
 
-- 扫描 NTFS 格式的硬盘时，扫描工具可能需要管理员权限
+- 扫描 NTFS 格式的硬盘时，程序可能需要管理员权限
 - AI 功能使用的是 OpenAI 兼容接口（`/v1/chat/completions`）
 - 2API 模式不会发送 API Key，而是根据模型名称匹配对应的 Cookie
-- 软件会同时生成 .NET 4.0 和 .NET 4.8 两个版本，4.8 版本用的网络库更安全
+- 当前 native 懒加载扫描主线验证 .NET Framework 4.8 x64
 - 项目使用 MIT 开源许可证，可以自由使用和修改
 
 ## 遇到问题？
