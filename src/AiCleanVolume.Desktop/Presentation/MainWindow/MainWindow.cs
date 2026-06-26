@@ -64,6 +64,8 @@ namespace AiCleanVolume.Desktop
 
         private const string AppDisplayName = "AI智能清盘";
 
+        private const int DeletionProgressTimerIntervalMs = 16;
+
         private const int WmSize = 0x0005;
 
         private const int WmEraseBackground = 0x0014;
@@ -323,6 +325,14 @@ namespace AiCleanVolume.Desktop
         private bool restoreBoundsQueued;
 
         private bool busy;
+
+        private DeletionProgressState activeDeletionProgress;
+
+        private Timer deletionProgressTimer;
+
+        private long lastDeletionProgressVersion;
+
+        private string lastDeletionProgressText;
 
         private bool sidebarResizing;
 

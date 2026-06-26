@@ -98,6 +98,84 @@ namespace AiCleanVolume.Desktop
             if (privilegedQuickCheckbox != null) privilegedQuickCheckbox.Enabled = !busy;
         }
 
+        private void StartDeletionProgressDisplay(DeletionProgressState progress)
+        {
+            if (progress == null) return;
+
+            activeDeletionProgress = progress;
+            activeDeletionProgress.Reset();
+            lastDeletionProgressVersion = -1L;
+            lastDeletionProgressText = null;
+
+            if (deletionProgressTimer == null)
+            {
+                deletionProgressTimer = new Timer();
+                deletionProgressTimer.Tick += DeletionProgressTimer_Tick;
+            }
+
+            deletionProgressTimer.Interval = DeletionProgressTimerIntervalMs;
+            SetDeletionProgressSubText("正在删除...");
+            deletionProgressTimer.Start();
+        }
+
+        private void StopDeletionProgressDisplay()
+        {
+            if (deletionProgressTimer != null) deletionProgressTimer.Stop();
+            activeDeletionProgress = null;
+            lastDeletionProgressVersion = 0L;
+            lastDeletionProgressText = null;
+
+            if (appBar != null)
+            {
+                string pageId = string.IsNullOrWhiteSpace(activePageId) ? PageScan : activePageId;
+                appBar.SubText = GetPageTitle(pageId);
+            }
+        }
+
+        private void DeletionProgressTimer_Tick(object sender, EventArgs e)
+        {
+            DeletionProgressState progress = activeDeletionProgress;
+            if (progress == null) return;
+
+            DeletionProgressSnapshot snapshot = progress.Read();
+            if (snapshot == null || snapshot.Version == lastDeletionProgressVersion) return;
+
+            lastDeletionProgressVersion = snapshot.Version;
+            SetDeletionProgressSubText(BuildDeletionProgressSubText(snapshot));
+        }
+
+        private void SetDeletionProgressSubText(string text)
+        {
+            if (appBar == null) return;
+            if (string.Equals(lastDeletionProgressText, text, StringComparison.Ordinal)) return;
+
+            lastDeletionProgressText = text;
+            appBar.SubText = text;
+        }
+
+        private static string BuildDeletionProgressSubText(DeletionProgressSnapshot snapshot)
+        {
+            string stage = snapshot == null || string.IsNullOrWhiteSpace(snapshot.Stage) ? "正在删除" : snapshot.Stage;
+            string path = snapshot == null ? string.Empty : CompactDeletionPath(snapshot.Path, 132);
+            if (string.IsNullOrWhiteSpace(path)) return stage + "...";
+            return stage + "：" + path;
+        }
+
+        private static string CompactDeletionPath(string path, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(path) || path.Length <= maxLength) return path ?? string.Empty;
+
+            int headLength = Math.Min(48, Math.Max(12, maxLength / 3));
+            int tailLength = maxLength - headLength - 5;
+            if (tailLength < 24)
+            {
+                tailLength = Math.Max(12, maxLength / 2);
+                headLength = Math.Max(8, maxLength - tailLength - 5);
+            }
+
+            return path.Substring(0, headLength) + " ... " + path.Substring(path.Length - tailLength);
+        }
+
         public void Log(string message)
         {
             if (logInput == null) return;

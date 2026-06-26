@@ -71,6 +71,7 @@ namespace AiCleanVolume.Desktop
             if (disposing)
             {
                 if (scanProgressTimer != null) scanProgressTimer.Dispose();
+                if (deletionProgressTimer != null) deletionProgressTimer.Dispose();
                 if (backgroundWorker != null) backgroundWorker.Dispose();
             }
             base.Dispose(disposing);

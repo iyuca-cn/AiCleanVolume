@@ -88,18 +88,22 @@ namespace AiCleanVolume.Desktop
             if (confirm != DialogResult.OK) return;
 
             List<DeletionOutcome> outcomes = new List<DeletionOutcome>();
+            DeletionProgressState progress = new DeletionProgressState();
             DateTime deleteStartedAt = DateTime.UtcNow;
+            StartDeletionProgressDisplay(progress);
             RunBackground("正在执行删除…", delegate
             {
                 for (int i = 0; i < rows.Count; i++)
                 {
                     CleanupSuggestionRow row = rows[i];
                     if (row == null || row.Suggestion == null) continue;
-                    CleanupDeletionWorkflowResult result = deletionWorkflow.Delete(row.Suggestion, settings.Sandbox);
+                    progress.Update("正在删除", row.Suggestion.Path);
+                    CleanupDeletionWorkflowResult result = deletionWorkflow.Delete(row.Suggestion, settings.Sandbox, progress);
                     outcomes.Add(new DeletionOutcome { Row = row, Result = result.Result });
                 }
             }, delegate
             {
+                StopDeletionProgressDisplay();
                 int successCount = 0;
                 int failedCount = 0;
                 for (int i = 0; i < outcomes.Count; i++)
@@ -119,6 +123,9 @@ namespace AiCleanVolume.Desktop
                 suggestionTable.Refresh();
                 TimeSpan elapsed = DateTime.UtcNow - deleteStartedAt;
                 Log("删除流程执行完成：成功 " + successCount + " 项，失败 " + failedCount + " 项，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒。");
+            }, delegate
+            {
+                StopDeletionProgressDisplay();
             });
         }
 
@@ -259,12 +266,16 @@ namespace AiCleanVolume.Desktop
 
             CleanupSuggestion suggestion = CreateManualStorageSuggestion(row, sandbox);
             CleanupResult deleteResult = null;
+            DeletionProgressState progress = new DeletionProgressState();
 
+            StartDeletionProgressDisplay(progress);
             RunBackground("正在删除文件树项目…", delegate
             {
-                deleteResult = deletionWorkflow.Delete(suggestion, settings.Sandbox).Result;
+                progress.Update("正在删除", suggestion.Path);
+                deleteResult = deletionWorkflow.Delete(suggestion, settings.Sandbox, progress).Result;
             }, delegate
             {
+                StopDeletionProgressDisplay();
                 if (deleteResult != null && deleteResult.Success)
                 {
                     RemoveDeletedStorageRow(row);
@@ -275,6 +286,9 @@ namespace AiCleanVolume.Desktop
                 string message = deleteResult == null ? "删除失败。" : deleteResult.Message;
                 Log("文件树删除失败：" + suggestion.Path + "，" + message);
                 ShowError("删除失败", message);
+            }, delegate
+            {
+                StopDeletionProgressDisplay();
             });
         }
 

@@ -25,13 +25,18 @@ namespace AiCleanVolume.Core.Application.Deletion
 
         public CleanupDeletionWorkflowResult Delete(CleanupSuggestion suggestion, SandboxSettings settings)
         {
+            return Delete(suggestion, settings, null);
+        }
+
+        public CleanupDeletionWorkflowResult Delete(CleanupSuggestion suggestion, SandboxSettings settings, DeletionProgressState progress)
+        {
             if (suggestion != null)
             {
                 suggestion.Sandbox = Evaluate(suggestion.Path, settings);
             }
 
             bool useRecycleBin = settings != null && settings.UseRecycleBin;
-            CleanupResult result = deletionService.Delete(suggestion, useRecycleBin);
+            CleanupResult result = deletionService.Delete(suggestion, useRecycleBin, progress);
             return new CleanupDeletionWorkflowResult
             {
                 Suggestion = suggestion,
