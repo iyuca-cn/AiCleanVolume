@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFrameworks>net40;net48</TargetFrameworks>
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>7.3</LangVersion>
@@ -10,12 +10,43 @@
     <PlatformTarget Condition="'$(Platform)' == 'x64'">x64</PlatformTarget>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <NativeBridgePlatform>x64</NativeBridgePlatform>
+    <NativeBridgeProject>$(MSBuildThisFileDirectory)..\AiCleanVolume.NativeBridge\AiCleanVolume.NativeBridge.vcxproj</NativeBridgeProject>
+    <NativeBridgeOutputDirectory>$(MSBuildThisFileDirectory)bin\$(NativeBridgePlatform)\$(Configuration)\$(TargetFramework)</NativeBridgeOutputDirectory>
+    <NativeBridgeIntermediateDirectory>$(MSBuildThisFileDirectory)..\AiCleanVolume.NativeBridge\obj\$(NativeBridgePlatform)\$(Configuration)\$(TargetFramework)</NativeBridgeIntermediateDirectory>
+    <NativeBridgeOutput>$(NativeBridgeOutputDirectory)\AiCleanVolume.NativeBridge.dll</NativeBridgeOutput>
+    <NativeBridgeTargetFrameworkVersion Condition="'$(TargetFramework)' == 'net40'">v4.0</NativeBridgeTargetFrameworkVersion>
+    <NativeBridgeTargetFrameworkVersion Condition="'$(TargetFramework)' == 'net48'">v4.8</NativeBridgeTargetFrameworkVersion>
+    <MftScanCoreProject Condition="'$(MftScanCoreProject)' == ''">E:\work\mft\mftscan-core.vcxproj</MftScanCoreProject>
+    <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('D:\vs\2022\Community\MSBuild\Current\Bin\MSBuild.exe')">D:\vs\2022\Community\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
+    <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe')">C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
+    <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe')">C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
+    <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe')">C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
+    <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe')">C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
+  </PropertyGroup>
+
+  <Target Name="BuildNativeBridgeBeforeResolveReferences" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(NativeBridgeMSBuildPath)' == ''" Text="未找到 Visual Studio MSBuild，无法自动构建 AiCleanVolume.NativeBridge。请安装 VS 2022 C++ 生成工具，或通过 /p:NativeBridgeMSBuildPath=... 指定 MSBuild.exe。" />
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net40' and '$(NativeBridgeFrameworkPathOverride)' == '' and '$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net40)' != ''">
+      <NativeBridgeFrameworkPathOverride>$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net40)\build\.NETFramework\v4.0</NativeBridgeFrameworkPathOverride>
+    </PropertyGroup>
+    <Exec Condition="Exists('$(MftScanCoreProject)')" Command="&quot;$(NativeBridgeMSBuildPath)&quot; &quot;$(MftScanCoreProject)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(NativeBridgePlatform) /m" />
+    <Exec Condition="'$(NativeBridgeFrameworkPathOverride)' != ''" Command="&quot;$(NativeBridgeMSBuildPath)&quot; &quot;$(NativeBridgeProject)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(NativeBridgePlatform) /p:TargetFrameworkVersion=$(NativeBridgeTargetFrameworkVersion) /p:FrameworkPathOverride=$(NativeBridgeFrameworkPathOverride) /p:OutDir=$(NativeBridgeOutputDirectory)\ /p:IntDir=$(NativeBridgeIntermediateDirectory)\ /m" />
+    <Exec Condition="'$(NativeBridgeFrameworkPathOverride)' == ''" Command="&quot;$(NativeBridgeMSBuildPath)&quot; &quot;$(NativeBridgeProject)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(NativeBridgePlatform) /p:TargetFrameworkVersion=$(NativeBridgeTargetFrameworkVersion) /p:OutDir=$(NativeBridgeOutputDirectory)\ /p:IntDir=$(NativeBridgeIntermediateDirectory)\ /m" />
+    <Error Condition="!Exists('$(NativeBridgeOutput)')" Text="AiCleanVolume.NativeBridge 构建完成后仍未找到输出：$(NativeBridgeOutput)" />
+  </Target>
+
   <ItemGroup>
     <ProjectReference Include="..\AiCleanVolume.Core\AiCleanVolume.Core.csproj" />
     <ProjectReference Include="..\..\third_party\AntdUI-v2.3.0\src\AntdUI\AntdUI.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net40" Version="1.0.3" PrivateAssets="all" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
     <PackageReference Include="RestSharp" Version="106.15.0" />
   </ItemGroup>
@@ -27,7 +58,7 @@
   <ItemGroup>
     <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="AiCleanVolume.NativeBridge">
-      <HintPath>bin\x64\$(Configuration)\net48\AiCleanVolume.NativeBridge.dll</HintPath>
+      <HintPath>$(NativeBridgeOutput)</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>

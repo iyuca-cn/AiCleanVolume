@@ -53,17 +53,6 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
                     return result;
                 }
 
-                if (execution.ExitCode == 0)
-                {
-                    UpdateProgress(progress, "正在完成删除", path);
-                    DeleteRemainingTarget(path);
-                    result.Success = !File.Exists(path) && !Directory.Exists(path);
-                    result.Message = result.Success
-                        ? "已通过 IObitUnlocker delete 解锁，并完成删除。"
-                        : BuildFailureMessage(path, execution, false);
-                    return result;
-                }
-
                 result.Success = false;
                 result.Message = BuildFailureMessage(path, execution, targetRemoved);
                 return result;
@@ -137,27 +126,6 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
         private static void UpdateProgress(DeletionProgressState progress, string stage, string path)
         {
             if (progress != null) progress.Update(stage, path);
-        }
-
-        private static void DeleteRemainingTarget(string path)
-        {
-            if (File.Exists(path))
-            {
-                File.SetAttributes(path, FileAttributes.Normal);
-                File.Delete(path);
-                return;
-            }
-
-            if (!Directory.Exists(path)) return;
-
-            FileAttributes attributes = File.GetAttributes(path);
-            if ((attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                Directory.Delete(path, false);
-                return;
-            }
-
-            Directory.Delete(path, true);
         }
 
         private static string ResolveUnlockerCliPath()
