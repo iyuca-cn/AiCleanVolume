@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net40;net48</TargetFrameworks>
+    <TargetFramework>net48</TargetFramework>
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>7.3</LangVersion>
@@ -15,11 +15,7 @@
     <ProjectReference Include="..\..\third_party\AntdUI-v2.3.0\src\AntdUI\AntdUI.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net40" Version="1.0.3" PrivateAssets="all" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+  <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
     <PackageReference Include="RestSharp" Version="106.15.0" />
   </ItemGroup>
@@ -30,7 +26,7 @@
 
   <ItemGroup>
     <Reference Include="Microsoft.VisualBasic" />
-    <Reference Include="AiCleanVolume.NativeBridge" Condition="'$(TargetFramework)' == 'net48'">
+    <Reference Include="AiCleanVolume.NativeBridge">
       <HintPath>bin\x64\$(Configuration)\net48\AiCleanVolume.NativeBridge.dll</HintPath>
       <Private>true</Private>
     </Reference>
@@ -38,6 +34,15 @@
 
   <ItemGroup>
     <None Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Tools\IObitUnlocker\IObitUnlockerCLI.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Tools\IObitUnlocker\IObitUnlocker.sys">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Tools\IObitUnlocker\IObitUnlocker.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -1,35 +1,16 @@
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
-using AiCleanVolume.Core.Domain.Cleanup;
-using AiCleanVolume.Core.Domain.Sandbox;
-using AiCleanVolume.Core.Domain.Settings;
-using AiCleanVolume.Core.Domain.Storage;
-using AiCleanVolume.Core.Application.CleanupPlanning;
+using System.Text;
 using AiCleanVolume.Core.Application.Deletion;
-using AiCleanVolume.Core.Application.Scanning;
+using AiCleanVolume.Core.Domain.Cleanup;
 using AiCleanVolume.Core.Kernel.Ports;
 
 namespace AiCleanVolume.Desktop.Infrastructure.Windows
 {
     public sealed class RecycleBinDeletionService : IDeletionService
     {
-        private const uint FILE_ATTRIBUTE_NORMAL = 0x80;
-        private const uint FILE_ATTRIBUTE_DIRECTORY = 0x10;
-        private const uint FILE_ATTRIBUTE_REPARSE_POINT = 0x400;
-        private const uint INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF;
-
-        private const int ERROR_FILE_NOT_FOUND = 2;
-        private const int ERROR_PATH_NOT_FOUND = 3;
-        private const int ERROR_ACCESS_DENIED = 5;
-        private const int ERROR_NO_MORE_FILES = 18;
-        private const int ERROR_SHARING_VIOLATION = 32;
-        private const int ERROR_LOCK_VIOLATION = 33;
-        private const int ERROR_DIR_NOT_EMPTY = 145;
-
-        private static readonly IntPtr InvalidHandle = new IntPtr(-1);
+        private const string UnlockerCliRelativePath = @"Tools\IObitUnlocker\IObitUnlockerCLI.exe";
 
         public CleanupResult Delete(CleanupSuggestion suggestion, bool useRecycleBin, DeletionProgressState progress)
         {
@@ -46,30 +27,45 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
                 }
 
                 string path = NormalizeInputPath(suggestion.Path);
-                UpdateProgress(progress, path);
+                UpdateProgress(progress, "正在解锁并删除", path);
 
-                if (suggestion.IsDirectory)
+                if (!File.Exists(path) && !Directory.Exists(path))
                 {
-                    DeletionTally tally = new DeletionTally();
-                    DeleteDirectoryByWinApi(path, tally, progress);
-                    if (tally.FailedCount == 0)
-                    {
-                        result.Success = true;
-                        result.Message = "已删除文件夹（文件 " + tally.DeletedFiles + " 个，子目录 " + tally.DeletedDirectories + " 个）。";
-                    }
-                    else
-                    {
-                        result.Success = false;
-                        int done = tally.DeletedFiles + tally.DeletedDirectories;
-                        result.Message = "部分删除：已删除 " + done + " 项，" + tally.FailedCount + " 项无法删除（其余能删的已删除）。"
-                            + Environment.NewLine + tally.FirstFailureMessage;
-                    }
+                    result.Success = true;
+                    result.Message = "目标不存在，视为已删除。";
                     return result;
                 }
 
-                DeleteFileByWinApi(path);
-                result.Success = true;
-                result.Message = "已通过 WinAPI 删除文件。";
+                string unlockerCliPath = ResolveUnlockerCliPath();
+                if (!File.Exists(unlockerCliPath))
+                {
+                    result.Success = false;
+                    result.Message = "未找到 IObitUnlocker CLI，无法删除。路径：" + unlockerCliPath;
+                    return result;
+                }
+
+                ProcessExecution execution = RunUnlockerDelete(unlockerCliPath, path);
+                bool targetRemoved = !File.Exists(path) && !Directory.Exists(path);
+                if (execution.ExitCode == 0 && targetRemoved)
+                {
+                    result.Success = true;
+                    result.Message = suggestion.IsDirectory ? "已通过 IObitUnlocker 删除文件夹。" : "已通过 IObitUnlocker 删除文件。";
+                    return result;
+                }
+
+                if (execution.ExitCode == 0)
+                {
+                    UpdateProgress(progress, "正在完成删除", path);
+                    DeleteRemainingTarget(path);
+                    result.Success = !File.Exists(path) && !Directory.Exists(path);
+                    result.Message = result.Success
+                        ? "已通过 IObitUnlocker delete 解锁，并完成删除。"
+                        : BuildFailureMessage(path, execution, false);
+                    return result;
+                }
+
+                result.Success = false;
+                result.Message = BuildFailureMessage(path, execution, targetRemoved);
                 return result;
             }
             catch (Exception ex)
@@ -81,248 +77,159 @@ namespace AiCleanVolume.Desktop.Infrastructure.Windows
             }
         }
 
-        // 尽力删除（best-effort）：遇到删不掉的子项时记录并继续删除其余项，而不是中断整个删除。
-        private static void DeleteDirectoryByWinApi(string path, DeletionTally tally, DeletionProgressState progress)
+        private static ProcessExecution RunUnlockerDelete(string unlockerCliPath, string path)
         {
-            Stack<DirectoryDeleteFrame> pending = new Stack<DirectoryDeleteFrame>();
-            pending.Push(new DirectoryDeleteFrame(path, false));
+            ProcessStartInfo startInfo = new ProcessStartInfo();
+            startInfo.FileName = unlockerCliPath;
+            startInfo.Arguments = "delete " + QuoteArgument(path);
+            startInfo.WorkingDirectory = Path.GetDirectoryName(unlockerCliPath);
+            startInfo.UseShellExecute = false;
+            startInfo.CreateNoWindow = true;
+            startInfo.RedirectStandardOutput = true;
+            startInfo.RedirectStandardError = true;
 
-            while (pending.Count > 0)
+            StringBuilder output = new StringBuilder();
+            StringBuilder error = new StringBuilder();
+            using (Process process = new Process())
             {
-                DirectoryDeleteFrame frame = pending.Pop();
-                UpdateProgress(progress, frame.Path);
-
-                if (frame.RemoveSelf)
+                process.StartInfo = startInfo;
+                process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs args)
                 {
-                    try { RemoveDirectoryByWinApi(frame.Path); tally.DeletedDirectories++; }
-                    catch (Exception ex)
-                    {
-                        // 若已有子项删除失败，则本目录非空属必然结果，残留项已计入，不再重复计数；
-                        // 否则说明是目录自身被占用，记录该错误。
-                        if (tally.FailedCount == 0) tally.Record(ex.Message);
-                    }
-                    continue;
-                }
-
-                string currentPath = frame.Path;
-                string extended = ToExtendedPath(currentPath);
-                uint attributes = GetFileAttributesW(extended);
-                if (attributes == INVALID_FILE_ATTRIBUTES)
+                    if (args.Data != null) output.AppendLine(args.Data);
+                };
+                process.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs args)
                 {
-                    int error = Marshal.GetLastWin32Error();
-                    if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) continue;
-                    tally.Record(FriendlyMessage(true, currentPath, error));
-                    continue;
-                }
+                    if (args.Data != null) error.AppendLine(args.Data);
+                };
 
-                // 重解析点（目录联接 / 符号链接）：只删除链接本身，绝不进入目标，避免误删链接指向的真实数据。
-                if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
-                {
-                    try { RemoveDirectoryByWinApi(currentPath); tally.DeletedDirectories++; }
-                    catch (Exception ex) { tally.Record(ex.Message); }
-                    continue;
-                }
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+                process.WaitForExit();
 
-                if ((attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
-                {
-                    try { DeleteFileByWinApi(currentPath); tally.DeletedFiles++; }
-                    catch (Exception ex) { tally.Record(ex.Message); }
-                    continue;
-                }
-
-                SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
-
-                WIN32_FIND_DATA find;
-                IntPtr handle = FindFirstFileW(extended + "\\*", out find);
-                List<string> childDirectories = new List<string>();
-                bool canRemoveSelf = true;
-                if (handle == InvalidHandle)
-                {
-                    int error = Marshal.GetLastWin32Error();
-                    if (error != ERROR_FILE_NOT_FOUND && error != ERROR_NO_MORE_FILES && error != ERROR_PATH_NOT_FOUND)
-                    {
-                        tally.Record(FriendlyMessage(true, currentPath, error));
-                        canRemoveSelf = false;
-                    }
-                }
-                else
-                {
-                    try
-                    {
-                        do
-                        {
-                            string name = find.cFileName;
-                            if (name == "." || name == "..") continue;
-
-                            string childPath = currentPath + "\\" + name;
-                            if ((find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
-                            {
-                                childDirectories.Add(childPath);
-                            }
-                            else
-                            {
-                                UpdateProgress(progress, childPath);
-                                try { DeleteFileByWinApi(childPath); tally.DeletedFiles++; }
-                                catch (Exception ex) { tally.Record(ex.Message); }
-                            }
-                        }
-                        while (FindNextFileW(handle, out find));
-                    }
-                    finally
-                    {
-                        FindClose(handle);
-                    }
-                }
-
-                if (!canRemoveSelf) continue;
-
-                pending.Push(new DirectoryDeleteFrame(currentPath, true));
-                for (int i = 0; i < childDirectories.Count; i++)
-                {
-                    pending.Push(new DirectoryDeleteFrame(childDirectories[i], false));
-                }
+                return new ProcessExecution(process.ExitCode, output.ToString(), error.ToString());
             }
         }
 
-        private static void UpdateProgress(DeletionProgressState progress, string path)
+        private static string BuildFailureMessage(string path, ProcessExecution execution, bool targetRemoved)
         {
-            if (progress != null) progress.Update("正在删除", path);
-        }
-
-        private sealed class DirectoryDeleteFrame
-        {
-            public DirectoryDeleteFrame(string path, bool removeSelf)
+            StringBuilder message = new StringBuilder();
+            message.Append("IObitUnlocker 删除失败。");
+            if (execution.ExitCode == 0 && !targetRemoved)
             {
-                Path = path;
-                RemoveSelf = removeSelf;
+                message.Append("CLI 已返回成功，但目标仍存在。");
+            }
+            else
+            {
+                message.Append("退出码：").Append(execution.ExitCode).Append("。");
             }
 
-            public string Path { get; private set; }
-
-            public bool RemoveSelf { get; private set; }
-        }
-
-        // 单次尝试删除：被占用等原因失败时直接抛出，由上层记录并跳过该项，绝不重试，确保一次删除完成。
-        private static void DeleteFileByWinApi(string path)
-        {
-            string extended = ToExtendedPath(path);
-            SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
-
-            if (DeleteFileW(extended)) return;
-
-            int lastError = Marshal.GetLastWin32Error();
-            if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND) return;
-
-            ThrowFriendly(false, path, lastError);
-        }
-
-        // 单次尝试删除目录自身：同样不重试，失败即跳过。
-        private static void RemoveDirectoryByWinApi(string path)
-        {
-            string extended = ToExtendedPath(path);
-            SetFileAttributesW(extended, FILE_ATTRIBUTE_NORMAL);
-
-            if (RemoveDirectoryW(extended)) return;
-
-            int lastError = Marshal.GetLastWin32Error();
-            if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND) return;
-
-            ThrowFriendly(true, path, lastError);
-        }
-
-        private static string FriendlyMessage(bool isDirectory, string path, int error)
-        {
-            string target = isDirectory ? "文件夹" : "文件";
-            string reason;
-            switch (error)
+            string details = execution.GetDetails();
+            if (!string.IsNullOrWhiteSpace(details))
             {
-                case ERROR_SHARING_VIOLATION:
-                case ERROR_LOCK_VIOLATION:
-                    reason = target + "被其他程序占用，已跳过。可关闭杀毒软件 / Windows 搜索索引 / 网盘同步等可能占用它的程序后重试。";
-                    break;
-                case ERROR_ACCESS_DENIED:
-                    reason = "没有删除该" + target + "的权限。请以管理员身份运行，或在设置中开启“完全权限模式”后重试。";
-                    break;
-                case ERROR_DIR_NOT_EMPTY:
-                    reason = target + "非空：其中可能有文件正被占用而未能删除。请关闭占用程序后重试。";
-                    break;
-                default:
-                    reason = "删除" + target + "失败：" + new Win32Exception(error).Message;
-                    break;
+                message.Append(Environment.NewLine).Append(details.Trim());
             }
-            return reason + Environment.NewLine + "路径：" + path;
+
+            message.Append(Environment.NewLine).Append("路径：").Append(path);
+            return message.ToString();
         }
 
-        private static void ThrowFriendly(bool isDirectory, string path, int error)
+        private static void UpdateProgress(DeletionProgressState progress, string stage, string path)
         {
-            throw new IOException(FriendlyMessage(isDirectory, path, error), error);
+            if (progress != null) progress.Update(stage, path);
+        }
+
+        private static void DeleteRemainingTarget(string path)
+        {
+            if (File.Exists(path))
+            {
+                File.SetAttributes(path, FileAttributes.Normal);
+                File.Delete(path);
+                return;
+            }
+
+            if (!Directory.Exists(path)) return;
+
+            FileAttributes attributes = File.GetAttributes(path);
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                Directory.Delete(path, false);
+                return;
+            }
+
+            Directory.Delete(path, true);
+        }
+
+        private static string ResolveUnlockerCliPath()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, UnlockerCliRelativePath);
         }
 
         private static string NormalizeInputPath(string path)
         {
             string normalized = path.Trim().Trim('"').Replace('/', '\\');
-            // 去掉尾部分隔符，但保留盘符根（如 "C:\"）。
             if (normalized.Length > 3) normalized = normalized.TrimEnd('\\');
             return normalized;
         }
 
-        private static string ToExtendedPath(string path)
+        private static string QuoteArgument(string value)
         {
-            if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) return path;
-            if (path.StartsWith(@"\\", StringComparison.Ordinal)) return @"\\?\UNC\" + path.Substring(2);
-            return @"\\?\" + path;
+            if (string.IsNullOrEmpty(value)) return "\"\"";
+
+            StringBuilder builder = new StringBuilder();
+            builder.Append('"');
+            int backslashes = 0;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char current = value[i];
+                if (current == '\\')
+                {
+                    backslashes++;
+                    continue;
+                }
+
+                if (current == '"')
+                {
+                    builder.Append('\\', backslashes * 2 + 1);
+                    builder.Append('"');
+                    backslashes = 0;
+                    continue;
+                }
+
+                if (backslashes > 0)
+                {
+                    builder.Append('\\', backslashes);
+                    backslashes = 0;
+                }
+                builder.Append(current);
+            }
+
+            if (backslashes > 0) builder.Append('\\', backslashes * 2);
+            builder.Append('"');
+            return builder.ToString();
         }
 
-        private sealed class DeletionTally
+        private sealed class ProcessExecution
         {
-            public int DeletedFiles;
-            public int DeletedDirectories;
-            public int FailedCount;
-            public string FirstFailureMessage;
-
-            public void Record(string message)
+            public ProcessExecution(int exitCode, string output, string error)
             {
-                FailedCount++;
-                if (FirstFailureMessage == null) FirstFailureMessage = message;
+                ExitCode = exitCode;
+                Output = output ?? string.Empty;
+                Error = error ?? string.Empty;
+            }
+
+            public int ExitCode { get; private set; }
+
+            public string Output { get; private set; }
+
+            public string Error { get; private set; }
+
+            public string GetDetails()
+            {
+                if (string.IsNullOrWhiteSpace(Output)) return Error;
+                if (string.IsNullOrWhiteSpace(Error)) return Output;
+                return Output.TrimEnd() + Environment.NewLine + Error;
             }
         }
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct WIN32_FIND_DATA
-        {
-            public uint dwFileAttributes;
-            public System.Runtime.InteropServices.ComTypes.FILETIME ftCreationTime;
-            public System.Runtime.InteropServices.ComTypes.FILETIME ftLastAccessTime;
-            public System.Runtime.InteropServices.ComTypes.FILETIME ftLastWriteTime;
-            public uint nFileSizeHigh;
-            public uint nFileSizeLow;
-            public uint dwReserved0;
-            public uint dwReserved1;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-            public string cFileName;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 14)]
-            public string cAlternateFileName;
-        }
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern IntPtr FindFirstFileW(string lpFileName, out WIN32_FIND_DATA lpFindFileData);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern bool FindNextFileW(IntPtr hFindFile, out WIN32_FIND_DATA lpFindFileData);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool FindClose(IntPtr hFindFile);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern uint GetFileAttributesW(string lpFileName);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern bool SetFileAttributesW(string lpFileName, uint dwFileAttributes);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern bool DeleteFileW(string lpFileName);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        private static extern bool RemoveDirectoryW(string lpPathName);
     }
 }
