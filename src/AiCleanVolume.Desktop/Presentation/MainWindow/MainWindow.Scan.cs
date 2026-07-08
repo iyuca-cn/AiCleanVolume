@@ -109,6 +109,7 @@ namespace AiCleanVolume.Desktop
             storageTreeDeleteDirty = false;
             string progressText = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用..." : statusText;
             string workerCaption = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用…" : statusText;
+            SetStorageTreeState(StorageTreeState.Scanning);
             StartScanProgress(progressText, scanStartedAt, ScanPageText.ResolveProgressInterval(request.Location));
             Log("扫描开始：" + ScanPageText.DescribeRequest(request));
 
@@ -128,6 +129,9 @@ namespace AiCleanVolume.Desktop
                 StopScanProgress();
                 UpdateScanProgressState("扫描完成", 1F, false, AntdUI.TType.Success);
                 UpdateScanElapsedState(elapsed);
+                SetStorageTreeState(StorageTreeState.Done);
+                UpdateStorageStatsBar();
+                RefreshStorageSelectionBar();
                 Log("扫描完成：" + result.Path + "，" + ScanPageText.DescribeSizeMode(request.SortMode) + " " + StorageFormatting.FormatBytes(result.Bytes) + "，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒，子项 " + (result.Children == null ? 0 : result.Children.Count) + "。");
                 if (onCompleted != null) onCompleted();
             }, delegate
@@ -136,6 +140,7 @@ namespace AiCleanVolume.Desktop
                 StopScanProgress();
                 UpdateScanProgressState("扫描失败", 1F, false, AntdUI.TType.Error);
                 UpdateScanElapsedState(elapsed);
+                SetStorageTreeState(currentRoot == null ? StorageTreeState.Empty : StorageTreeState.Done);
             });
         }
 
@@ -337,7 +342,7 @@ namespace AiCleanVolume.Desktop
 
         private ScanSortMode ResolveSelectedSizeMode()
         {
-            return sortSelect != null && sortSelect.SelectedValue is ScanSortMode ? (ScanSortMode)sortSelect.SelectedValue : ScanSortMode.Allocated;
+            return settings != null && settings.Scan != null ? settings.Scan.SortMode : ScanSortMode.Allocated;
         }
 
         private void UpdateStorageSizeColumnTitle(ScanSortMode mode)
@@ -375,52 +380,6 @@ namespace AiCleanVolume.Desktop
             }
 
             OpenStorageRow(row);
-        }
-
-        private void UpdateDriveSummaryForLocation(string location)
-        {
-            if (selectedDriveValueLabel == null) return;
-
-            DriveInfo drive = ScanPageText.TryResolveDriveInfo(location);
-            selectedDriveValueLabel.Text = ScanPageText.BuildDriveDisplayText(drive, location);
-
-            if (drive == null)
-            {
-                SetDriveSummaryValue(totalSpaceValueLabel, "-");
-                SetDriveSummaryValue(usedSpaceValueLabel, "-");
-                SetDriveSummaryValue(availableSpaceValueLabel, "-");
-                SetDriveSummaryValue(reservedSpaceValueLabel, "-");
-                return;
-            }
-
-            try
-            {
-                if (!drive.IsReady)
-                {
-                    SetDriveSummaryValue(totalSpaceValueLabel, "-");
-                    SetDriveSummaryValue(usedSpaceValueLabel, "-");
-                    SetDriveSummaryValue(availableSpaceValueLabel, "-");
-                    SetDriveSummaryValue(reservedSpaceValueLabel, "-");
-                    return;
-                }
-
-                long totalBytes = drive.TotalSize;
-                long availableBytes = drive.AvailableFreeSpace;
-                long reservedBytes = Math.Max(0L, drive.TotalFreeSpace - availableBytes);
-                long usedBytes = Math.Max(0L, totalBytes - drive.TotalFreeSpace);
-
-                SetDriveSummaryValue(totalSpaceValueLabel, StorageFormatting.FormatBytes(totalBytes));
-                SetDriveSummaryValue(usedSpaceValueLabel, ScanPageText.FormatBytesWithPercent(usedBytes, totalBytes));
-                SetDriveSummaryValue(availableSpaceValueLabel, ScanPageText.FormatBytesWithPercent(availableBytes, totalBytes));
-                SetDriveSummaryValue(reservedSpaceValueLabel, StorageFormatting.FormatBytes(reservedBytes));
-            }
-            catch
-            {
-                SetDriveSummaryValue(totalSpaceValueLabel, "-");
-                SetDriveSummaryValue(usedSpaceValueLabel, "-");
-                SetDriveSummaryValue(availableSpaceValueLabel, "-");
-                SetDriveSummaryValue(reservedSpaceValueLabel, "-");
-            }
         }
 
         private void UpdateScanProgressState(string text, float value, bool loading, AntdUI.TType state)
@@ -563,11 +522,6 @@ namespace AiCleanVolume.Desktop
             {
                 scanProgress.Animation = animation;
             }
-        }
-
-        private static void SetDriveSummaryValue(AntdUI.Label label, string text)
-        {
-            if (label != null) label.Text = text;
         }
 
         private void ClearScanProviderCache()

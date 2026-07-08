@@ -47,7 +47,6 @@ namespace AiCleanVolume.Desktop
             limitInput.Text = settings.Scan.PerLevelLimit.ToString();
             if (suggestionMinSizeInput != null) suggestionMinSizeInput.Text = "128";
             if (suggestionLimitInput != null) suggestionLimitInput.Text = "-1";
-            sortSelect.SelectedValue = settings.Scan.SortMode;
             UpdateStorageSizeColumnTitle(settings.Scan.SortMode);
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(settings.Sandbox.AllowedRoots);
             allowRootsInput.Text = string.Join(Environment.NewLine, new List<string>(settings.Sandbox.AllowedRoots).ToArray());
@@ -243,7 +242,6 @@ namespace AiCleanVolume.Desktop
             settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(ParseLines(allowRootsInput.Text));
             settings.Scan.MinSizeMb = ParseInt(minSizeInput.Text, -1);
             settings.Scan.PerLevelLimit = ParseInt(limitInput.Text, -1);
-            if (sortSelect.SelectedValue is ScanSortMode) settings.Scan.SortMode = (ScanSortMode)sortSelect.SelectedValue;
             settings.EnsureDefaults();
         }
 

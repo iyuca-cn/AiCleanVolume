@@ -72,7 +72,6 @@ namespace AiCleanVolume.Desktop
             if (suggestionDriveSelect != null) suggestionDriveSelect.Enabled = !busy;
             if (suggestionMinSizeInput != null) suggestionMinSizeInput.Enabled = !busy;
             if (suggestionLimitInput != null) suggestionLimitInput.Enabled = !busy;
-            if (sortSelect != null) sortSelect.Enabled = !busy;
             analyzeButton.Enabled = !busy;
             regularCleanButton.Enabled = !busy;
             superCleanButton.Enabled = !busy;

@@ -120,10 +120,6 @@ namespace AiCleanVolume.Desktop
 
         private readonly ScanPageState scanState;
 
-        private ScanPageView scanPageView;
-
-        private ScanPageController scanPageController;
-
         private readonly SettingsPageState settingsState;
 
         private SettingsPageView settingsPageView;
@@ -187,8 +183,6 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Select driveSelect;
 
         private AntdUI.Select suggestionDriveSelect;
-
-        private AntdUI.Select sortSelect;
 
         private AntdUI.Input pathInput;
 
@@ -263,16 +257,6 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Input allowRootsInput;
 
         private AntdUI.Input logInput;
-
-        private AntdUI.Label selectedDriveValueLabel;
-
-        private AntdUI.Label totalSpaceValueLabel;
-
-        private AntdUI.Label usedSpaceValueLabel;
-
-        private AntdUI.Label availableSpaceValueLabel;
-
-        private AntdUI.Label reservedSpaceValueLabel;
 
         private AntdUI.Label scanStatusLabel;
 
@@ -462,10 +446,7 @@ namespace AiCleanVolume.Desktop
             pageHost.BackColor = PageBackground;
             pageHost.Padding = Padding.Empty;
 
-            scanPageView = new ScanPageView(Font);
-            scanPage = scanPageView.Panel;
-            BindScanPageView(scanPageView);
-            scanPageController = new ScanPageController(this, scanPageView, ScanCurrentLocation, DriveSelect_SelectedValueChanged, SizeModeSelect_SelectedValueChanged, PathInput_TextChanged, StorageTable_ExpandChanged, StorageTable_CellClick, StorageTable_CellDoubleClick, StorageTable_KeyDown);
+            EnsureScanToolbarControls();
 
             suggestionsPageView = new SuggestionsPageView(Font);
             suggestionsPage = suggestionsPageView.Panel;
@@ -488,9 +469,8 @@ namespace AiCleanVolume.Desktop
             aiProfilePageController = new AiProfilePageController(this, aiProfilePageView, CancelAiProfileCreatePage, CancelAiProfileCreatePage, SaveAiProfileFromPage, AiProfileAccessModeSelect_SelectedValueChanged, AiProfileProviderPresetSelect_SelectedValueChanged, AiProfileEndpointOrModelInput_TextChanged);
 
             BuildColumnsHost();
-            scanPage.Dock = DockStyle.Fill;
+            BuildStorageTreeColumn();
             suggestionsPage.Dock = DockStyle.Fill;
-            leftColumnPanel.Controls.Add(scanPage);
             rightColumnPanel.Controls.Add(suggestionsPage);
 
             logPage.Visible = false;
@@ -522,26 +502,6 @@ namespace AiCleanVolume.Desktop
             stack.Height = 60 + (banner.Visible ? 34 : 0);
             banner.VisibleChanged += delegate { stack.Height = 60 + (banner.Visible ? 34 : 0); };
             return stack;
-        }
-
-        private void BindScanPageView(ScanPageView view)
-        {
-            driveSelect = view.DriveSelect;
-            sortSelect = view.SortSelect;
-            pathInput = view.PathInput;
-            minSizeInput = view.MinSizeInput;
-            limitInput = view.LimitInput;
-            scanButton = view.ScanButton;
-            storageTable = view.StorageTable;
-            selectedDriveValueLabel = view.SelectedDriveValueLabel;
-            totalSpaceValueLabel = view.TotalSpaceValueLabel;
-            usedSpaceValueLabel = view.UsedSpaceValueLabel;
-            availableSpaceValueLabel = view.AvailableSpaceValueLabel;
-            reservedSpaceValueLabel = view.ReservedSpaceValueLabel;
-            scanStatusLabel = view.ScanStatusLabel;
-            scanElapsedLabel = view.ScanElapsedLabel;
-            scanProgress = view.ScanProgress;
-
         }
 
         private void BindSuggestionsPageView(SuggestionsPageView view)
@@ -607,15 +567,14 @@ namespace AiCleanVolume.Desktop
 
         private void ConfigureTables()
         {
-            storageSizeColumn = new AntdUI.Column("size", "占用大小", AntdUI.ColumnAlign.Right).SetWidth("126");
+            storageSizeColumn = new AntdUI.Column("size", "占用", AntdUI.ColumnAlign.Right).SetWidth("92");
             storageTable.Columns = new AntdUI.ColumnCollection
             {
-                new AntdUI.Column("name", "名称").SetTree("Children").SetWidth("auto"),
+                new AntdUI.ColumnCheck("selected").SetWidth("36"),
+                new AntdUI.Column("name", "名称").SetTree("Children"),
+                new AntdUI.Column("tag", "").SetWidth("92"),
                 storageSizeColumn,
-                new AntdUI.Column("kind", "类型", AntdUI.ColumnAlign.Center).SetWidth("86"),
-                new AntdUI.Column("files", "文件数", AntdUI.ColumnAlign.Right).SetWidth("90"),
-                new AntdUI.Column("dirs", "子目录", AntdUI.ColumnAlign.Right).SetWidth("90"),
-                new AntdUI.Column("path", "完整路径").SetWidth("auto")
+                new AntdUI.Column("ratio", "").SetWidth("84")
             };
 
             suggestionTable.Columns = new AntdUI.ColumnCollection

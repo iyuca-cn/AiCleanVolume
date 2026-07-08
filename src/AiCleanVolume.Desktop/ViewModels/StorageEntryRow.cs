@@ -73,6 +73,33 @@ namespace AiCleanVolume.Desktop.ViewModels
             files = Item.TotalFileCount;
             dirs = Item.TotalDirectoryCount;
             kind = Item.IsDirectory ? "文件夹" : "文件";
+            ratio = BuildRatioCell();
+        }
+
+        // 占父目录（根节点为占整体扫描根）的比例条
+        private AntdUI.CellProgress BuildRatioCell()
+        {
+            long parentBytes = Parent != null && Parent.Item != null ? Parent.Item.Bytes : 0L;
+            if (parentBytes <= 0L || Item.Bytes < 0L) return null;
+
+            float value = (float)((double)Item.Bytes / parentBytes);
+            if (value > 1F) value = 1F;
+            AntdUI.CellProgress cell = new AntdUI.CellProgress(value);
+            cell.Radius = 3;
+            return cell;
+        }
+
+        /// <summary>AI/本地规则分类标签：可安全清理 / 需确认 / 系统保留，null 不显示。</summary>
+        public void SetCleanupTag(string text, AntdUI.TTypeMini type)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                tag = null;
+                return;
+            }
+
+            AntdUI.CellTag cell = new AntdUI.CellTag(text, type);
+            tag = new AntdUI.CellTag[] { cell };
         }
 
         public void ReloadChildren()
@@ -157,6 +184,21 @@ namespace AiCleanVolume.Desktop.ViewModels
         public int files { get; set; }
         public int dirs { get; set; }
         public string path { get; set; }
+        public AntdUI.CellProgress ratio { get; set; }
+        public AntdUI.CellTag[] tag { get; set; }
+
+        private bool selectedValue;
+
+        public bool selected
+        {
+            get { return selectedValue; }
+            set
+            {
+                if (selectedValue == value) return;
+                selectedValue = value;
+                OnPropertyChanged("selected");
+            }
+        }
 
         private sealed class ExpandMarker
         {

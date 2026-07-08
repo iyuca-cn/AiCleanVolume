@@ -117,15 +117,20 @@ namespace AiCleanVolume.Desktop
             aiStatusTag.BorderWidth = 1F;
             aiStatusTag.Margin = new Padding(0, 4, 10, 4);
 
+            // Dock=Left 时后加入者更靠左：磁盘选择最左，其后扫描按钮、权限开关、说明、警示
+            toolbarPanel.Controls.Add(privilegeWarningTag);
             toolbarPanel.Controls.Add(privilegeLabel);
             toolbarPanel.Controls.Add(toolbarPrivilegeSwitch);
-            toolbarPanel.Controls.Add(privilegeWarningTag);
+            if (scanButton != null)
+            {
+                scanButton.Margin = new Padding(10, 0, 14, 0);
+                toolbarPanel.Controls.Add(scanButton);
+            }
+            if (driveSelect != null) toolbarPanel.Controls.Add(driveSelect);
             toolbarPanel.Controls.Add(aiStatusTag);
             toolbarPanel.Controls.Add(settingsToolbarButton);
             toolbarPanel.Controls.Add(bottomLine);
 
-            // Dock 顺序调整：switch 在 label 左侧
-            toolbarPrivilegeSwitch.BringToFront();
             UpdateAiStatusChip();
             return toolbarPanel;
         }
