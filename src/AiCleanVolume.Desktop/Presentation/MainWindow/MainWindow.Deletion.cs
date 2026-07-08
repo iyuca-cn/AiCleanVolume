@@ -76,16 +76,21 @@ namespace AiCleanVolume.Desktop
         {
             if (rows == null || rows.Count == 0) return;
 
-            string message = SuggestionDeletionText.BuildBatchConfirmMessage(rows);
+            List<DeleteConfirmItem> items = new List<DeleteConfirmItem>();
+            for (int i = 0; i < rows.Count; i++)
+            {
+                CleanupSuggestionRow row = rows[i];
+                if (row == null || row.Suggestion == null) continue;
+                items.Add(new DeleteConfirmItem
+                {
+                    Name = row.Suggestion.Name,
+                    Path = row.Suggestion.Path,
+                    Bytes = row.Suggestion.Bytes,
+                    Sandbox = row.Suggestion.Sandbox
+                });
+            }
 
-            AntdUI.TType icon = AntdUI.TType.Warn;
-            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "确认删除", message, icon);
-            config.OkText = "确认删除";
-            config.CancelText = "取消";
-            config.OkType = AntdUI.TTypeMini.Error;
-            config.MaskClosable = false;
-            DialogResult confirm = AntdUI.Modal.open(config);
-            if (confirm != DialogResult.OK) return;
+            if (!ShowDeleteConfirmModal(items, settings.Sandbox.UseRecycleBin)) return;
 
             List<DeletionOutcome> outcomes = new List<DeletionOutcome>();
             DeletionProgressState progress = new DeletionProgressState();
@@ -535,6 +540,145 @@ namespace AiCleanVolume.Desktop
             {
                 return path.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
+        }
+
+        private sealed class DeleteConfirmItem
+        {
+            public string Name;
+            public string Path;
+            public long Bytes;
+            public SandboxEvaluation Sandbox;
+        }
+
+        // 统一删除确认弹窗：逐项列出沙盒结论与大小，永久删除时加红色警示条。
+        private bool ShowDeleteConfirmModal(List<DeleteConfirmItem> items, bool useRecycleBin)
+        {
+            if (items == null || items.Count == 0) return false;
+
+            const int contentWidth = 540;
+            long totalBytes = 0;
+            for (int i = 0; i < items.Count; i++) totalBytes += items[i].Bytes;
+
+            AntdUI.Panel content = CreateFlatPanel();
+            content.Width = contentWidth;
+            content.BackColor = Color.Transparent;
+
+            AntdUI.Label summary = new AntdUI.Label();
+            summary.Dock = DockStyle.Top;
+            summary.Height = 28;
+            summary.Text = "即将删除 " + items.Count + " 项 · 共 " + StorageFormatting.FormatBytes(totalBytes);
+            summary.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold);
+            summary.ForeColor = Palette.TextPrimary;
+            summary.BackColor = Color.Transparent;
+
+            AntdUI.StackPanel list = CreateVerticalScrollPanel();
+            list.Dock = DockStyle.Fill;
+            list.AutoScroll = true;
+            list.BackColor = Color.Transparent;
+            int rowWidth = contentWidth - 6;
+            for (int i = 0; i < items.Count; i++)
+            {
+                list.Controls.Add(BuildDeleteConfirmRow(items[i], rowWidth));
+            }
+
+            int visibleRows = Math.Min(items.Count, 8);
+            int listHeight = visibleRows * 44 + 4;
+            int warnHeight = useRecycleBin ? 0 : 48;
+
+            if (!useRecycleBin)
+            {
+                AntdUI.Panel warn = CreateFlatPanel();
+                warn.Dock = DockStyle.Bottom;
+                warn.Height = warnHeight;
+                warn.Back = Palette.DangerSoft;
+                warn.Radius = 8;
+                warn.Padding = new Padding(12, 0, 12, 0);
+                warn.Margin = new Padding(0, 8, 0, 0);
+                AntdUI.Label warnLabel = new AntdUI.Label();
+                warnLabel.Dock = DockStyle.Fill;
+                warnLabel.Text = "永久删除不经过回收站，无法恢复。";
+                warnLabel.Font = new Font("Microsoft YaHei UI", 9.5F, FontStyle.Bold);
+                warnLabel.ForeColor = Palette.Danger;
+                warnLabel.BackColor = Color.Transparent;
+                warnLabel.TextAlign = ContentAlignment.MiddleLeft;
+                warn.Controls.Add(warnLabel);
+                content.Controls.Add(warn);
+            }
+
+            content.Controls.Add(list);
+            content.Controls.Add(summary);
+            list.BringToFront();
+            content.Height = 28 + listHeight + warnHeight + 6;
+
+            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "确认删除", content, useRecycleBin ? AntdUI.TType.Warn : AntdUI.TType.Error);
+            config.OkText = useRecycleBin ? "移到回收站" : "永久删除";
+            config.CancelText = "取消";
+            config.OkType = useRecycleBin ? AntdUI.TTypeMini.Primary : AntdUI.TTypeMini.Error;
+            config.Width = contentWidth + 100;
+            config.MaskClosable = false;
+            return AntdUI.Modal.open(config) == DialogResult.OK;
+        }
+
+        private static Control BuildDeleteConfirmRow(DeleteConfirmItem item, int width)
+        {
+            SandboxAction action = item.Sandbox == null ? SandboxAction.RequireConfirmation : item.Sandbox.Action;
+            Color dotColor;
+            string verdict;
+            if (action == SandboxAction.Allow) { dotColor = Palette.Success; verdict = "允许"; }
+            else if (action == SandboxAction.Bypass) { dotColor = Palette.Danger; verdict = "越权删除"; }
+            else { dotColor = Palette.Warning; verdict = "需确认"; }
+            if (item.Sandbox != null && !string.IsNullOrWhiteSpace(item.Sandbox.Message)) verdict = item.Sandbox.Message;
+
+            AntdUI.Panel row = CreateFlatPanel();
+            row.Width = width;
+            row.Height = 38;
+            row.Margin = new Padding(0, 0, 0, 6);
+            row.Back = Palette.CardFill;
+            row.Radius = 8;
+            row.Padding = new Padding(10, 0, 12, 0);
+
+            AntdUI.Label dot = new AntdUI.Label();
+            dot.Dock = DockStyle.Left;
+            dot.Width = 18;
+            dot.Text = "●";
+            dot.ForeColor = dotColor;
+            dot.BackColor = Color.Transparent;
+            dot.TextAlign = ContentAlignment.MiddleCenter;
+
+            AntdUI.Label size = new AntdUI.Label();
+            size.Dock = DockStyle.Right;
+            size.Width = 104;
+            size.Text = StorageFormatting.FormatBytes(item.Bytes);
+            size.Font = new Font("Consolas", 9.5F);
+            size.ForeColor = Palette.TextSecondary;
+            size.BackColor = Color.Transparent;
+            size.TextAlign = ContentAlignment.MiddleRight;
+
+            AntdUI.Label sandbox = new AntdUI.Label();
+            sandbox.Dock = DockStyle.Right;
+            sandbox.Width = 128;
+            sandbox.Text = verdict;
+            sandbox.Font = new Font("Microsoft YaHei UI", 8.5F);
+            sandbox.ForeColor = dotColor;
+            sandbox.BackColor = Color.Transparent;
+            sandbox.AutoEllipsis = true;
+            sandbox.TextAlign = ContentAlignment.MiddleLeft;
+
+            AntdUI.Label name = new AntdUI.Label();
+            name.Dock = DockStyle.Fill;
+            name.Text = string.IsNullOrWhiteSpace(item.Name) ? item.Path : item.Name;
+            name.Font = new Font("Microsoft YaHei UI", 9.5F);
+            name.ForeColor = Palette.TextPrimary;
+            name.BackColor = Color.Transparent;
+            name.AutoEllipsis = true;
+            name.TextAlign = ContentAlignment.MiddleLeft;
+
+            row.Controls.Add(dot);
+            row.Controls.Add(size);
+            row.Controls.Add(sandbox);
+            row.Controls.Add(name);
+            name.BringToFront();
+            return row;
         }
 
         private sealed class DeletionOutcome

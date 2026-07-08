@@ -1,103 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using AiCleanVolume.Core.Domain.Cleanup;
-using AiCleanVolume.Core.Domain.Sandbox;
 using AiCleanVolume.Core.Domain.Settings;
-using AiCleanVolume.Core.Domain.Storage;
-using AiCleanVolume.Core.Application.CleanupPlanning;
-using AiCleanVolume.Core.Application.Deletion;
-using AiCleanVolume.Core.Application.Scanning;
-using AiCleanVolume.Core.Kernel.Ports;
-using AiCleanVolume.Desktop.Controls;
-using AiCleanVolume.Desktop.Infrastructure.Ai;
-using AiCleanVolume.Desktop.Infrastructure.Scanning;
-using AiCleanVolume.Desktop.Infrastructure.Settings;
-using AiCleanVolume.Desktop.Infrastructure.Windows;
 using AiCleanVolume.Desktop.Presentation.Features.Settings;
 using AiCleanVolume.Desktop.Presentation.Shared;
-using AiCleanVolume.Desktop.ViewModels;
 
 
 namespace AiCleanVolume.Desktop
 {
+    // 设置弹窗中的 AI 配置档案列表：选择 / 应用到输入框 / 删除 / 另存当前为档案。
     public sealed partial class MainWindow : AntdUI.Window
     {
-        private void SelectAiProfileProviderPresetForValues(string endpoint, string model)
-        {
-            if (aiProfileProviderPresetSelect == null) return;
-
-            AiSettingsPresetCatalog.AiProviderPresetOption preset = AiSettingsPresetCatalog.FindProviderPreset(endpoint, model);
-            syncingAiProfileProviderPreset = true;
-            try
-            {
-                aiProfileProviderPresetSelect.SelectedValue = preset == null ? AiSettingsPresetCatalog.CustomProviderPresetKey : preset.Key;
-            }
-            finally
-            {
-                syncingAiProfileProviderPreset = false;
-            }
-        }
-
-        private void AiProfileProviderPresetSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
-        {
-            if (loadingStartupUi) return;
-            if (syncingAiProfileProviderPreset || e.Value == null) return;
-
-            string key = e.Value.ToString();
-            if (string.Equals(key, AiSettingsPresetCatalog.CustomProviderPresetKey, StringComparison.OrdinalIgnoreCase)) return;
-
-            AiSettingsPresetCatalog.AiProviderPresetOption preset = AiSettingsPresetCatalog.FindProviderPresetByKey(key);
-            if (preset == null) return;
-
-            syncingAiProfileProviderPreset = true;
-            try
-            {
-                if (aiProfileEndpointInput != null) aiProfileEndpointInput.Text = preset.Endpoint;
-                if (aiProfileModelInput != null) aiProfileModelInput.Text = preset.Model;
-            }
-            finally
-            {
-                syncingAiProfileProviderPreset = false;
-            }
-        }
-
-        private void AiProfileEndpointOrModelInput_TextChanged(object sender, EventArgs e)
-        {
-            if (loadingStartupUi) return;
-            if (syncingAiProfileProviderPreset) return;
-            SelectAiProfileProviderPresetForValues(aiProfileEndpointInput == null ? null : aiProfileEndpointInput.Text, aiProfileModelInput == null ? null : aiProfileModelInput.Text);
-        }
-
-        private void AiProfileAccessModeSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)
-        {
-            UpdateAiProfileAccessModeUi();
-        }
-
-        private string ResolveSelectedAiProfileAccessMode()
-        {
-            if (aiProfileAccessModeSelect == null || aiProfileAccessModeSelect.SelectedValue == null) return AiSettings.StandardApiAccessMode;
-            return AiSettings.NormalizeAccessMode(aiProfileAccessModeSelect.SelectedValue.ToString());
-        }
-
-        private void UpdateAiProfileAccessModeUi()
-        {
-            bool twoApi = string.Equals(ResolveSelectedAiProfileAccessMode(), AiSettings.TwoApiAccessMode, StringComparison.OrdinalIgnoreCase);
-            if (aiProfileApiKeyInput != null)
-            {
-                aiProfileApiKeyInput.Enabled = !twoApi;
-                aiProfileApiKeyInput.PlaceholderText = twoApi ? "2API 模式不使用 API Key" : "sk-...";
-            }
-            if (aiProfileCookieMappingsInput != null)
-            {
-                aiProfileCookieMappingsInput.Enabled = true;
-            }
-        }
-
         private void PopulateAiProfiles()
         {
             PopulateAiProfiles(selectedAiProfileIndex);
@@ -132,35 +46,6 @@ namespace AiCleanVolume.Desktop
             PopulateAiProfiles(0);
         }
 
-        private void OpenAiProfileCreatePage()
-        {
-            editingAiProfileIndex = -1;
-            InitializeAiProfilePageValues();
-            UpdateAiProfilePageHeader(false);
-            SetActivePage(PageAiProfileCreate);
-        }
-
-        private void UpdateAiProfilePageHeader(bool editing)
-        {
-            if (aiProfilePageTitle != null) aiProfilePageTitle.Text = editing ? "编辑 AI 配置" : "新增 AI 配置";
-            if (aiProfilePageDesc != null) aiProfilePageDesc.Text = editing ? "修改接入参数，保存后会更新原有的配置卡片。" : "填写接入参数并保存为配置卡片。";
-            if (saveAiProfilePageButton != null) saveAiProfilePageButton.Text = editing ? "更新" : "保存";
-        }
-
-        private void InitializeAiProfilePageValues()
-        {
-            string model = settings == null || settings.Ai == null ? AiSettings.DefaultModel : settings.Ai.Model;
-            aiProfileNameInput.Text = AiSettings.BuildProfileAutoName(model, DateTime.Now);
-            aiProfileAccessModeSelect.SelectedValue = settings == null || settings.Ai == null ? AiSettings.StandardApiAccessMode : settings.Ai.AccessMode;
-            aiProfileEndpointInput.Text = settings == null || settings.Ai == null ? string.Empty : NormalizeValue(settings.Ai.Endpoint);
-            aiProfileApiKeyInput.Text = settings == null || settings.Ai == null ? string.Empty : NormalizeValue(settings.Ai.ApiKey);
-            aiProfileModelInput.Text = string.IsNullOrWhiteSpace(model) ? AiSettings.DefaultModel : NormalizeValue(model);
-            aiProfileMaxSuggestionsInput.Text = settings == null || settings.Ai == null ? "30" : settings.Ai.MaxSuggestions.ToString();
-            aiProfileCookieMappingsInput.Text = settings == null || settings.Ai == null ? string.Empty : FormatModelCookieMappings(settings.Ai.ModelCookieMappings, settings.Ai.Model);
-            UpdateAiProfileAccessModeUi();
-            SelectAiProfileProviderPresetForValues(aiProfileEndpointInput.Text, aiProfileModelInput.Text);
-        }
-
         private void SaveCurrentAiProfileWithPrompt()
         {
             try
@@ -175,92 +60,12 @@ namespace AiCleanVolume.Desktop
                 settingsStore.Save(settings);
                 PopulateAiProfiles(0);
                 Log("AI 配置方案已保存：" + profile.Name + "。");
-                ShowInfo("完成", "AI 配置方案已保存。");
             }
             catch (Exception ex)
             {
                 Log("保存 AI 配置方案失败：" + ex.Message);
                 ShowError("保存失败", ex.Message);
             }
-        }
-
-        private void SaveAiProfileFromPage()
-        {
-            try
-            {
-                AiProfile profile = CreateAiProfileFromPage();
-                bool editing = editingAiProfileIndex >= 0 && settings.Ai.Profiles != null && editingAiProfileIndex < settings.Ai.Profiles.Count;
-                int targetIndex = editing ? editingAiProfileIndex : -1;
-                InsertOrReplaceAiProfile(profile, targetIndex);
-                settingsStore.Save(settings);
-                int selectedIndex = editing ? targetIndex : 0;
-                editingAiProfileIndex = -1;
-                SetActivePage(PageSettings);
-                PopulateAiProfiles(selectedIndex);
-                ResetAiProfileListScroll();
-                RefreshAiProfileListLayout();
-                string verb = editing ? "已更新" : "已新增";
-                Log("AI 配置方案" + verb + "：" + profile.Name + "。");
-                ShowInfo("完成", "AI 配置方案" + verb + "。");
-            }
-            catch (Exception ex)
-            {
-                Log("保存 AI 配置方案失败：" + ex.Message);
-                ShowError("保存失败", ex.Message);
-            }
-        }
-
-        private AiProfile CreateAiProfileFromPage()
-        {
-            DateTime savedAt = DateTime.Now;
-            string name = aiProfileNameInput == null ? null : NormalizeValue(aiProfileNameInput.Text);
-            string model = aiProfileModelInput == null ? null : NormalizeValue(aiProfileModelInput.Text);
-
-            AiProfile profile = new AiProfile
-            {
-                Name = name,
-                SavedAt = savedAt,
-                AccessMode = ResolveSelectedAiProfileAccessMode(),
-                Endpoint = aiProfileEndpointInput == null ? string.Empty : NormalizeValue(aiProfileEndpointInput.Text),
-                ApiKey = aiProfileApiKeyInput == null ? string.Empty : NormalizeValue(aiProfileApiKeyInput.Text),
-                Model = model,
-                MaxSuggestions = ParsePositiveInt(aiProfileMaxSuggestionsInput == null ? null : aiProfileMaxSuggestionsInput.Text, 30),
-                SystemPrompt = ResolveAiProfilePageSystemPrompt(),
-                ModelCookieMappings = new List<AiModelCookieMapping>()
-            };
-
-            if (string.IsNullOrWhiteSpace(profile.Endpoint)) throw new InvalidOperationException("请填写接口地址。");
-            if (string.IsNullOrWhiteSpace(profile.Model)) throw new InvalidOperationException("请填写模型。");
-
-            IList<AiModelCookieMapping> mappings = ParseModelCookieMappings(aiProfileCookieMappingsInput == null ? null : aiProfileCookieMappingsInput.Text, profile.Model);
-            for (int index = 0; index < mappings.Count; index++)
-            {
-                profile.ModelCookieMappings.Add(new AiModelCookieMapping
-                {
-                    Model = mappings[index].Model,
-                    Cookie = mappings[index].Cookie
-                });
-            }
-
-            if (string.IsNullOrWhiteSpace(profile.Name)) profile.Name = AiSettings.BuildProfileAutoName(profile.Model, profile.SavedAt);
-            return profile;
-        }
-
-        private string ResolveAiProfilePageSystemPrompt()
-        {
-            if (editingAiProfileIndex >= 0 && settings != null && settings.Ai != null && settings.Ai.Profiles != null && editingAiProfileIndex < settings.Ai.Profiles.Count)
-            {
-                string profilePrompt = NormalizeValue(settings.Ai.Profiles[editingAiProfileIndex].SystemPrompt);
-                return string.IsNullOrWhiteSpace(profilePrompt) ? GetCurrentSystemPromptText() : profilePrompt;
-            }
-
-            return GetCurrentSystemPromptText();
-        }
-
-        private void CancelAiProfileCreatePage()
-        {
-            editingAiProfileIndex = -1;
-            SetActivePage(PageSettings);
         }
 
         private void ApplySelectedAiProfile()
@@ -273,7 +78,7 @@ namespace AiCleanVolume.Desktop
             }
 
             ApplyAiProfileToUi(profile);
-            Log("已应用 AI 配置方案到界面：" + profile.Name + "。点击保存配置后生效。");
+            Log("已应用 AI 配置方案到界面：" + profile.Name + "。点击保存后生效。");
         }
 
         private AiProfile ResolveSelectedAiProfile()
@@ -303,7 +108,7 @@ namespace AiCleanVolume.Desktop
                 selectedAiProfileIndex = selectedIndex;
                 for (int index = 0; index < settings.Ai.Profiles.Count; index++)
                 {
-                    aiProfileListPanel.Controls.Add(AiProfileCardFactory.CreateProfileCard(aiProfileListPanel, settings.Ai.Profiles[index], index, index == selectedIndex, SelectAiProfile, ApplyAiProfileFromCard, EditAiProfile, DeleteAiProfile));
+                    aiProfileListPanel.Controls.Add(AiProfileCardFactory.CreateProfileCard(aiProfileListPanel, settings.Ai.Profiles[index], index, index == selectedIndex, SelectAiProfile, ApplyAiProfileFromCard, ApplyAiProfileFromCard, DeleteAiProfile));
                 }
             }
             finally
@@ -412,15 +217,15 @@ namespace AiCleanVolume.Desktop
         private void ApplyAiProfileToUi(AiProfile profile)
         {
             if (profile == null) return;
-            aiAccessModeSelect.SelectedValue = AiSettings.NormalizeAccessMode(profile.AccessMode);
-            endpointInput.Text = NormalizeValue(profile.Endpoint);
-            apiKeyInput.Text = NormalizeValue(profile.ApiKey);
-            modelInput.Text = NormalizeValue(profile.Model);
-            maxSuggestionsInput.Text = (profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions).ToString();
             pendingSystemPrompt = NormalizeValue(profile.SystemPrompt);
-            modelCookieMappingsInput.Text = FormatModelCookieMappings(profile.ModelCookieMappings, profile.Model);
-            UpdateAiAccessModeUi();
-            SelectAiProviderPresetForSettings(endpointInput.Text, modelInput.Text);
+            if (aiAccessModeSelect != null) aiAccessModeSelect.SelectedValue = AiSettings.NormalizeAccessMode(profile.AccessMode);
+            if (endpointInput != null) endpointInput.Text = NormalizeValue(profile.Endpoint);
+            if (apiKeyInput != null) apiKeyInput.Text = NormalizeValue(profile.ApiKey);
+            if (modelInput != null) modelInput.Text = NormalizeValue(profile.Model);
+            if (maxSuggestionsInput != null) maxSuggestionsInput.Text = (profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions).ToString();
+            if (modelCookieMappingsInput != null) modelCookieMappingsInput.Text = FormatModelCookieMappings(profile.ModelCookieMappings, profile.Model);
+            if (aiAccessModeSelect != null) UpdateAiAccessModeUi();
+            if (aiProviderPresetSelect != null && endpointInput != null && modelInput != null) SelectAiProviderPresetForSettings(endpointInput.Text, modelInput.Text);
         }
 
         private string PromptForAiProfileName(string defaultName)
@@ -449,32 +254,6 @@ namespace AiCleanVolume.Desktop
             config.Width = 480;
             config.MaskClosable = false;
             return AntdUI.Modal.open(config) == DialogResult.OK ? NormalizeValue(input.Text) : null;
-        }
-
-        private void EditAiProfile(int index)
-        {
-            if (settings == null || settings.Ai == null || settings.Ai.Profiles == null) return;
-            if (index < 0 || index >= settings.Ai.Profiles.Count) return;
-
-            AiProfile profile = settings.Ai.Profiles[index];
-            editingAiProfileIndex = index;
-            LoadAiProfilePageValues(profile);
-            UpdateAiProfilePageHeader(true);
-            SetActivePage(PageAiProfileCreate);
-        }
-
-        private void LoadAiProfilePageValues(AiProfile profile)
-        {
-            if (profile == null) return;
-            aiProfileNameInput.Text = NormalizeValue(profile.Name);
-            aiProfileAccessModeSelect.SelectedValue = AiSettings.NormalizeAccessMode(profile.AccessMode);
-            aiProfileEndpointInput.Text = NormalizeValue(profile.Endpoint);
-            aiProfileApiKeyInput.Text = NormalizeValue(profile.ApiKey);
-            aiProfileModelInput.Text = NormalizeValue(profile.Model);
-            aiProfileMaxSuggestionsInput.Text = (profile.MaxSuggestions <= 0 ? 30 : profile.MaxSuggestions).ToString();
-            aiProfileCookieMappingsInput.Text = FormatModelCookieMappings(profile.ModelCookieMappings, profile.Model);
-            UpdateAiProfileAccessModeUi();
-            SelectAiProfileProviderPresetForValues(aiProfileEndpointInput.Text, aiProfileModelInput.Text);
         }
 
         private void DeleteAiProfile(int index)

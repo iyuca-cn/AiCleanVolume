@@ -27,29 +27,34 @@ namespace AiCleanVolume.Desktop
 {
     public sealed partial class MainWindow : AntdUI.Window
     {
+        // 设置项分两类：常驻隐藏控件（扫描阈值、权限同步）任何时候都灌值；仅存在于设置弹窗的控件在弹窗构建后才有值。
         private void LoadSettingsToUi()
         {
             settings.EnsureDefaults();
-            aiEnabledSwitch.Checked = settings.Ai.Enabled;
-            recycleSwitch.Checked = settings.Sandbox.UseRecycleBin;
-            ApplyPrivilegedCheckboxState(settings.Sandbox.FullyPrivilegedMode);
-            aiAccessModeSelect.SelectedValue = settings.Ai.AccessMode;
-            endpointInput.Text = settings.Ai.Endpoint;
-            apiKeyInput.Text = settings.Ai.ApiKey;
-            modelInput.Text = settings.Ai.Model;
-            maxSuggestionsInput.Text = settings.Ai.MaxSuggestions.ToString();
+            settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(settings.Sandbox.AllowedRoots);
             pendingSystemPrompt = settings.Ai.SystemPrompt;
-            modelCookieMappingsInput.Text = FormatModelCookieMappings(settings.Ai.ModelCookieMappings, settings.Ai.Model);
-            UpdateAiAccessModeUi();
-            PopulateAiProfiles();
-            SelectAiProviderPresetForSettings(settings.Ai.Endpoint, settings.Ai.Model);
-            minSizeInput.Text = settings.Scan.MinSizeMb.ToString();
-            limitInput.Text = settings.Scan.PerLevelLimit.ToString();
+
+            ApplyPrivilegedCheckboxState(settings.Sandbox.FullyPrivilegedMode);
+            if (minSizeInput != null) minSizeInput.Text = settings.Scan.MinSizeMb.ToString();
+            if (limitInput != null) limitInput.Text = settings.Scan.PerLevelLimit.ToString();
             if (suggestionMinSizeInput != null) suggestionMinSizeInput.Text = "128";
             if (suggestionLimitInput != null) suggestionLimitInput.Text = "-1";
             UpdateStorageSizeColumnTitle(settings.Scan.SortMode);
-            settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(settings.Sandbox.AllowedRoots);
-            allowRootsInput.Text = string.Join(Environment.NewLine, new List<string>(settings.Sandbox.AllowedRoots).ToArray());
+            UpdateAiStatusChip();
+
+            if (aiEnabledSwitch != null) aiEnabledSwitch.Checked = settings.Ai.Enabled;
+            if (recycleSegmented != null) recycleSegmented.SelectIndex = settings.Sandbox.UseRecycleBin ? 0 : 1;
+            if (sortSegmented != null) sortSegmented.SelectIndex = settings.Scan.SortMode == ScanSortMode.Logical ? 1 : 0;
+            if (aiAccessModeSelect != null) aiAccessModeSelect.SelectedValue = settings.Ai.AccessMode;
+            if (endpointInput != null) endpointInput.Text = settings.Ai.Endpoint;
+            if (apiKeyInput != null) apiKeyInput.Text = settings.Ai.ApiKey;
+            if (modelInput != null) modelInput.Text = settings.Ai.Model;
+            if (maxSuggestionsInput != null) maxSuggestionsInput.Text = settings.Ai.MaxSuggestions.ToString();
+            if (modelCookieMappingsInput != null) modelCookieMappingsInput.Text = FormatModelCookieMappings(settings.Ai.ModelCookieMappings, settings.Ai.Model);
+            if (allowRootsInput != null) allowRootsInput.Text = string.Join(Environment.NewLine, new List<string>(settings.Sandbox.AllowedRoots).ToArray());
+            if (aiAccessModeSelect != null) UpdateAiAccessModeUi();
+            PopulateAiProfiles();
+            if (aiProviderPresetSelect != null) SelectAiProviderPresetForSettings(settings.Ai.Endpoint, settings.Ai.Model);
         }
 
         private void PopulateAiAccessModes()
@@ -180,30 +185,14 @@ namespace AiCleanVolume.Desktop
             SelectAiProviderPresetForSettings(endpointInput == null ? null : endpointInput.Text, modelInput == null ? null : modelInput.Text);
         }
 
-        private void SaveSettings()
-        {
-            try
-            {
-                SaveSettingsFromUi();
-                SaveCurrentAiProfileAutomatic();
-                settingsStore.Save(settings);
-                Log("配置已保存。");
-                ShowInfo("完成", "配置已保存。");
-            }
-            catch (Exception ex)
-            {
-                Log("保存配置失败：" + ex.Message);
-                ShowError("保存失败", ex.Message);
-            }
-        }
-
         private void TestAiSettings()
         {
             try
             {
                 SaveSettingsFromUi();
                 settings.Ai.Enabled = IsAiConfigured(settings.Ai);
-                aiEnabledSwitch.Checked = settings.Ai.Enabled;
+                if (aiEnabledSwitch != null) aiEnabledSwitch.Checked = settings.Ai.Enabled;
+                UpdateAiStatusChip();
                 Log("AI 配置测试开始：Enabled=" + settings.Ai.Enabled + "，AccessMode=" + settings.Ai.AccessMode + "，Endpoint=" + settings.Ai.Endpoint + "，Model=" + settings.Ai.Model + "。");
             }
             catch (Exception ex)
@@ -227,134 +216,29 @@ namespace AiCleanVolume.Desktop
             });
         }
 
+        // 仅从当前存活的控件回写；设置弹窗关闭后其控件引用被置空，对应字段沿用已持久化的值。
         private void SaveSettingsFromUi()
         {
-            settings.Ai.Enabled = aiEnabledSwitch.Checked;
-            settings.Ai.AccessMode = ResolveSelectedAiAccessMode();
-            settings.Ai.Endpoint = endpointInput.Text.Trim();
-            settings.Ai.ApiKey = apiKeyInput.Text.Trim();
-            settings.Ai.Model = modelInput.Text.Trim();
-            settings.Ai.MaxSuggestions = ParsePositiveInt(maxSuggestionsInput.Text, 30);
+            if (aiEnabledSwitch != null) settings.Ai.Enabled = aiEnabledSwitch.Checked;
+            if (aiAccessModeSelect != null) settings.Ai.AccessMode = ResolveSelectedAiAccessMode();
+            if (endpointInput != null) settings.Ai.Endpoint = endpointInput.Text.Trim();
+            if (apiKeyInput != null) settings.Ai.ApiKey = apiKeyInput.Text.Trim();
+            if (modelInput != null) settings.Ai.Model = modelInput.Text.Trim();
+            if (maxSuggestionsInput != null) settings.Ai.MaxSuggestions = ParsePositiveInt(maxSuggestionsInput.Text, 30);
             settings.Ai.SystemPrompt = NormalizeValue(pendingSystemPrompt);
-            settings.Ai.ModelCookieMappings = ParseModelCookieMappings(modelCookieMappingsInput.Text, settings.Ai.Model);
-            settings.Sandbox.UseRecycleBin = recycleSwitch.Checked;
+            if (modelCookieMappingsInput != null) settings.Ai.ModelCookieMappings = ParseModelCookieMappings(modelCookieMappingsInput.Text, settings.Ai.Model);
+            if (recycleSegmented != null) settings.Sandbox.UseRecycleBin = recycleSegmented.SelectIndex == 0;
             settings.Sandbox.FullyPrivilegedMode = IsFullyPrivilegedChecked();
-            settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(ParseLines(allowRootsInput.Text));
-            settings.Scan.MinSizeMb = ParseInt(minSizeInput.Text, -1);
-            settings.Scan.PerLevelLimit = ParseInt(limitInput.Text, -1);
+            if (allowRootsInput != null) settings.Sandbox.AllowedRoots = SandboxSettings.NormalizeAllowedRoots(ParseLines(allowRootsInput.Text));
+            if (minSizeInput != null) settings.Scan.MinSizeMb = ParseInt(minSizeInput.Text, -1);
+            if (limitInput != null) settings.Scan.PerLevelLimit = ParseInt(limitInput.Text, -1);
+            if (sortSegmented != null) settings.Scan.SortMode = sortSegmented.SelectIndex == 1 ? ScanSortMode.Logical : ScanSortMode.Allocated;
             settings.EnsureDefaults();
         }
 
         private static bool IsAiConfigured(AiSettings ai)
         {
             return ai != null && !string.IsNullOrWhiteSpace(ai.Endpoint) && !string.IsNullOrWhiteSpace(ai.Model);
-        }
-
-        private void ShowSuggestionPromptEditor()
-        {
-            if (settings == null || settings.Ai == null) return;
-
-            AntdUI.Panel content = CreateFlatPanel();
-            content.Width = 680;
-            content.Height = 402;
-            content.Padding = new Padding(0, 4, 0, 0);
-            content.BackColor = Color.Transparent;
-
-            AntdUI.GridPanel form = CreateGridPanel("44:92 fill;328:92 fill");
-            form.Dock = DockStyle.Fill;
-            form.BackColor = Color.Transparent;
-
-            AntdUI.Select presetSelect = CreateSettingsSelect();
-            PopulateAiPromptPresets(presetSelect);
-            AntdUI.Input promptInput = CreateInput("系统提示词");
-            promptInput.Multiline = true;
-            promptInput.AutoScroll = true;
-            promptInput.MaxLength = int.MaxValue;
-
-            bool syncingPreset = true;
-            promptInput.Text = GetCurrentSystemPromptText();
-            SelectAiPromptPresetForPrompt(presetSelect, promptInput.Text);
-            syncingPreset = false;
-
-            presetSelect.SelectedValueChanged += delegate(object sender, AntdUI.ObjectNEventArgs e)
-            {
-                if (syncingPreset || e.Value == null) return;
-
-                string key = e.Value.ToString();
-                if (string.Equals(key, AiSettingsPresetCatalog.CustomPromptPresetKey, StringComparison.OrdinalIgnoreCase)) return;
-
-                AiSettingsPresetCatalog.AiPromptPresetOption preset = AiSettingsPresetCatalog.FindPromptPreset(key);
-                if (preset == null) return;
-
-                syncingPreset = true;
-                try
-                {
-                    promptInput.Text = preset.BuildPrompt(GetPromptDriveRoot());
-                }
-                finally
-                {
-                    syncingPreset = false;
-                }
-            };
-
-            promptInput.TextChanged += delegate
-            {
-                if (syncingPreset) return;
-                syncingPreset = true;
-                try
-                {
-                    SelectAiPromptPresetForPrompt(presetSelect, promptInput.Text);
-                }
-                finally
-                {
-                    syncingPreset = false;
-                }
-            };
-
-            AddWideProfileField(form, "AI 预设", presetSelect, 0);
-            AddWideProfileField(form, "系统提示词", promptInput, 1);
-            content.Controls.Add(form);
-
-            AntdUI.Modal.Config config = AntdUI.Modal.config(this, "AI 提示词", content, AntdUI.TType.Info);
-            config.OkText = "保存";
-            config.CancelText = "取消";
-            config.OkType = AntdUI.TTypeMini.Primary;
-            config.Width = 740;
-            config.MaskClosable = false;
-            config.Resizable = true;
-            config.MinimumSize = new Size(640, 430);
-            config.OnOk = delegate
-            {
-                string prompt = NormalizeValue(promptInput.Text);
-                if (string.IsNullOrWhiteSpace(prompt))
-                {
-                    ShowWarning("提示", "系统提示词不能为空。");
-                    return false;
-                }
-
-                try
-                {
-                    SaveSettingsFromUi();
-                    pendingSystemPrompt = prompt;
-                    settings.Ai.SystemPrompt = prompt;
-                    settings.EnsureDefaults();
-                    pendingSystemPrompt = settings.Ai.SystemPrompt;
-                    settingsStore.Save(settings);
-                    Log("AI 提示词已保存。");
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    Log("保存 AI 提示词失败：" + ex.Message);
-                    ShowError("保存失败", ex.Message);
-                    return false;
-                }
-            };
-
-            if (AntdUI.Modal.open(config) == DialogResult.OK)
-            {
-                ShowInfo("完成", "AI 提示词已保存。");
-            }
         }
 
         private string GetCurrentSystemPromptText()
@@ -386,16 +270,6 @@ namespace AiCleanVolume.Desktop
         private static int ParsePositiveInt(string text, int fallback)
         {
             return AiSettingsText.ParsePositiveInt(text, fallback);
-        }
-
-        private static void AddWideProfileField(AntdUI.GridPanel form, string caption, Control control, int row)
-        {
-            AntdUI.Label label = CreateCaption(caption);
-            label.Margin = new Padding(0, 0, 8, 8);
-            control.Margin = new Padding(0, 0, 0, 8);
-            int index = row * 2;
-            AddGridControl(form, label, index);
-            AddGridControl(form, control, index + 1);
         }
     }
 }

@@ -80,13 +80,6 @@ namespace AiCleanVolume.Desktop
             superCleanButton.Loading = busy && activePageId == PageSuggestions;
             if (suggestionPromptButton != null) suggestionPromptButton.Enabled = !busy;
             deleteButton.Enabled = !busy;
-            saveSettingsButton.Enabled = !busy;
-            if (testAiSettingsButton != null) testAiSettingsButton.Enabled = !busy;
-            if (applyAiProfileButton != null) applyAiProfileButton.Enabled = !busy;
-            if (addAiProfileButton != null) addAiProfileButton.Enabled = !busy;
-            if (saveAiProfilePageButton != null) saveAiProfilePageButton.Enabled = !busy;
-            if (cancelAiProfilePageButton != null) cancelAiProfilePageButton.Enabled = !busy;
-            if (backAiProfilePageButton != null) backAiProfilePageButton.Enabled = !busy;
             if (aiProfileListPanel != null) aiProfileListPanel.Enabled = !busy;
             if (selectAllSuggestionsButton != null) selectAllSuggestionsButton.Enabled = !busy;
             if (clearAllSuggestionsButton != null) clearAllSuggestionsButton.Enabled = !busy;

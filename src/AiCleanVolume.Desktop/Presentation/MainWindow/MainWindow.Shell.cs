@@ -281,12 +281,16 @@ namespace AiCleanVolume.Desktop
 
         private void SettingsToolbarButton_Click(object sender, EventArgs e)
         {
-            SetActivePage(activePageId == PageSettings ? PageScan : PageSettings);
+            ShowSettingsModal();
         }
 
         private void StatusStateLabel_Click(object sender, EventArgs e)
         {
-            SetActivePage(activePageId == PageLog ? PageScan : PageLog);
+            if (logPageFeature == null || logPageFeature.View == null) return;
+            logPageFeature.View.Width = 560;
+            AntdUI.Drawer.Config config = AntdUI.Drawer.config(this, logPageFeature.View, AntdUI.TAlignMini.Right);
+            config.Dispose = false;
+            AntdUI.Drawer.open(config);
         }
 
         internal void UpdateAiStatusChip()
@@ -329,120 +333,15 @@ namespace AiCleanVolume.Desktop
             }
         }
 
-        private AntdUI.Panel CreatePageContainer()
-        {
-            AntdUI.Panel page = CreateFlatPanel();
-            page.Dock = DockStyle.Fill;
-            page.BackColor = PageBackground;
-            return page;
-        }
-
-        private void SetActivePage(string pageId)
-        {
-            if (activePageId == pageId) return;
-
-            SuspendLayout();
-            if (pageHost != null) pageHost.SuspendLayout();
-            try
-            {
-                activePageId = pageId;
-
-                Control overlay = GetOverlayControl(pageId);
-                if (columnsHost != null) columnsHost.Visible = overlay == null;
-                if (logPage != null) logPage.Visible = pageId == PageLog;
-                if (settingsPage != null) settingsPage.Visible = pageId == PageSettings;
-                if (aiProfileCreatePage != null) aiProfileCreatePage.Visible = pageId == PageAiProfileCreate;
-                if (overlay != null) overlay.BringToFront();
-                else if (columnsHost != null) columnsHost.BringToFront();
-
-                if (settingsToolbarButton != null)
-                {
-                    settingsToolbarButton.Text = pageId == PageSettings || pageId == PageAiProfileCreate ? "返回" : "设置";
-                    settingsToolbarButton.IconSvg = pageId == PageSettings || pageId == PageAiProfileCreate ? "ArrowLeftOutlined" : "SettingOutlined";
-                }
-
-                appBar.SubText = GetPageTitle(pageId);
-            }
-            finally
-            {
-                if (pageHost != null) pageHost.ResumeLayout(true);
-                ResumeLayout(true);
-                if (pageId == PageSettings) RefreshSettingsPageLayout(true);
-                Invalidate(true);
-            }
-        }
-
-        private Control GetOverlayControl(string pageId)
-        {
-            switch (pageId)
-            {
-                case PageLog:
-                    return logPage;
-                case PageSettings:
-                    return settingsPage;
-                case PageAiProfileCreate:
-                    return aiProfileCreatePage;
-                default:
-                    return null;
-            }
-        }
-
+        // 单屏只有主界面一种状态，页面标题固定显示版本号。
         private static string GetPageTitle(string pageId)
         {
-            switch (pageId)
-            {
-                case PageLog:
-                    return "日志";
-                case PageSettings:
-                    return "设置";
-                case PageAiProfileCreate:
-                    return "新增 AI 配置";
-                default:
-                    return "v" + typeof(MainWindow).Assembly.GetName().Version.ToString(3);
-            }
+            return "v" + typeof(MainWindow).Assembly.GetName().Version.ToString(3);
         }
 
         private string GetActivePageDescription()
         {
             return "扫描磁盘占用，结合 AI 解析给出清理建议。";
-        }
-
-        private void RefreshSettingsPageLayout(bool resetScroll)
-        {
-            if (settingsScrollHost == null) return;
-
-            if (settingsPage != null) settingsPage.SuspendLayout();
-            if (settingsContentLayout != null)
-            {
-                settingsContentLayout.Width = Math.Max(720, settingsScrollHost.ClientSize.Width - 12);
-                settingsContentLayout.Height = 944;
-                settingsContentLayout.PerformLayout();
-            }
-
-            ResizeAiProfileCards();
-
-            if (resetScroll && settingsScrollHost.ScrollBar != null && settingsScrollHost.ScrollBar.ValueY != 0)
-            {
-                settingsScrollHost.ScrollBar.ValueY = 0;
-            }
-
-            settingsScrollHost.PerformLayout();
-            if (settingsPage != null) settingsPage.PerformLayout();
-            if (settingsPage != null) settingsPage.ResumeLayout(true);
-            InvalidateSettingsPageControls(settingsPage);
-            if (settingsContentLayout != null) settingsContentLayout.Invalidate(true);
-            settingsScrollHost.Invalidate(true);
-            if (settingsPage != null) settingsPage.Update();
-        }
-
-        private static void InvalidateSettingsPageControls(Control control)
-        {
-            if (control == null) return;
-            control.Invalidate(true);
-            foreach (Control child in control.Controls)
-            {
-                InvalidateSettingsPageControls(child);
-            }
         }
     }
 }

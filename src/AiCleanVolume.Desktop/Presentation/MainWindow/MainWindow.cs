@@ -122,35 +122,13 @@ namespace AiCleanVolume.Desktop
 
         private readonly SettingsPageState settingsState;
 
-        private SettingsPageView settingsPageView;
-
-        private SettingsPageController settingsPageController;
-
         private readonly SuggestionsPageState suggestionsState;
-
-        private AiProfilePageView aiProfilePageView;
-
-        private AiProfilePageController aiProfilePageController;
-
 
         private LogPageFeature logPageFeature;
 
         private AntdUI.PageHeader appBar;
 
         private AntdUI.Panel pageHost;
-
-        private AntdUI.Panel scanPage;
-
-
-        private AntdUI.Panel logPage;
-
-        private AntdUI.Panel settingsPage;
-
-        private AntdUI.Panel aiProfileCreatePage;
-
-        private AntdUI.StackPanel settingsScrollHost;
-
-        private AntdUI.GridPanel settingsContentLayout;
 
         private AntdUI.Button scanButton;
 
@@ -161,10 +139,6 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Button superCleanButton;
 
         private AntdUI.Button deleteButton;
-
-        private AntdUI.Button saveSettingsButton;
-
-        private AntdUI.Button testAiSettingsButton;
 
         private AntdUI.Button suggestionPromptButton;
 
@@ -198,8 +172,6 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Switch aiEnabledSwitch;
 
-        private AntdUI.Switch recycleSwitch;
-
         private AntdUI.Checkbox privilegedCheckbox;
 
         private AntdUI.Checkbox privilegedQuickCheckbox;
@@ -215,36 +187,6 @@ namespace AiCleanVolume.Desktop
         private AntdUI.Input maxSuggestionsInput;
 
         private AntdUI.StackPanel aiProfileListPanel;
-
-        private AntdUI.Button applyAiProfileButton;
-
-        private AntdUI.Button addAiProfileButton;
-
-        private AntdUI.Button saveAiProfilePageButton;
-
-        private AntdUI.Button cancelAiProfilePageButton;
-
-        private AntdUI.Button backAiProfilePageButton;
-
-        private AntdUI.Input aiProfileNameInput;
-
-        private AntdUI.Select aiProfileAccessModeSelect;
-
-        private AntdUI.Select aiProfileProviderPresetSelect;
-
-        private AntdUI.Input aiProfileEndpointInput;
-
-        private AntdUI.Input aiProfileApiKeyInput;
-
-        private AntdUI.Input aiProfileModelInput;
-
-        private AntdUI.Input aiProfileMaxSuggestionsInput;
-
-        private AntdUI.Input aiProfileCookieMappingsInput;
-
-        private AntdUI.Label aiProfilePageTitle;
-
-        private AntdUI.Label aiProfilePageDesc;
 
         private AntdUI.Select aiProviderPresetSelect;
 
@@ -447,40 +389,22 @@ namespace AiCleanVolume.Desktop
             EnsureScanToolbarControls();
             EnsureSuggestionCompatControls();
 
+            // 日志面板作为右侧 Drawer 的内容按需滑出，不再作为覆盖页装配。
             logPageFeature = new LogPageFeature();
             logInput = logPageFeature.LogInput;
-            logPage = CreatePageContainer();
-            logPage.Controls.Add(logPageFeature.View);
-
-            settingsPageView = new SettingsPageView(Font);
-            settingsPage = settingsPageView.ViewPanel;
-            BindSettingsPageView(settingsPageView);
-            settingsPageController = new SettingsPageController(this, settingsPageView, SaveSettings, TestAiSettings, ApplySelectedAiProfile, OpenAiProfileCreatePage, AiAccessModeSelect_SelectedValueChanged, AiProviderPresetSelect_SelectedValueChanged, AiEndpointOrModelInput_TextChanged, PrivilegedCheckbox_CheckedChanged, ResizeAiProfileCards);
-
-            aiProfilePageView = new AiProfilePageView(Font);
-            aiProfileCreatePage = aiProfilePageView.ViewPanel;
-            BindAiProfilePageView(aiProfilePageView);
-            aiProfilePageController = new AiProfilePageController(this, aiProfilePageView, CancelAiProfileCreatePage, CancelAiProfileCreatePage, SaveAiProfileFromPage, AiProfileAccessModeSelect_SelectedValueChanged, AiProfileProviderPresetSelect_SelectedValueChanged, AiProfileEndpointOrModelInput_TextChanged);
 
             BuildColumnsHost();
             BuildStorageTreeColumn();
             BuildAiChatColumn();
             BuildSuggestionCardsColumn();
 
-            logPage.Visible = false;
-            settingsPage.Visible = false;
-            aiProfileCreatePage.Visible = false;
-
-            pageHost.Controls.Add(aiProfileCreatePage);
-            pageHost.Controls.Add(settingsPage);
-            pageHost.Controls.Add(logPage);
             pageHost.Controls.Add(columnsHost);
 
             Controls.Add(pageHost);
             Controls.Add(BuildStatusBar());
             Controls.Add(BuildColumnsSeparatorlessToolbarStack());
             Controls.Add(appBar);
-            SetActivePage(PageScan);
+            activePageId = PageScan;
         }
 
         // 工具栏与提升横幅合成一个 Dock=Top 容器：工具栏贴顶、横幅贴底，隐藏横幅时收缩高度
@@ -496,49 +420,6 @@ namespace AiCleanVolume.Desktop
             stack.Height = 60 + (banner.Visible ? 34 : 0);
             banner.VisibleChanged += delegate { stack.Height = 60 + (banner.Visible ? 34 : 0); };
             return stack;
-        }
-
-        private void BindSettingsPageView(SettingsPageView view)
-        {
-            aiAccessModeSelect = view.AiAccessModeSelect;
-            endpointInput = view.EndpointInput;
-            apiKeyInput = view.ApiKeyInput;
-            modelInput = view.ModelInput;
-            maxSuggestionsInput = view.MaxSuggestionsInput;
-            aiProviderPresetSelect = view.AiProviderPresetSelect;
-            modelCookieMappingsInput = view.ModelCookieMappingsInput;
-            allowRootsInput = view.AllowRootsInput;
-            settingsScrollHost = view.SettingsScrollHost;
-            settingsContentLayout = view.SettingsContentLayout;
-            aiProfileListPanel = view.AiProfileListPanel;
-            saveSettingsButton = view.SaveSettingsButton;
-            testAiSettingsButton = view.TestAiSettingsButton;
-            applyAiProfileButton = view.ApplyAiProfileButton;
-            addAiProfileButton = view.AddAiProfileButton;
-            aiEnabledSwitch = view.AiEnabledSwitch;
-            recycleSwitch = view.RecycleSwitch;
-            privilegedCheckbox = view.PrivilegedCheckbox;
-
-            PopulateAiAccessModes();
-            PopulateAiProviderPresets();
-        }
-
-        private void BindAiProfilePageView(AiProfilePageView view)
-        {
-            backAiProfilePageButton = view.BackButton;
-            saveAiProfilePageButton = view.SaveButton;
-            cancelAiProfilePageButton = view.CancelButton;
-            aiProfilePageTitle = view.TitleLabel;
-            aiProfilePageDesc = view.DescLabel;
-            aiProfileNameInput = view.NameInput;
-            aiProfileAccessModeSelect = view.AccessModeSelect;
-            aiProfileMaxSuggestionsInput = view.MaxSuggestionsInput;
-            aiProfileProviderPresetSelect = view.ProviderPresetSelect;
-            aiProfileEndpointInput = view.EndpointInput;
-            aiProfileApiKeyInput = view.ApiKeyInput;
-            aiProfileModelInput = view.ModelInput;
-            aiProfileCookieMappingsInput = view.CookieMappingsInput;
-
         }
 
         private void ConfigureTables()
@@ -581,7 +462,6 @@ namespace AiCleanVolume.Desktop
                 LoadDrives();
                 UpdateDriveSummaryForLocation(ResolveSelectedLocation());
                 RefreshPromptForCurrentLocation();
-                RefreshSettingsPageLayout(true);
             }
             finally
             {

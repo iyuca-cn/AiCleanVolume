@@ -508,22 +508,25 @@ namespace AiCleanVolume.Desktop
                 }
             }
 
-            long totalBytes = 0;
-            for (int i = 0; i < rows.Count; i++) totalBytes += rows[i].Item.Bytes;
-
-            string modeText = useRecycleBin ? "移到回收站" : "永久删除（不可恢复）";
-            AntdUI.Modal.Config config = AntdUI.Modal.config(
-                this,
-                "确认删除",
-                "将对选中的 " + rows.Count + " 项（共 " + StorageFormatting.FormatBytes(totalBytes) + "）执行：" + modeText + "。\r\n每项删除前会先做沙盒安全评估。",
-                useRecycleBin ? AntdUI.TType.Info : AntdUI.TType.Warn);
-            config.OkText = "确认删除";
-            config.CancelText = "取消";
-            config.OkType = AntdUI.TTypeMini.Error;
-            config.MaskClosable = false;
-            if (AntdUI.Modal.open(config) != DialogResult.OK) return;
-
             SaveSettingsFromUi();
+
+            // 勾选项已被父目录吞并合并，数量有限；确认前同步逐项评估沙盒即可。
+            // ponytail: 同步评估，项数极多时可移到后台线程，目前合并后规模足够小。
+            List<DeleteConfirmItem> confirmItems = new List<DeleteConfirmItem>();
+            for (int i = 0; i < rows.Count; i++)
+            {
+                StorageEntryRow row = rows[i];
+                confirmItems.Add(new DeleteConfirmItem
+                {
+                    Name = row.Item.Name,
+                    Path = row.Item.Path,
+                    Bytes = row.Item.Bytes,
+                    Sandbox = deletionWorkflow.Evaluate(row.Item.Path, settings.Sandbox)
+                });
+            }
+
+            if (!ShowDeleteConfirmModal(confirmItems, useRecycleBin)) return;
+
             bool originalRecycle = settings.Sandbox.UseRecycleBin;
             settings.Sandbox.UseRecycleBin = useRecycleBin;
 

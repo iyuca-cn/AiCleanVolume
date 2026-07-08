@@ -83,7 +83,8 @@ namespace AiCleanVolume.Desktop
             if (preferAi && !settings.Ai.Enabled && IsAiConfigured(settings.Ai))
             {
                 settings.Ai.Enabled = true;
-                aiEnabledSwitch.Checked = true;
+                if (aiEnabledSwitch != null) aiEnabledSwitch.Checked = true;
+                UpdateAiStatusChip();
                 Log("AI 配置已填写，自动启用 AI 识别。");
             }
             IList<CleanupSuggestion> suggestions = null;
