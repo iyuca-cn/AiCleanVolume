@@ -132,9 +132,6 @@ namespace AiCleanVolume.Desktop
 
         private AiProfilePageController aiProfilePageController;
 
-        private SuggestionsPageView suggestionsPageView;
-
-        private SuggestionsPageController suggestionsPageController;
 
         private LogPageFeature logPageFeature;
 
@@ -144,7 +141,6 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.Panel scanPage;
 
-        private AntdUI.Panel suggestionsPage;
 
         private AntdUI.Panel logPage;
 
@@ -449,11 +445,7 @@ namespace AiCleanVolume.Desktop
             pageHost.Padding = Padding.Empty;
 
             EnsureScanToolbarControls();
-
-            suggestionsPageView = new SuggestionsPageView(Font);
-            suggestionsPage = suggestionsPageView.Panel;
-            BindSuggestionsPageView(suggestionsPageView);
-            suggestionsPageController = new SuggestionsPageController(this, suggestionsPageView, AnalyzeRegularSuggestions, AnalyzeSuperSuggestions, AnalyzeSuggestions, ShowSuggestionPromptEditor, DeleteSelectedSuggestions, delegate { SetSuggestionSelection(true); }, delegate { SetSuggestionSelection(false); }, InvertSuggestionSelection, SuggestionDriveSelect_SelectedValueChanged, PrivilegedCheckbox_CheckedChanged, SuggestionTable_CellDoubleClick, SuggestionTable_CellButtonClick);
+            EnsureSuggestionCompatControls();
 
             logPageFeature = new LogPageFeature();
             logInput = logPageFeature.LogInput;
@@ -473,8 +465,7 @@ namespace AiCleanVolume.Desktop
             BuildColumnsHost();
             BuildStorageTreeColumn();
             BuildAiChatColumn();
-            suggestionsPage.Dock = DockStyle.Fill;
-            rightColumnPanel.Controls.Add(suggestionsPage);
+            BuildSuggestionCardsColumn();
 
             logPage.Visible = false;
             settingsPage.Visible = false;
@@ -505,24 +496,6 @@ namespace AiCleanVolume.Desktop
             stack.Height = 60 + (banner.Visible ? 34 : 0);
             banner.VisibleChanged += delegate { stack.Height = 60 + (banner.Visible ? 34 : 0); };
             return stack;
-        }
-
-        private void BindSuggestionsPageView(SuggestionsPageView view)
-        {
-            suggestionDriveSelect = view.DriveSelect;
-            suggestionMinSizeInput = view.MinSizeInput;
-            suggestionLimitInput = view.LimitInput;
-            privilegedQuickCheckbox = view.PrivilegedQuickCheckbox;
-            suggestionPromptButton = view.PromptButton;
-            selectAllSuggestionsButton = view.SelectAllButton;
-            clearAllSuggestionsButton = view.ClearAllButton;
-            invertSuggestionsButton = view.InvertButton;
-            regularCleanButton = view.RegularCleanButton;
-            superCleanButton = view.SuperCleanButton;
-            analyzeButton = view.AnalyzeButton;
-            deleteButton = view.DeleteButton;
-            suggestionTable = view.SuggestionTable;
-
         }
 
         private void BindSettingsPageView(SettingsPageView view)

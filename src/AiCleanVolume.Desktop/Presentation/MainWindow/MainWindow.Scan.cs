@@ -135,6 +135,8 @@ namespace AiCleanVolume.Desktop
                 UpdateStorageStatsBar();
                 RefreshStorageSelectionBar();
                 StartAiScanReport();
+                // 直接点「开始扫描」时自动生成推荐；带续接动作的扫描由其自身流程分析
+                if (onCompleted == null) BeginInvoke((MethodInvoker)delegate { if (!IsDisposed && !busy) AnalyzeSuggestionsCore(true); });
                 Log("扫描完成：" + result.Path + "，" + ScanPageText.DescribeSizeMode(request.SortMode) + " " + StorageFormatting.FormatBytes(result.Bytes) + "，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒，子项 " + (result.Children == null ? 0 : result.Children.Count) + "。");
                 if (onCompleted != null) onCompleted();
             }, delegate
@@ -277,12 +279,7 @@ namespace AiCleanVolume.Desktop
 
         private string ResolveSuggestionLocation()
         {
-            if (suggestionDriveSelect != null && suggestionDriveSelect.SelectedValue != null)
-            {
-                string selected = suggestionDriveSelect.SelectedValue.ToString();
-                if (!string.IsNullOrWhiteSpace(selected)) return selected.Trim();
-            }
-
+            // 推荐分析与左树共用同一扫描位置
             return ResolveSelectedLocation();
         }
 

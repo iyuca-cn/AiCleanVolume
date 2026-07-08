@@ -121,6 +121,7 @@ namespace AiCleanVolume.Desktop
                     }
                 }
                 suggestionTable.Refresh();
+                RebuildSuggestionCards();
                 TimeSpan elapsed = DateTime.UtcNow - deleteStartedAt;
                 Log("删除流程执行完成：成功 " + successCount + " 项，失败 " + failedCount + " 项，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒。");
             }, delegate

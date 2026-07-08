@@ -133,6 +133,7 @@ namespace AiCleanVolume.Desktop
                 for (int i = 0; i < suggestions.Count; i++) suggestionRows.Add(new CleanupSuggestionRow(suggestions[i]));
             }
             suggestionTable.DataSource = suggestionRows;
+            RebuildSuggestionCards();
         }
 
         private void RefreshSuggestionSandboxFromCurrentSettings()
