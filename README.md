@@ -28,9 +28,10 @@
 如果你是开发者，可以这样编译：
 
 ```powershell
-msbuild E:\work\mft\mftscan-core.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64
-msbuild E:\work\ai-clean-volume\src\AiCleanVolume.NativeBridge\AiCleanVolume.NativeBridge.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64
-dotnet build E:\work\ai-clean-volume\src\AiCleanVolume.Desktop\AiCleanVolume.Desktop.csproj -c Debug -f net48 -p:Platform=x64
+# 需要同级目录存在 folder-size-ranker-cli 仓库（提供 mftscan-core 静态库），
+# 以及 VS2022+ 的 C++ 生成工具（含 C++/CLI 支持）。一条命令自动串起整个构建链：
+dotnet build src\AiCleanVolume.Desktop\AiCleanVolume.Desktop.csproj -c Debug -f net48 -p:Platform=x64
+# mftscan 仓库不在同级目录时，用 -p:MftScanRoot=<路径> 与 -p:MftScanCoreProject=<vcxproj路径> 指定
 ```
 
 ### 第二步：运行程序
@@ -40,6 +41,9 @@ dotnet build E:\work\ai-clean-volume\src\AiCleanVolume.Desktop\AiCleanVolume.Des
 ```powershell
 .\src\AiCleanVolume.Desktop\bin\x64\Debug\net48\AiCleanVolume.exe
 ```
+
+界面为单屏三栏：左侧存储结构树、中间 AI 解析对话、右侧智能推荐；
+设置在顶部工具栏弹窗中配置，日志点击左下角状态栏打开。
 
 ### 第三步：配置 AI（可选）
 

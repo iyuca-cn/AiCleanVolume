@@ -31,18 +31,34 @@ namespace AiCleanVolume.Desktop
         private void LoadDrives()
         {
             driveSelect.Items.Clear();
-            if (suggestionDriveSelect != null) suggestionDriveSelect.Items.Clear();
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 if (drive.DriveType != DriveType.Fixed) continue;
-                driveSelect.Items.Add(new AntdUI.SelectItem(drive.Name, drive.Name));
-                if (suggestionDriveSelect != null) suggestionDriveSelect.Items.Add(new AntdUI.SelectItem(drive.Name, drive.Name));
+                driveSelect.Items.Add(new AntdUI.SelectItem(BuildDriveOptionText(drive), drive.Name));
             }
 
             string defaultDrive = ResolveDefaultDrive();
             driveSelect.SelectedValue = defaultDrive;
-            if (suggestionDriveSelect != null) suggestionDriveSelect.SelectedValue = defaultDrive;
             pathInput.Text = defaultDrive;
+        }
+
+        private static string BuildDriveOptionText(DriveInfo drive)
+        {
+            try
+            {
+                if (drive.IsReady)
+                {
+                    long usedBytes = Math.Max(0L, drive.TotalSize - drive.TotalFreeSpace);
+                    long gb = 1024L * 1024L * 1024L;
+                    return drive.Name.TrimEnd('\\') + "  " + (usedBytes / gb) + "/" + (drive.TotalSize / gb) + " GB";
+                }
+            }
+            catch
+            {
+                // 读取失败退回纯盘符
+            }
+
+            return drive.Name;
         }
 
         private void DriveSelect_SelectedValueChanged(object sender, AntdUI.ObjectNEventArgs e)

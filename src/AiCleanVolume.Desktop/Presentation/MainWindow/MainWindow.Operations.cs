@@ -60,6 +60,7 @@ namespace AiCleanVolume.Desktop
         {
             this.busy = busy;
             UseWaitCursor = busy;
+            UpdateStatusBar(busy ? "处理中" : "空闲", busy ? Palette.AccentHover : Palette.TitleBarMuted, null);
             if (appBar != null) appBar.Loading = busy;
             if (settingsToolbarButton != null) settingsToolbarButton.Enabled = !busy;
             if (toolbarPrivilegeSwitch != null) toolbarPrivilegeSwitch.Enabled = !busy;

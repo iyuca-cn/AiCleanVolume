@@ -58,7 +58,7 @@ namespace AiCleanVolume.Desktop
         {
             driveSelect = new AntdUI.Select();
             driveSelect.Dock = DockStyle.Left;
-            driveSelect.Width = 150;
+            driveSelect.Width = 170;
             driveSelect.DropDownArrow = true;
             driveSelect.ListAutoWidth = true;
             driveSelect.DropDownRadius = 8;
