@@ -18,7 +18,8 @@
     <NativeBridgeOutput>$(NativeBridgeOutputDirectory)\AiCleanVolume.NativeBridge.dll</NativeBridgeOutput>
     <NativeBridgeTargetFrameworkVersion Condition="'$(TargetFramework)' == 'net40'">v4.0</NativeBridgeTargetFrameworkVersion>
     <NativeBridgeTargetFrameworkVersion Condition="'$(TargetFramework)' == 'net48'">v4.8</NativeBridgeTargetFrameworkVersion>
-    <MftScanCoreProject Condition="'$(MftScanCoreProject)' == ''">E:\work\mft\mftscan-core.vcxproj</MftScanCoreProject>
+    <MftScanCoreProject Condition="'$(MftScanCoreProject)' == ''">$(MSBuildThisFileDirectory)..\..\..\folder-size-ranker-cli\mftscan-core.vcxproj</MftScanCoreProject>
+    <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('F:\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe')">F:\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
     <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('D:\vs\2022\Community\MSBuild\Current\Bin\MSBuild.exe')">D:\vs\2022\Community\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
     <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe')">C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
     <NativeBridgeMSBuildPath Condition="'$(NativeBridgeMSBuildPath)' == '' and Exists('C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe')">C:\Program Files\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe</NativeBridgeMSBuildPath>
@@ -30,6 +31,9 @@
     <Error Condition="'$(NativeBridgeMSBuildPath)' == ''" Text="未找到 Visual Studio MSBuild，无法自动构建 AiCleanVolume.NativeBridge。请安装 VS 2022 C++ 生成工具，或通过 /p:NativeBridgeMSBuildPath=... 指定 MSBuild.exe。" />
     <PropertyGroup Condition="'$(TargetFramework)' == 'net40' and '$(NativeBridgeFrameworkPathOverride)' == '' and '$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net40)' != ''">
       <NativeBridgeFrameworkPathOverride>$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net40)\build\.NETFramework\v4.0</NativeBridgeFrameworkPathOverride>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net48' and '$(NativeBridgeFrameworkPathOverride)' == '' and '$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net48)' != ''">
+      <NativeBridgeFrameworkPathOverride>$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net48)\build\.NETFramework\v4.8</NativeBridgeFrameworkPathOverride>
     </PropertyGroup>
     <Exec Condition="Exists('$(MftScanCoreProject)')" Command="&quot;$(NativeBridgeMSBuildPath)&quot; &quot;$(MftScanCoreProject)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(NativeBridgePlatform) /m" />
     <Exec Condition="'$(NativeBridgeFrameworkPathOverride)' != ''" Command="&quot;$(NativeBridgeMSBuildPath)&quot; &quot;$(NativeBridgeProject)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(NativeBridgePlatform) /p:TargetFrameworkVersion=$(NativeBridgeTargetFrameworkVersion) /p:FrameworkPathOverride=$(NativeBridgeFrameworkPathOverride) /p:OutDir=$(NativeBridgeOutputDirectory)\ /p:IntDir=$(NativeBridgeIntermediateDirectory)\ /m" />
@@ -47,7 +51,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="RestSharp" Version="106.15.0" />
   </ItemGroup>
 
