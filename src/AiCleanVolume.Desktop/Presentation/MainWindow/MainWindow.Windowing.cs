@@ -47,7 +47,6 @@ namespace AiCleanVolume.Desktop
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-            ApplySidebarWidth(ResolveInitialSidebarWidth());
             ApplyNormalWindowBounds(true);
             PerformLayout();
             BindInitialUiBeforeFirstFrame();

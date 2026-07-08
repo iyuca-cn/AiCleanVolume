@@ -61,10 +61,8 @@ namespace AiCleanVolume.Desktop
             this.busy = busy;
             UseWaitCursor = busy;
             if (appBar != null) appBar.Loading = busy;
-            if (navigationMenu != null) navigationMenu.Enabled = !busy;
-            if (settingsNavButton != null) settingsNavButton.Enabled = !busy;
-            if (sidebarResizeRail != null) sidebarResizeRail.Enabled = !busy && !sidebarCollapsed;
-            if (sidebarCollapseButton != null) sidebarCollapseButton.Enabled = !busy;
+            if (settingsToolbarButton != null) settingsToolbarButton.Enabled = !busy;
+            if (toolbarPrivilegeSwitch != null) toolbarPrivilegeSwitch.Enabled = !busy;
             scanButton.Enabled = !busy;
             scanButton.Loading = busy && activePageId == PageScan;
             if (driveSelect != null) driveSelect.Enabled = !busy;

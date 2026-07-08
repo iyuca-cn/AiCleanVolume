@@ -8,6 +8,17 @@ namespace AiCleanVolume.Desktop.Presentation.Shared.Antd
 {
     public static class AntdControlFactory
     {
+        /// <summary>等宽字体：路径、大小、计数等数字文本用。</summary>
+        public static Font MonoFont(float size)
+        {
+            return new Font("Consolas", size);
+        }
+
+        public static Font MonoFontBold(float size)
+        {
+            return new Font("Consolas", size, FontStyle.Bold);
+        }
+
         public static AntdUI.Panel CreateFlatPanel()
         {
             AntdUI.Panel panel = new AntdUI.Panel();

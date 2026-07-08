@@ -53,6 +53,15 @@ namespace AiCleanVolume.Desktop
             AntdUI.Style.Set(AntdUI.Colour.PrimaryBorder, Palette.AccentSoftBorder);
             AntdUI.Style.Set(AntdUI.Colour.FillSecondary, Palette.CardFill);
             AntdUI.Style.Set(AntdUI.Colour.FillTertiary, Palette.CardFill);
+
+            AntdUI.Style.Set(AntdUI.Colour.Success, Palette.Success);
+            AntdUI.Style.Set(AntdUI.Colour.SuccessBg, Palette.SuccessSoft);
+            AntdUI.Style.Set(AntdUI.Colour.Warning, Palette.Warning);
+            AntdUI.Style.Set(AntdUI.Colour.WarningBg, Palette.WarningSoft);
+            AntdUI.Style.Set(AntdUI.Colour.WarningBorder, Palette.WarningBorder);
+            AntdUI.Style.Set(AntdUI.Colour.Error, Palette.Danger);
+            AntdUI.Style.Set(AntdUI.Colour.ErrorBg, Palette.DangerSoft);
+            AntdUI.Style.Set(AntdUI.Colour.ErrorBorder, Palette.DangerBorder);
         }
 
         private static string ToHex(Color color)

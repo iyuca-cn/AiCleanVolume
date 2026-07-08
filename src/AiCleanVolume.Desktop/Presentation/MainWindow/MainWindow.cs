@@ -92,17 +92,9 @@ namespace AiCleanVolume.Desktop
 
         private static readonly IntPtr SizeMaximized = new IntPtr(2);
 
-        private static readonly Size DefaultClientArea = new Size(1540, 920);
+        private static readonly Size DefaultClientArea = new Size(1560, 940);
 
-        private static readonly Size BaseMinimumWindowSize = new Size(1120, 720);
-
-        private const int SidebarMinWidth = 180;
-
-        private const int SidebarMaxWidth = 320;
-
-        private const int SidebarRailWidth = 10;
-
-        private const int SidebarCollapsedWidth = 64;
+        private static readonly Size BaseMinimumWindowSize = new Size(1280, 760);
 
         private readonly ISettingsStore settingsStore;
 
@@ -152,25 +144,7 @@ namespace AiCleanVolume.Desktop
 
         private AntdUI.PageHeader appBar;
 
-        private AntdUI.Menu navigationMenu;
-
         private AntdUI.Panel pageHost;
-
-        private AntdUI.Panel sidebarHost;
-
-        private AntdUI.Panel sidebarPanel;
-
-        private AntdUI.Panel sidebarBrandPanel;
-
-        private AntdUI.Label sidebarBrandIconLabel;
-
-        private AntdUI.Label sidebarBrandTextLabel;
-
-        private AntdUI.Panel sidebarResizeRail;
-
-        private AntdUI.Button sidebarCollapseButton;
-
-        private AntdUI.Button settingsNavButton;
 
         private AntdUI.Panel scanPage;
 
@@ -334,18 +308,6 @@ namespace AiCleanVolume.Desktop
 
         private string lastDeletionProgressText;
 
-        private bool sidebarResizing;
-
-        private bool sidebarCollapsed;
-
-        private int sidebarWidth;
-
-        private int expandedSidebarWidth;
-
-        private int sidebarResizeStartX;
-
-        private int sidebarResizeStartWidth;
-
         private const string StorageContextOpenId = "open";
 
         private const string StorageContextDeleteId = "delete";
@@ -374,8 +336,6 @@ namespace AiCleanVolume.Desktop
             deletionWorkflow = RequireDependency(dependencies.DeletionWorkflow, "DeletionWorkflow");
             explorerService = RequireDependency(dependencies.ExplorerService, "ExplorerService");
             lastWindowState = FormWindowState.Normal;
-            sidebarWidth = 0;
-            expandedSidebarWidth = 0;
 
             InitializeComponent();
             ConfigureTables();
@@ -495,37 +455,12 @@ namespace AiCleanVolume.Desktop
             MinimumSize = BaseMinimumWindowSize;
             KeyPreview = true;
 
-            appBar = new AntdUI.PageHeader();
-            appBar.Dock = DockStyle.Top;
-            appBar.BackColor = SurfaceColor;
-            appBar.ShowButton = true;
-            appBar.ShowIcon = true;
-            appBar.IconSvg = "RobotFilled";
-            appBar.IconRatio = 0.62F;
-            appBar.UseTitleFont = false;
-            appBar.DividerShow = true;
-            appBar.DividerMargin = 3;
-            appBar.DividerColor = BorderLightColor;
-            appBar.Padding = new Padding(12, 0, 0, 0);
-            appBar.Text = AppDisplayName;
-            appBar.SubText = string.Empty;
-            appBar.Description = string.Empty;
-            appBar.Height = 40;
-
-            AntdUI.Panel shell = CreateFlatPanel();
-            shell.Dock = DockStyle.Fill;
-            shell.BackColor = SurfaceColor;
-            shell.Padding = Padding.Empty;
-
-            AntdUI.Panel contentHost = CreateFlatPanel();
-            contentHost.Dock = DockStyle.Fill;
-            contentHost.BackColor = SurfaceColor;
-            contentHost.Padding = Padding.Empty;
+            BuildAppBar();
 
             pageHost = CreateFlatPanel();
             pageHost.Dock = DockStyle.Fill;
             pageHost.BackColor = PageBackground;
-            pageHost.Padding = new Padding(8, 6, 8, 8);
+            pageHost.Padding = Padding.Empty;
 
             scanPageView = new ScanPageView(Font);
             scanPage = scanPageView.Panel;
@@ -552,23 +487,41 @@ namespace AiCleanVolume.Desktop
             BindAiProfilePageView(aiProfilePageView);
             aiProfilePageController = new AiProfilePageController(this, aiProfilePageView, CancelAiProfileCreatePage, CancelAiProfileCreatePage, SaveAiProfileFromPage, AiProfileAccessModeSelect_SelectedValueChanged, AiProfileProviderPresetSelect_SelectedValueChanged, AiProfileEndpointOrModelInput_TextChanged);
 
+            BuildColumnsHost();
+            scanPage.Dock = DockStyle.Fill;
+            suggestionsPage.Dock = DockStyle.Fill;
+            leftColumnPanel.Controls.Add(scanPage);
+            rightColumnPanel.Controls.Add(suggestionsPage);
+
+            logPage.Visible = false;
+            settingsPage.Visible = false;
+            aiProfileCreatePage.Visible = false;
+
             pageHost.Controls.Add(aiProfileCreatePage);
             pageHost.Controls.Add(settingsPage);
             pageHost.Controls.Add(logPage);
-            pageHost.Controls.Add(suggestionsPage);
-            pageHost.Controls.Add(scanPage);
+            pageHost.Controls.Add(columnsHost);
 
-            contentHost.Controls.Add(pageHost);
-
-            sidebarHost = CreateSidebarHost();
-
-            shell.Controls.Add(contentHost);
-            shell.Controls.Add(sidebarHost);
-
-            Controls.Add(shell);
+            Controls.Add(pageHost);
+            Controls.Add(BuildStatusBar());
+            Controls.Add(BuildColumnsSeparatorlessToolbarStack());
             Controls.Add(appBar);
             SetActivePage(PageScan);
-            ApplySidebarWidth(ResolveInitialSidebarWidth());
+        }
+
+        // 工具栏与提升横幅合成一个 Dock=Top 容器：工具栏贴顶、横幅贴底，隐藏横幅时收缩高度
+        private Control BuildColumnsSeparatorlessToolbarStack()
+        {
+            AntdUI.Panel stack = CreateFlatPanel();
+            stack.Dock = DockStyle.Top;
+            AntdUI.Panel banner = BuildElevationBanner();
+            banner.Dock = DockStyle.Bottom;
+            AntdUI.Panel toolbar = BuildToolbar();
+            stack.Controls.Add(toolbar);
+            stack.Controls.Add(banner);
+            stack.Height = 60 + (banner.Visible ? 34 : 0);
+            banner.VisibleChanged += delegate { stack.Height = 60 + (banner.Visible ? 34 : 0); };
+            return stack;
         }
 
         private void BindScanPageView(ScanPageView view)
