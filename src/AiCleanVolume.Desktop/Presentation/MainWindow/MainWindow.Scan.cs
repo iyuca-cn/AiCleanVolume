@@ -110,6 +110,7 @@ namespace AiCleanVolume.Desktop
             string progressText = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用..." : statusText;
             string workerCaption = string.IsNullOrWhiteSpace(statusText) ? "正在扫描空间占用…" : statusText;
             SetStorageTreeState(StorageTreeState.Scanning);
+            SetAiChatState(StorageTreeState.Scanning);
             StartScanProgress(progressText, scanStartedAt, ScanPageText.ResolveProgressInterval(request.Location));
             Log("扫描开始：" + ScanPageText.DescribeRequest(request));
 
@@ -130,8 +131,10 @@ namespace AiCleanVolume.Desktop
                 UpdateScanProgressState("扫描完成", 1F, false, AntdUI.TType.Success);
                 UpdateScanElapsedState(elapsed);
                 SetStorageTreeState(StorageTreeState.Done);
+                SetAiChatState(StorageTreeState.Done);
                 UpdateStorageStatsBar();
                 RefreshStorageSelectionBar();
+                StartAiScanReport();
                 Log("扫描完成：" + result.Path + "，" + ScanPageText.DescribeSizeMode(request.SortMode) + " " + StorageFormatting.FormatBytes(result.Bytes) + "，耗时 " + elapsed.TotalSeconds.ToString("0.00") + " 秒，子项 " + (result.Children == null ? 0 : result.Children.Count) + "。");
                 if (onCompleted != null) onCompleted();
             }, delegate
@@ -141,6 +144,7 @@ namespace AiCleanVolume.Desktop
                 UpdateScanProgressState("扫描失败", 1F, false, AntdUI.TType.Error);
                 UpdateScanElapsedState(elapsed);
                 SetStorageTreeState(currentRoot == null ? StorageTreeState.Empty : StorageTreeState.Done);
+                SetAiChatState(currentRoot == null ? StorageTreeState.Empty : StorageTreeState.Done);
             });
         }
 

@@ -136,7 +136,7 @@ namespace AiCleanVolume.Desktop
             descLabel.TextAlign = ContentAlignment.TopCenter;
 
             AntdUI.Button startButton = new AntdUI.Button();
-            startButton.Anchor = AnchorStyles.Top;
+            startButton.AutoSizeMode = AntdUI.TAutoSize.None;
             startButton.Text = "开始扫描";
             startButton.Type = AntdUI.TTypeMini.Primary;
             startButton.Radius = 8;
@@ -474,8 +474,19 @@ namespace AiCleanVolume.Desktop
 
         private void AskAiButton_Click(object sender, EventArgs e)
         {
-            // 阶段3接入：把选中路径附加到中栏 AI 提问
-            ShowInfo("提示", "AI 对话功能即将上线。");
+            List<StorageEntryRow> rows = CollectCheckedStorageRows();
+            if (rows.Count == 0)
+            {
+                ShowInfo("提示", "请先勾选要询问的项目。");
+                return;
+            }
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                AddChatAttachment(rows[i].Item.Path, rows[i].Item.Bytes);
+            }
+
+            if (chatInput != null) chatInput.Focus();
         }
 
         private void DeleteCheckedStorageRows(bool useRecycleBin)

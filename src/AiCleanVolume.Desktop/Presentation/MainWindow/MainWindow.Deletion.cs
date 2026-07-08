@@ -156,6 +156,12 @@ namespace AiCleanVolume.Desktop
             bool canDelete = CanOfferStorageDelete(row);
             AntdUI.IContextMenuStripItem[] items =
             {
+                new AntdUI.ContextMenuStripItem("附加到 AI 提问")
+                {
+                    ID = StorageContextAskAiId,
+                    IconSvg = "RobotOutlined",
+                    Enabled = canOpen
+                },
                 new AntdUI.ContextMenuStripItem("在文件资源管理器打开")
                 {
                     ID = StorageContextOpenId,
@@ -182,6 +188,16 @@ namespace AiCleanVolume.Desktop
         private void StorageContextMenu_Click(AntdUI.IContextMenuStrip item)
         {
             if (item == null || string.IsNullOrWhiteSpace(item.ID)) return;
+            if (string.Equals(item.ID, StorageContextAskAiId, StringComparison.OrdinalIgnoreCase))
+            {
+                if (storageContextRow != null && storageContextRow.Item != null)
+                {
+                    AddChatAttachment(storageContextRow.Item.Path, storageContextRow.Item.Bytes);
+                    if (chatInput != null) chatInput.Focus();
+                }
+                return;
+            }
+
             if (string.Equals(item.ID, StorageContextOpenId, StringComparison.OrdinalIgnoreCase))
             {
                 OpenStorageRow(storageContextRow);

@@ -294,6 +294,8 @@ namespace AiCleanVolume.Desktop
 
         private const string StorageContextOpenId = "open";
 
+        private const string StorageContextAskAiId = "ask_ai";
+
         private const string StorageContextDeleteId = "delete";
 
         public MainWindow()
@@ -470,6 +472,7 @@ namespace AiCleanVolume.Desktop
 
             BuildColumnsHost();
             BuildStorageTreeColumn();
+            BuildAiChatColumn();
             suggestionsPage.Dock = DockStyle.Fill;
             rightColumnPanel.Controls.Add(suggestionsPage);
 

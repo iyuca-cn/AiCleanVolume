@@ -20,6 +20,12 @@ namespace AiCleanVolume.Desktop.Infrastructure.Ai
         private sealed class ChatCompletionResponse
         {
             public List<ChatChoice> choices { get; set; }
+            public ChatUsage usage { get; set; }
+        }
+
+        private sealed class ChatUsage
+        {
+            public int total_tokens { get; set; }
         }
 
         private sealed class ChatChoice
