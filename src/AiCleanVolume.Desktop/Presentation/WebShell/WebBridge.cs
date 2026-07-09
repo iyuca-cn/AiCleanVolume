@@ -128,8 +128,16 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
         {
             if (string.IsNullOrWhiteSpace(path)) return path;
             string p = path.Trim().Trim('"', '\'').Trim();
+            bool fileUrl = p.StartsWith("file:", StringComparison.OrdinalIgnoreCase);
+            if (fileUrl)
+            {
+                p = p.Substring(p.StartsWith("file:///", StringComparison.OrdinalIgnoreCase) ? 8 : (p.StartsWith("file://", StringComparison.OrdinalIgnoreCase) ? 7 : 5));
+                try { p = Uri.UnescapeDataString(p); } catch { }
+            }
             try { p = Environment.ExpandEnvironmentVariables(p); } catch { }
-            return p.Replace('/', '\\');
+            p = p.Replace('/', '\\').Trim();
+            if (p.Length > 3) p = p.TrimEnd('\\'); // 去尾随反斜杠，保留盘根 "C:\"
+            return p;
         }
 
         // 全递归实测：不限层数，30 秒 / 100 万文件上限，超限置 approx。根目录首次枚举被拒则置 rootDenied。
@@ -590,7 +598,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             "\r\n\r\n如果你的回答里给出了具体可清理/有风险的路径结论，请在回答的最后追加一个 ```json 代码块：" +
             "{\"items\":[{\"path\":\"完整路径\",\"name\":\"显示名\",\"risk\":\"safe|caution|danger\",\"bytes\":估算字节整数可选0,\"reason\":\"一句话理由\"}]}。" +
             "safe=可安全清理，caution=需人工确认，danger=高风险。没有具体路径结论时不要输出该 JSON 块。" +
-            "结论里的 path 必须逐字取自对话中出现过的真实目录结构，禁止使用占位符（如 [你的QQ号]、<用户名>）或凭空猜测的路径。";
+            "path 请用真实存在的完整路径，禁止占位符（如 [你的QQ号]、<用户名>）；若对话中提供了目录结构，则 path 必须取自其中。";
 
         private object AiChat(JObject parameters)
         {
@@ -698,25 +706,30 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
             foreach (JToken it in arr)
             {
-                string path = ResolveExistingPath(NormalizeInputPath(it["path"]?.ToString()));
-                if (string.IsNullOrWhiteSpace(path)) { dropped++; continue; }
-                string name = it["name"]?.ToString();
-                if (string.IsNullOrWhiteSpace(name)) name = Path.GetFileName(path.TrimEnd('\\', '/'));
-                if (string.IsNullOrWhiteSpace(name)) name = path;
-                string risk = (it["risk"]?.ToString() ?? "caution").Trim().ToLowerInvariant();
-                SandboxEvaluation ev = dependencies.DeletionWorkflow.Evaluate(path, settings.Sandbox);
-                // 不在这里实测大小（会阻塞对话回复）；前端拿到卡片后再逐个异步调 path.size。
-                result.Add(new
+                // 单项异常不影响其余：解析/校验/沙盒任一环节抛错都跳过该项。
+                try
                 {
-                    path,
-                    name,
-                    risk,
-                    bytes = ReadLong(it as JObject, "bytes"),
-                    approx = false,
-                    reason = it["reason"]?.ToString(),
-                    sandboxOk = ev != null && ev.Action == SandboxAction.Allow,
-                    sandboxNote = ev == null ? null : ev.Message
-                });
+                    string path = ResolveExistingPath(NormalizeInputPath(it["path"]?.ToString()));
+                    if (string.IsNullOrWhiteSpace(path)) { dropped++; continue; }
+                    string name = it["name"]?.ToString();
+                    if (string.IsNullOrWhiteSpace(name)) name = Path.GetFileName(path.TrimEnd('\\', '/'));
+                    if (string.IsNullOrWhiteSpace(name)) name = path;
+                    string risk = (it["risk"]?.ToString() ?? "caution").Trim().ToLowerInvariant();
+                    SandboxEvaluation ev = dependencies.DeletionWorkflow.Evaluate(path, settings.Sandbox);
+                    // 不在这里实测大小（会阻塞对话回复）；前端拿到卡片后再逐个异步调 path.size。
+                    result.Add(new
+                    {
+                        path,
+                        name,
+                        risk,
+                        bytes = ReadLong(it as JObject, "bytes"),
+                        approx = false,
+                        reason = it["reason"]?.ToString(),
+                        sandboxOk = ev != null && ev.Action == SandboxAction.Allow,
+                        sandboxNote = ev == null ? null : ev.Message
+                    });
+                }
+                catch { dropped++; }
             }
 
             // 解析出的是 items 块就从正文剥离（哪怕条目全被丢弃），避免裸 JSON 漏进气泡。

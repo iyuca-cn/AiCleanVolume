@@ -1257,7 +1257,7 @@ class Component extends DCLogic {
         const it = pending[idx++];
         active++;
         this.call('size.measure', { path: it.path })
-          .then((r) => done(it.path, r.error ? { sizeError: r.error } : { bytes: r.bytes || 0, approx: !!r.approx, sizeError: null }))
+          .then((r) => done(it.path, r.error ? { sizeError: r.error } : { bytes: r.bytes || 0, approx: !!r.approx, sizeError: null, sized: true }))
           .catch((e) => done(it.path, { sizeError: '测量失败' }))
           .then(() => { active--; pump(); });
       }
@@ -1721,6 +1721,7 @@ class Component extends DCLogic {
       if (r.bytes > 0) sizeText = (r.approx ? '约 ' : '') + fmt(r.bytes);
       else if (r.sizeError) sizeText = r.sizeError;
       else if (sizing) { sizeText = '···'; sizeAnim = 'acv-pulse 1.2s ease-in-out infinite'; }
+      else if (r.sized) sizeText = '空目录'; // 已实测但为 0 字节，区别于"未测(大小待定)"
       return {
         title: r.name, desc: (r.reason || '') + (r.sandboxNote ? (' · ' + r.sandboxNote) : ''),
         path: r.path, pathShort: this.midTruncate(r.path, 46),
