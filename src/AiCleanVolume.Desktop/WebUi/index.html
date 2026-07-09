@@ -1199,15 +1199,17 @@ class Component extends DCLogic {
 
   // 发送一轮对话：追加用户气泡，带历史与系统提示词调用 ai.chat，回填 AI 气泡。
   // display 为用户气泡展示文本，content 为实际发给模型的内容（可含附件路径）。
-  postChat(display, content) {
+  postChat(display, content, contextPaths) {
     const history = [{ role: 'system', content: this.chatSystemPrompt() }];
     this.state.chatBubbles.forEach((b) => history.push({ role: b.me ? 'user' : 'assistant', content: b.text }));
     history.push({ role: 'user', content });
     this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { me: true, text: display }], chatPending: true }));
-    this.call('ai.chat', { messages: history }).then((r) => {
+    this.call('ai.chat', { messages: history, contextPaths: contextPaths || [] }).then((r) => {
       const items = r.items || [];
+      const dropped = r.dropped || 0;
       let text = r.content || '';
-      if (items.length) text += '\n\n*已把 ' + items.length + ' 项结论加入右侧推荐 →*';
+      if (items.length) text += '\n\n*已把 ' + items.length + ' 项结论加入右侧推荐' + (dropped ? '（' + dropped + ' 项路径无效已忽略）' : '') + ' →*';
+      else if (dropped) text += '\n\n*（' + dropped + ' 项建议路径无效已忽略）*';
       this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text }], chatTokens: st.chatTokens + (r.tokens || 0), chatPending: false }));
       if (items.length) this.applyAiItems(items);
     }).catch((e) => {
@@ -1334,26 +1336,23 @@ class Component extends DCLogic {
       this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { me: true, text: display }, { ai: true, text: 'AI 未启用，请在设置中开启后再对话。' }] }));
       return;
     }
-    this.postChat(display, content);
+    this.postChat(display, content, atts.map((a) => a.path));
   }
 
-  // 预判卡片点击：扫描中/AI 回答中忽略并轻提示；目标盘已扫描则直接问 AI，否则切盘扫描后再问。
+  // 预判卡片点击：扫描中/AI 回答中忽略并轻提示。跨盘不销毁当前推荐去重扫——
+  // 目标盘已扫描则切过去问，未扫描则提示切盘扫描；当前盘已扫描直接问、未扫描才扫描后问。
   prescan(card) {
     const s = this.state;
     if (s.view === 'scanning') { this.notifyAttach('正在扫描，请稍候…'); return; }
     if (s.chatPending) { this.notifyAttach('AI 正在回答，请稍候…'); return; }
     const drive = (card && card.drive) || s.drive;
-    // ponytail: 仅"当前盘已扫描"走直接提问；跨盘一律重扫（预判目标多在当前盘，够用）。
-    if (drive === s.drive && s.view === 'done' && s.rootInfo && s.scannedDrives[drive]) {
-      this.askPrecheck(card);
+    if (drive !== s.drive) {
+      if (s.scannedDrives[drive]) { this.switchDrive(drive); setTimeout(() => this.askPrecheck(card), 350); }
+      else this.notifyAttach('该方向在 ' + drive + ': 盘，请切到该盘点击「开始扫描」。');
       return;
     }
-    const ask = () => this.startScan(() => this.askPrecheck(card));
-    if (drive !== s.drive) {
-      this.setState({ drive, treeTags: {}, treeSelPath: {}, report: null, chatBubbles: [], chatTokens: 0, recItems: null, recSelPath: {}, openPaths: {}, nodeChildren: {}, rootInfo: null }, ask);
-    } else {
-      ask();
-    }
+    if (s.view === 'done' && s.rootInfo && s.scannedDrives[drive]) { this.askPrecheck(card); return; }
+    this.startScan(() => this.askPrecheck(card));
   }
 
   // recItems 与 AI 报告 classified 中判定 safe、但推荐未覆盖的目录合并成一份可执行推荐列表。
@@ -1391,7 +1390,7 @@ class Component extends DCLogic {
     }
     const display = target ? (q + '\n\n📁 ' + target) : q;
     const content = target ? (q + '\n\n附加文件夹：\n' + target) : q;
-    this.postChat(display, content);
+    this.postChat(display, content, target ? [target] : []);
   }
 
   // ================= delete flow =================

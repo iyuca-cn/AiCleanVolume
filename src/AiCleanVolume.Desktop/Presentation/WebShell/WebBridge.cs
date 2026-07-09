@@ -106,7 +106,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
         // 超限返回已累计值 approx=true；根目录本身无权限则返回 error（前端显示"需管理员权限"）。
         private object SizeMeasure(JObject parameters)
         {
-            string path = Str(parameters, "path");
+            string path = NormalizeInputPath(Str(parameters, "path"));
             try
             {
                 if (string.IsNullOrWhiteSpace(path)) return new { error = "路径为空" };
@@ -120,6 +120,16 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             long bytes = MeasureFull(path, out approx, out rootDenied);
             if (rootDenied && bytes == 0) return new { error = "需管理员权限" };
             return new { bytes, approx };
+        }
+
+        // 规整 AI/外部传入的路径：去引号空白、展开环境变量、正斜杠转反斜杠。避免把 %VAR%、带引号或 / 的
+        // 合法目录误判成"路径不存在"。ponytail: 不处理 >260 长路径（需 \\?\ 前缀），命中再加。
+        private static string NormalizeInputPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return path;
+            string p = path.Trim().Trim('"', '\'').Trim();
+            try { p = Environment.ExpandEnvironmentVariables(p); } catch { }
+            return p.Replace('/', '\\');
         }
 
         // 全递归实测：不限层数，30 秒 / 100 万文件上限，超限置 approx。根目录首次枚举被拒则置 rootDenied。
@@ -579,19 +589,79 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
         private const string ChatItemsConvention =
             "\r\n\r\n如果你的回答里给出了具体可清理/有风险的路径结论，请在回答的最后追加一个 ```json 代码块：" +
             "{\"items\":[{\"path\":\"完整路径\",\"name\":\"显示名\",\"risk\":\"safe|caution|danger\",\"bytes\":估算字节整数可选0,\"reason\":\"一句话理由\"}]}。" +
-            "safe=可安全清理，caution=需人工确认，danger=高风险。没有具体路径结论时不要输出该 JSON 块。";
+            "safe=可安全清理，caution=需人工确认，danger=高风险。没有具体路径结论时不要输出该 JSON 块。" +
+            "结论里的 path 必须逐字取自对话中出现过的真实目录结构，禁止使用占位符（如 [你的QQ号]、<用户名>）或凭空猜测的路径。";
 
         private object AiChat(JObject parameters)
         {
             ApplicationSettings settings = this.settings;
             List<AiChatMessage> messages = ReadMessages(parameters?["messages"] as JArray);
             AppendItemsConvention(messages);
+            AppendContextListings(messages, parameters?["contextPaths"] as JArray);
             AiChatResult result = Advisor.Complete(messages, settings);
             if (result == null || !result.Success) throw new InvalidOperationException(result == null ? "AI 无响应" : result.Error);
 
+            int dropped;
             string content = result.Content ?? string.Empty;
-            object[] items = ExtractChatItems(ref content, settings);
-            return new { content, tokens = result.TotalTokens, items };
+            object[] items = ExtractChatItems(ref content, settings, out dropped);
+            return new { content, tokens = result.TotalTokens, items, dropped };
+        }
+
+        // 把上下文路径（预判 targetPath / 对话附件）的真实两层目录结构拼进最后一条 user 消息，
+        // 让 AI 只能引用真实存在的目录名，杜绝占位符。plain FS 枚举，不依赖扫描会话。
+        private void AppendContextListings(List<AiChatMessage> messages, JArray paths)
+        {
+            if (paths == null || paths.Count == 0) return;
+            StringBuilder listings = new StringBuilder();
+            foreach (JToken p in paths)
+            {
+                string path = NormalizeInputPath(p?.ToString());
+                if (string.IsNullOrWhiteSpace(path) || !DirExists(path)) continue;
+                listings.Append("\r\n").Append(BuildPathListing(path, 2, 40));
+            }
+            if (listings.Length == 0) return;
+
+            string note = "\r\n\r\n以下是相关目录的真实结构，你的结论里的 path 必须逐字取自其中，禁止占位符（如 [你的QQ号]）、禁止猜测：" + listings;
+            for (int i = messages.Count - 1; i >= 0; i--)
+            {
+                if (messages[i].Role == AiChatMessage.UserRole)
+                {
+                    messages[i] = new AiChatMessage(AiChatMessage.UserRole, messages[i].Content + note);
+                    return;
+                }
+            }
+            messages.Add(new AiChatMessage(AiChatMessage.UserRole, note.TrimStart()));
+        }
+
+        // 两层子目录名 + 第一层大小，纯文件系统枚举、有界，供喂给 AI。
+        private static string BuildPathListing(string path, int depth, int perLevel)
+        {
+            StringBuilder sb = new StringBuilder();
+            try { AppendListing(sb, path, 0, depth, perLevel); } catch { }
+            if (sb.Length > 6000) sb.Length = 6000;
+            return sb.ToString();
+        }
+
+        private static void AppendListing(StringBuilder sb, string dir, int indent, int maxDepth, int perLevel)
+        {
+            DirectoryInfo di;
+            try { di = new DirectoryInfo(dir); if (!di.Exists) return; } catch { return; }
+            if (sb.Length > 5600) return;
+            sb.Append('\r').Append('\n');
+            for (int i = 0; i < indent; i++) sb.Append("  ");
+            sb.Append(indent == 0 ? di.FullName : di.Name);
+            try { long b = ShallowBytes(dir); if (b > 0) sb.Append("  ").Append(StorageFormatting.FormatBytes(b)); } catch { }
+            if (indent >= maxDepth) return;
+            int n = 0;
+            try
+            {
+                foreach (DirectoryInfo sub in di.EnumerateDirectories())
+                {
+                    if (n++ >= perLevel) break;
+                    AppendListing(sb, sub.FullName, indent + 1, maxDepth, perLevel);
+                }
+            }
+            catch { }
         }
 
         // 把结构化输出约定并入首个 system 消息；无 system 消息则插入一条。
@@ -609,8 +679,10 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
         }
 
         // 剥离正文末尾的 ```json {"items":[...]} 块，返回结构化项（每项补沙盒评估）；无块时返回空。
-        private object[] ExtractChatItems(ref string content, ApplicationSettings settings)
+        // 路径不存在的项尝试通配解析（占位符/*），仍解析不出则丢弃并计入 dropped。
+        private object[] ExtractChatItems(ref string content, ApplicationSettings settings, out int dropped)
         {
+            dropped = 0;
             List<object> result = new List<object>();
             if (string.IsNullOrWhiteSpace(content)) return result.ToArray();
 
@@ -626,8 +698,8 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
             foreach (JToken it in arr)
             {
-                string path = it["path"]?.ToString();
-                if (string.IsNullOrWhiteSpace(path)) continue;
+                string path = ResolveExistingPath(NormalizeInputPath(it["path"]?.ToString()));
+                if (string.IsNullOrWhiteSpace(path)) { dropped++; continue; }
                 string name = it["name"]?.ToString();
                 if (string.IsNullOrWhiteSpace(name)) name = Path.GetFileName(path.TrimEnd('\\', '/'));
                 if (string.IsNullOrWhiteSpace(name)) name = path;
@@ -647,9 +719,53 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                 });
             }
 
-            // 只在成功解析出条目时才从正文剥离 JSON 块，避免误删无关代码块。
-            if (result.Count > 0) content = content.Remove(m.Index, m.Length).TrimEnd();
+            // 解析出的是 items 块就从正文剥离（哪怕条目全被丢弃），避免裸 JSON 漏进气泡。
+            content = content.Remove(m.Index, m.Length).TrimEnd();
             return result.ToArray();
+        }
+
+        // 返回真实存在的路径：直接命中则返回；含占位符/通配的分段沿真实目录逐段解析，多匹配取最大者；解析不出返回 null。
+        private static string ResolveExistingPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            if (File.Exists(path) || Directory.Exists(path)) return path;
+            try
+            {
+                string root = Path.GetPathRoot(path);
+                if (string.IsNullOrEmpty(root) || !Directory.Exists(root)) return null;
+                string[] segs = path.Substring(root.Length).Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+                string cur = root;
+                foreach (string seg in segs)
+                {
+                    string exact = Path.Combine(cur, seg);
+                    if (Directory.Exists(exact)) { cur = exact; continue; }
+
+                    string pattern = ToWildcard(seg);
+                    if (pattern == null) return null;
+                    DirectoryInfo[] matches;
+                    try { matches = new DirectoryInfo(cur).GetDirectories(pattern); }
+                    catch { return null; }
+                    if (matches.Length == 0) return null;
+
+                    DirectoryInfo best = matches[0];
+                    long bestBytes = ShallowBytes(best.FullName);
+                    for (int i = 1; i < matches.Length; i++)
+                    {
+                        long b = ShallowBytes(matches[i].FullName);
+                        if (b > bestBytes) { bestBytes = b; best = matches[i]; }
+                    }
+                    cur = best.FullName;
+                }
+                return (File.Exists(cur) || Directory.Exists(cur)) ? cur : null;
+            }
+            catch { return null; }
+        }
+
+        // 把分段里的 [xxx] <xxx> {xxx} 占位符换成 *；无占位符且无 * 则返回 null（不是通配段）。
+        private static string ToWildcard(string seg)
+        {
+            string w = Regex.Replace(seg, "\\[[^\\]]*\\]|<[^>]*>|\\{[^}]*\\}", "*");
+            return w.IndexOf('*') >= 0 ? w : null;
         }
 
         private object AiReport(JObject parameters)
@@ -682,7 +798,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             {
                 foreach (JToken it in items)
                 {
-                    string path = it["path"]?.ToString();
+                    string path = NormalizeInputPath(it["path"]?.ToString());
                     string tag = it["tag"]?.ToString();
                     if (!string.IsNullOrWhiteSpace(path) && !string.IsNullOrWhiteSpace(tag))
                     {
