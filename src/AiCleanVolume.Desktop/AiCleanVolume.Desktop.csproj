@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net40;net48</TargetFrameworks>
+    <TargetFramework>net48</TargetFramework>
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>7.3</LangVersion>
@@ -46,13 +46,10 @@
     <ProjectReference Include="..\..\third_party\AntdUI-v2.3.0\src\AntdUI\AntdUI.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net40" Version="1.0.3" PrivateAssets="all" GeneratePathProperty="true" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="RestSharp" Version="106.15.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2535.41" />
   </ItemGroup>
 
   <ItemGroup>
@@ -78,6 +75,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Tools\IObitUnlocker\IObitUnlocker.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="WebUi\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

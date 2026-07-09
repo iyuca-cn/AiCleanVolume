@@ -4,6 +4,7 @@ using System.Drawing.Text;
 using System.Windows.Forms;
 using AiCleanVolume.Desktop.Composition;
 using AiCleanVolume.Desktop.Presentation.Shared;
+using AiCleanVolume.Desktop.Presentation.WebShell;
 
 namespace AiCleanVolume.Desktop
 {
@@ -27,7 +28,7 @@ namespace AiCleanVolume.Desktop
                 .Header(ToHex(Palette.Surface), "#141414")
                 .FormBorderColor();
             ApplyMinimalTheme();
-            Application.Run(DesktopCompositionRoot.CreateMainWindow());
+            Application.Run(new WebShellWindow(DesktopCompositionRoot.CreateDependencies()));
         }
 
         // 把极简色板同步到 AntdUI 主题令牌，凡是读取 Style.Db.* 的控件都会跟随。

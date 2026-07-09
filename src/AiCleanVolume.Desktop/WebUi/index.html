@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./react.production.min.js"></script>
+<script src="./react-dom.production.min.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #E8ECEF; }
+  * { box-sizing: border-box; }
+  @keyframes acv-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes acv-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
+  @keyframes acv-spin { to { transform: rotate(360deg); } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 28px 32px; font-family: 'IBM Plex Sans', 'Noto Sans SC', sans-serif; color: #1A2530;">
+
+<!-- ============ STATE SWITCHER (presentation only) ============ -->
+<sc-if value="{{ showSwitcher }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #D5DDE2; border-radius: 24px; padding: 5px 6px; box-shadow: 0 2px 8px rgba(15,30,42,0.06);">
+  <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: #8CA0AD; padding: 0 8px 0 10px;">界面状态</span>
+  <sc-for list="{{ pills }}" as="pill" hint-placeholder-count="5">
+    <div onClick="{{ pill.onClick }}" style="padding: 6px 16px; border-radius: 18px; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{ pill.bg }}; color: {{ pill.color }};" style-hover="opacity: 0.85">{{ pill.label }}</div>
+  </sc-for>
+</div>
+</sc-if>
+
+<!-- ============ APP WINDOW ============ -->
+<div style="width: 1560px; height: 940px; background: #F6F8F9; border-radius: 10px; box-shadow: 0 24px 64px rgba(15,30,42,0.28), 0 2px 8px rgba(15,30,42,0.12); overflow: hidden; display: flex; flex-direction: column; border: 1px solid rgba(15,30,42,0.08); position: relative;" data-screen-label="AiCleanVolume 主窗口">
+
+  <!-- Title bar -->
+  <div style="height: 42px; flex: none; display: flex; align-items: center; padding: 0 0 0 16px; background: #10202C; color: #C7D3DC;">
+    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+      <div style="width: 20px; height: 20px; border-radius: 5px; background: linear-gradient(135deg, #14B8C4, #0E7490); display: flex; align-items: center; justify-content: center;">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 7 L5 10 L10 2.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </div>
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.02em;">AiCleanVolume</span>
+      <span style="font-size: 11px; color: #56707F; font-family: 'IBM Plex Mono', monospace;">v0.2.0</span>
+    </div>
+    <div style="display: flex; height: 100%;">
+      <div style="width: 46px; display: flex; align-items: center; justify-content: center;" style-hover="background: rgba(255,255,255,0.08)"><svg width="10" height="10" viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#C7D3DC" stroke-width="1.2"></line></svg></div>
+      <div style="width: 46px; display: flex; align-items: center; justify-content: center;" style-hover="background: rgba(255,255,255,0.08)"><svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="#C7D3DC" stroke-width="1.2"></rect></svg></div>
+      <div style="width: 46px; display: flex; align-items: center; justify-content: center;" style-hover="background: #C4314B"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="#C7D3DC" stroke-width="1.2"></path></svg></div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div style="height: 60px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 20px; background: #FFFFFF; border-bottom: 1px solid #E1E7EB;">
+    <div style="position: relative;">
+      <div onClick="{{ onToggleDriveMenu }}" style="display: flex; align-items: center; gap: 10px; padding: 8px 14px; border: 1px solid {{ driveTriggerBorder }}; border-radius: 8px; background: #FFFFFF; cursor: pointer;" style-hover="border-color: #9FB4BF">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="4" width="13" height="8" rx="2" stroke="#42586A" stroke-width="1.4"></rect><circle cx="12" cy="8" r="1.2" fill="#42586A"></circle></svg>
+        <span style="font-size: 13px; font-weight: 600;">{{ curDriveName }}</span>
+        <span style="font-size: 11.5px; color: #6B8090; font-family: 'IBM Plex Mono', monospace;">{{ curDriveMeta }}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="transform: rotate({{ driveChevRot }}); transition: transform 0.15s;"><path d="M2 3.5 L5 6.5 L8 3.5" stroke="#6B8090" stroke-width="1.4" stroke-linecap="round"></path></svg>
+      </div>
+      <sc-if value="{{ driveOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; top: 100%; left: 0; width: 340px; margin-top: 6px; background: #FFFFFF; border: 1px solid #D5DDE2; border-radius: 10px; box-shadow: 0 16px 40px rgba(15,30,42,0.2); z-index: 40; padding: 5px;">
+          <sc-for list="{{ driveRows }}" as="dr" hint-placeholder-count="3">
+            <div onClick="{{ dr.onClick }}" style="padding: 10px 12px; border-radius: 8px; cursor: pointer; background: {{ dr.bg }};" style-hover="background: #F2F6F8">
+              <div style="display: flex; align-items: center; gap: 9px;">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="flex: none;"><rect x="1.5" y="4" width="13" height="8" rx="2" stroke="#42586A" stroke-width="1.4"></rect><circle cx="12" cy="8" r="1.2" fill="#42586A"></circle></svg>
+                <span style="font-size: 12.5px; font-weight: 600; color: #22323F;">{{ dr.name }}</span>
+                <span style="font-size: 11px; color: #8CA0AD; font-family: 'IBM Plex Mono', monospace;">{{ dr.fs }}</span>
+                <div style="flex: 1;"></div>
+                <sc-if value="{{ dr.scanned }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #E4F3EC; color: #0F7A56; white-space: nowrap;">已扫描</span>
+                </sc-if>
+                <svg width="11" height="11" viewBox="0 0 10 10" fill="none" style="flex: none; opacity: {{ dr.checkOpacity }};"><path d="M1.5 5.2 L4 7.7 L8.5 2.3" stroke="{{ accent }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              </div>
+              <div style="height: 5px; border-radius: 3px; background: #EDF1F4; overflow: hidden; margin: 8px 0 5px;">
+                <div style="height: 100%; width: {{ dr.pctW }}; background: #33475A; border-radius: 3px;"></div>
+              </div>
+              <div style="font-size: 10.5px; color: #8CA0AD; font-family: 'IBM Plex Mono', monospace;">{{ dr.usage }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+    <button onClick="{{ onScan }}" style="display: flex; align-items: center; gap: 8px; padding: 9px 18px; border: none; border-radius: 8px; background: {{ scanBtnBg }}; color: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="animation: {{ scanIconAnim }};"><path d="M12 7 A5 5 0 1 1 9.5 2.7" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"></path><path d="M9.5 0.8 L9.5 3 L11.7 3" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      {{ scanLabel }}
+    </button>
+    <div style="width: 1px; height: 24px; background: #E1E7EB;"></div>
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #42586A;">
+      <div onClick="{{ onTogglePerm }}" style="width: 34px; height: 19px; border-radius: 10px; background: {{ permBg }}; position: relative; cursor: pointer; transition: background 0.15s;">
+        <div style="width: 15px; height: 15px; border-radius: 50%; background: #FFFFFF; position: absolute; top: 2px; left: {{ permKnobLeft }}; transition: left 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.25);"></div>
+      </div>
+      完全权限模式
+    </div>
+    <sc-if value="{{ permOn }}" hint-placeholder-val="{{ false }}">
+      <span style="font-size: 11.5px; color: #9A5B00; background: #FBF0DC; border: 1px solid #EBD9B4; padding: 3px 10px; border-radius: 20px;">已启用 — 可处理受保护的系统文件，请谨慎操作</span>
+    </sc-if>
+    <div style="flex: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: {{ aiChipBg }}; border: 1px solid {{ aiChipBorder }};">
+      <div style="width: 7px; height: 7px; border-radius: 50%; background: {{ aiDot }};"></div>
+      <span style="font-size: 12px; font-weight: 500; color: {{ aiChipColor }};">{{ aiChipText }}</span>
+      <span style="font-size: 11px; color: #55808A; font-family: 'IBM Plex Mono', monospace;">deepseek-chat</span>
+    </div>
+    <div onClick="{{ onOpenSettings }}" title="设置" style="height: 34px; padding: 0 12px; border-radius: 8px; display: flex; align-items: center; gap: 7px; cursor: pointer; border: 1px solid transparent; color: #42586A; font-size: 12.5px; font-weight: 600;" style-hover="background: #F0F3F5; border-color: #E1E7EB">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><line x1="2" y1="4" x2="14" y2="4" stroke="#42586A" stroke-width="1.4" stroke-linecap="round"></line><circle cx="6" cy="4" r="1.9" fill="#FFFFFF" stroke="#42586A" stroke-width="1.4"></circle><line x1="2" y1="8" x2="14" y2="8" stroke="#42586A" stroke-width="1.4" stroke-linecap="round"></line><circle cx="10.5" cy="8" r="1.9" fill="#FFFFFF" stroke="#42586A" stroke-width="1.4"></circle><line x1="2" y1="12" x2="14" y2="12" stroke="#42586A" stroke-width="1.4" stroke-linecap="round"></line><circle cx="5" cy="12" r="1.9" fill="#FFFFFF" stroke="#42586A" stroke-width="1.4"></circle></svg>
+      设置
+    </div>
+  </div>
+
+  <!-- Elevation banner -->
+  <sc-if value="{{ showElevateBanner }}" hint-placeholder-val="{{ false }}">
+    <div style="flex: none; display: flex; align-items: center; gap: 10px; padding: 7px 20px; background: #FBF0DC; border-bottom: 1px solid #EBD9B4; font-size: 12px; color: #9A5B00;">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex: none;"><circle cx="8" cy="8" r="6.5" stroke="#9A5B00" stroke-width="1.3"></circle><path d="M8 4.8 L8 8.6 M8 10.8 L8 10.9" stroke="#9A5B00" stroke-width="1.5" stroke-linecap="round"></path></svg>
+      <span style="flex: 1;">当前未以管理员身份运行，NTFS 完整扫描与部分系统文件的删除可能受限。</span>
+      <span onClick="{{ onElevate }}" style="font-weight: 600; cursor: pointer; text-decoration: underline; white-space: nowrap;">以管理员身份重新启动</span>
+      <div onClick="{{ onDismissBanner }}" style="width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none;" style-hover="background: #F2E3C4">
+        <svg width="9" height="9" viewBox="0 0 10 10"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="#9A5B00" stroke-width="1.3"></path></svg>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Body: 3 columns -->
+  <div style="flex: 1; display: grid; grid-template-columns: 470px minmax(0, 1fr) 350px; min-height: 0;">
+
+    <!-- ==== LEFT: storage tree ==== -->
+    <div style="border-right: 1px solid #E1E7EB; background: #FFFFFF; display: flex; flex-direction: column; min-height: 0;" data-screen-label="存储结构">
+
+      <!-- empty -->
+      <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 56px; text-align: center;">
+          <div style="width: 72px; height: 72px; border-radius: 18px; background: #F0F4F6; border: 1px dashed #C3CFD6; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+            <svg width="32" height="28" viewBox="0 0 16 14" fill="none"><path d="M1.5 3.5 a2 2 0 0 1 2-2 h3 l1.8 2 h5.2 a1.5 1.5 0 0 1 1.5 1.5 v6 a2 2 0 0 1-2 2 h-9.5 a2 2 0 0 1-2-2 z" fill="none" stroke="#8CA0AD" stroke-width="0.9"></path></svg>
+          </div>
+          <div style="font-size: 16px; font-weight: 700; margin-bottom: 8px;">还没有扫描</div>
+          <div style="font-size: 12.5px; line-height: 1.8; color: #6B8090;">在顶部选择磁盘或文件夹，点击「开始扫描」。<br>扫描完成后，这里会按占用大小列出每个文件夹，<br>并标出 AI 判定可清理的部分。</div>
+          <button onClick="{{ onScan }}" style="margin-top: 22px; padding: 10px 26px; border: none; border-radius: 8px; background: {{ accent }}; color: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">开始扫描</button>
+        </div>
+      </sc-if>
+
+      <!-- scanning -->
+      <sc-if value="{{ isScanning }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 16px 18px 12px; flex: none;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px;">
+            <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em;">正在扫描</span>
+            <span style="font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: {{ accent }};">{{ scanPct }}</span>
+          </div>
+          <div style="height: 8px; border-radius: 4px; background: #EAEEF1; overflow: hidden; position: relative;">
+            <div style="position: absolute; inset: 0; width: 30%; border-radius: 4px; background: {{ accent }}; animation: acv-sweep 1.4s ease-in-out infinite;"></div>
+          </div>
+          <div style="margin-top: 10px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #8CA0AD; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">C:\Users\iyuca\AppData\Local\Packages\…</div>
+          <div style="display: flex; gap: 18px; margin-top: 8px; font-size: 11.5px; color: #6B8090;">
+            <span>已发现 <b style="color: #22323F;">86,412</b> 文件</span>
+            <span><b style="color: #22323F;">17,203</b> 文件夹</span>
+            <span>用时 <b style="color: #22323F;">2.8s</b></span>
+          </div>
+        </div>
+        <div style="height: 1px; background: #E9EEF1; flex: none;"></div>
+        <div style="flex: 1; overflow: hidden; padding: 10px 18px;">
+          <sc-for list="{{ skeletonRows }}" as="sk" hint-placeholder-count="6">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 9px 0; animation: acv-pulse 1.6s infinite; animation-delay: {{ sk.delay }};">
+              <div style="width: 15px; height: 13px; border-radius: 3px; background: #E5EBEF; flex: none;"></div>
+              <div style="height: 11px; border-radius: 5px; background: #E5EBEF; width: {{ sk.w }};"></div>
+              <div style="flex: 1;"></div>
+              <div style="width: 46px; height: 10px; border-radius: 5px; background: #EDF1F4;"></div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- done -->
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+        <div style="padding: 16px 18px 12px; flex: none;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: #1A2530;">存储结构</span>
+            <span style="font-size: 11.5px; color: #6B8090;">按占用排序</span>
+          </div>
+          <div style="margin-top: 12px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #42586A; margin-bottom: 6px;">
+              <span style="font-family: 'IBM Plex Mono', monospace;">{{ driveUsageLabel }}</span>
+              <span style="font-weight: 600; color: {{ accent }};">可释放约 34.2 GB</span>
+            </div>
+            <div style="height: 8px; border-radius: 4px; background: #EAEEF1; overflow: hidden; display: flex;">
+              <div style="width: 68%; background: #33475A;"></div>
+              <div style="width: 14%; background: {{ accent }};"></div>
+            </div>
+            <div style="display: flex; gap: 16px; margin-top: 6px; font-size: 11px; color: #6B8090;">
+              <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #33475A;"></span>正常占用</span>
+              <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: {{ accent }};"></span>AI 判定可清理</span>
+            </div>
+          </div>
+        </div>
+        <div style="height: 1px; background: #E9EEF1; flex: none;"></div>
+        <div style="flex: 1; overflow-y: auto; padding: 6px 8px 12px;">
+          <sc-for list="{{ treeRows }}" as="row" hint-placeholder-count="8">
+            <div onClick="{{ row.onToggle }}" onContextMenu="{{ row.onContext }}" draggable="{{ true }}" onDragStart="{{ row.onDragStart }}" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px 7px {{ row.pad }}; border-radius: 7px; cursor: pointer; position: relative;" style-hover="background: #F2F6F8">
+              <div onClick="{{ row.onCheck }}" style="width: 15px; height: 15px; flex: none; border-radius: 4px; border: 1.5px solid {{ row.checkBorder }}; background: {{ row.checkBg }}; display: flex; align-items: center; justify-content: center;" style-hover="border-color: {{ accent }}">
+                <sc-if value="{{ row.selected }}" hint-placeholder-val="{{ false }}">
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M1.5 5.2 L4 7.7 L8.5 2.3" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </sc-if>
+              </div>
+              <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="flex: none; opacity: {{ row.chevOpacity }}; transform: rotate({{ row.chevRot }});"><path d="M3 1.5 L7 5 L3 8.5" stroke="#8CA0AD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <svg width="15" height="13" viewBox="0 0 16 14" fill="none" style="flex: none;"><path d="M1.5 3.5 a2 2 0 0 1 2-2 h3 l1.8 2 h5.2 a1.5 1.5 0 0 1 1.5 1.5 v6 a2 2 0 0 1-2 2 h-9.5 a2 2 0 0 1-2-2 z" fill="{{ row.folderFill }}" stroke="{{ row.folderStroke }}" stroke-width="1.2"></path></svg>
+              <span style="font-size: 13px; font-weight: {{ row.weight }}; color: #22323F; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ row.name }}</span>
+              <sc-if value="{{ row.tag }}" hint-placeholder-val="{{ false }}">
+                <span style="flex: none; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: {{ row.tagBg }}; color: {{ row.tagColor }};">{{ row.tag }}</span>
+              </sc-if>
+              <span style="flex: none; width: 66px; text-align: right; font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: #42586A;">{{ row.size }}</span>
+              <div style="flex: none; width: 72px; height: 5px; border-radius: 3px; background: #EDF1F4; overflow: hidden;">
+                <div style="height: 100%; width: {{ row.pct }}; background: {{ row.barColor }}; border-radius: 3px;"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ treeHasSel }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: none; padding: 12px 18px 14px; border-top: 1px solid #E9EEF1; background: #FBFCFD;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px;">
+              <span style="font-size: 12px; color: #42586A;">已选 {{ treeSelCount }} 项 <span onClick="{{ onClearTreeSel }}" style="color: #8CA0AD; cursor: pointer; text-decoration: underline; margin-left: 6px;">取消选择</span></span>
+              <span style="font-size: 14px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: {{ accent }};">{{ treeSelSize }}</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button style="flex: 1; padding: 8px 0; border-radius: 8px; border: 1px solid #C4E0E5; background: #F0F7F8; color: {{ accent }}; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="background: #E2F0F2">询问 AI</button>
+              <button onClick="{{ onTreeDeleteRecycle }}" style="flex: 1; padding: 8px 0; border-radius: 8px; border: none; background: {{ accent }}; color: #FFFFFF; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">移到回收站</button>
+              <button onClick="{{ onTreeDeletePerm }}" style="flex: none; padding: 8px 12px; border-radius: 8px; border: 1px solid #E3C9CE; background: #FFFFFF; color: #A63A4B; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="background: #FBF1F2">永久删除</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ treeNoSel }}" hint-placeholder-val="{{ true }}">
+          <div style="flex: none; padding: 10px 18px; border-top: 1px solid #E9EEF1; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #6B8090;">
+            <span>共 128,443 个文件 · 24,891 个文件夹</span>
+            <span style="font-family: 'IBM Plex Mono', monospace;">MFT 扫描 · 4.2s</span>
+          </div>
+        </sc-if>
+      </sc-if>
+    </div>
+
+    <!-- ==== CENTER: AI analysis ==== -->
+    <div style="display: flex; flex-direction: column; min-height: 0; min-width: 0; background: #F6F8F9;" data-screen-label="AI 解析">
+      <div style="flex: none; padding: 16px 22px 12px; display: flex; align-items: center; gap: 10px;">
+        <div style="width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #14B8C4, #0E7490); display: flex; align-items: center; justify-content: center;">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1 L8.4 5.6 L13 7 L8.4 8.4 L7 13 L5.6 8.4 L1 7 L5.6 5.6 Z" fill="#FFFFFF"></path></svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-size: 13.5px; font-weight: 700;">AI 解析</div>
+          <div style="font-size: 11.5px; color: #6B8090;">基于扫描结果的智能清理分析 · 可把左侧任意文件夹拖进来提问</div>
+        </div>
+        <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+          <span style="font-size: 11px; color: #6B8090; font-family: 'IBM Plex Mono', monospace;">tokens 1,284</span>
+        </sc-if>
+      </div>
+
+      <!-- empty center -->
+      <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 48px;">
+          <div style="width: 380px; border: 1.5px dashed #B9C7D0; border-radius: 14px; padding: 36px 32px; text-align: center; background: #FBFCFD;">
+            <div style="width: 44px; height: 44px; margin: 0 auto 16px; border-radius: 11px; background: #F0F4F6; display: flex; align-items: center; justify-content: center;">
+              <svg width="20" height="20" viewBox="0 0 14 14" fill="none"><path d="M7 1 L8.4 5.6 L13 7 L8.4 8.4 L7 13 L5.6 8.4 L1 7 L5.6 5.6 Z" fill="#8CA0AD"></path></svg>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 10px;">AI 解析尚未开始</div>
+            <div style="font-size: 12.5px; line-height: 1.9; color: #6B8090;">选择磁盘 → 开始扫描 → AI 自动生成整盘解析报告。<br>之后可以把左侧任意文件 / 文件夹拖到下方输入框，<br>针对性地询问「这个能删吗」。</div>
+            <div style="display: flex; justify-content: center; gap: 6px; margin-top: 18px; flex-wrap: wrap;">
+              <span style="font-size: 11.5px; color: #42586A; background: #F0F3F5; border: 1px solid #E1E7EB; padding: 4px 11px; border-radius: 14px;">哪些缓存能清？</span>
+              <span style="font-size: 11.5px; color: #42586A; background: #F0F3F5; border: 1px solid #E1E7EB; padding: 4px 11px; border-radius: 14px;">C 盘为什么满了？</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- scanning center -->
+      <sc-if value="{{ isScanning }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 48px;">
+          <div style="width: 380px; border: 1px solid #E1E7EB; border-radius: 14px; padding: 32px; text-align: center; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15,30,42,0.04);">
+            <svg width="34" height="34" viewBox="0 0 14 14" fill="none" style="animation: acv-spin 1.2s linear infinite; margin-bottom: 14px;"><path d="M12 7 A5 5 0 1 1 9.5 2.7" stroke="{{ accent }}" stroke-width="1.4" stroke-linecap="round"></path></svg>
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">等待扫描结果</div>
+            <div style="font-size: 12.5px; line-height: 1.8; color: #6B8090;">扫描完成后将自动把存储结构摘要发送给 AI，<br>生成整盘解析报告。仅发送目录统计，<br>不上传任何文件内容。</div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- done center -->
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+        <div style="flex: 1; overflow-y: auto; padding: 4px 22px 12px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(15,30,42,0.04);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: {{ accent }};">扫描解析报告</span>
+              <span style="font-size: 11px; color: #8CA0AD;">2026-07-05 14:32</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px;">
+              <div style="padding: 12px 14px; border-radius: 9px; background: #F0F7F8; border: 1px solid #D8E9EC;">
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: {{ accent }};">34.2 <span style="font-size: 12px; font-weight: 500;">GB</span></div>
+                <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">可安全释放</div>
+              </div>
+              <div style="padding: 12px 14px; border-radius: 9px; background: #FBF6EC; border: 1px solid #EEE2C8;">
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #9A5B00;">44.8 <span style="font-size: 12px; font-weight: 500;">GB</span></div>
+                <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">需人工确认</div>
+              </div>
+              <div style="padding: 12px 14px; border-radius: 9px; background: #F2F4F6; border: 1px solid #E1E7EB;">
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #33475A;">96.2 <span style="font-size: 12px; font-weight: 500;">GB</span></div>
+                <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">系统保留 · 勿动</div>
+              </div>
+            </div>
+            <div style="font-size: 13px; line-height: 1.75; color: #33475A;">
+              本次扫描共分析 <b>128,443</b> 个文件。占用增长主要来自 <b>用户缓存</b>：微信 PC 端的图片与视频缓存 3 个月内增长了 8.1 GB；<span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; background: #F0F3F5; padding: 1px 6px; border-radius: 4px;">AppData\Local\Temp</span> 存在 61 天前的安装残留。建议优先执行右侧推荐的 3 项安全清理，预计 10 秒内完成。
+            </div>
+          </div>
+
+          <div style="align-self: flex-end; max-width: 72%; background: {{ accent }}; color: #FFFFFF; border-radius: 12px 12px 3px 12px; padding: 11px 16px; font-size: 13px; line-height: 1.7;">
+            Downloads 里 21.3 GB 都是什么？哪些可以删？
+          </div>
+
+          <div style="align-self: flex-start; max-width: 82%; display: flex; gap: 10px;">
+            <div style="width: 26px; height: 26px; flex: none; border-radius: 7px; background: linear-gradient(135deg, #14B8C4, #0E7490); display: flex; align-items: center; justify-content: center; margin-top: 2px;">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1 L8.4 5.6 L13 7 L8.4 8.4 L7 13 L5.6 8.4 L1 7 L5.6 5.6 Z" fill="#FFFFFF"></path></svg>
+            </div>
+            <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 3px 12px 12px 12px; padding: 13px 16px; font-size: 13px; line-height: 1.75; color: #33475A;">
+              Downloads 中主要是 3 类内容：<b>安装包 14.2 GB</b>（其中 9 个已安装完成，对应软件仍在系统中，可以删除）、<b>压缩包 4.8 GB</b>（有 3 个已解压到同目录）、<b>文档与图片 2.3 GB</b>（建议保留）。我已把「已安装的安装包」加入右侧推荐，删除前会逐个做安全评估。
+              <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <span style="font-size: 12px; font-weight: 600; color: {{ accent }}; border: 1px solid #C4E0E5; background: #F0F7F8; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap;" style-hover="background: #E2F0F2">查看这 9 个安装包</span>
+                <span style="font-size: 12px; font-weight: 600; color: #42586A; border: 1px solid #D5DDE2; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap;" style-hover="background: #F2F4F6">加入清理队列</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- input -->
+      <div style="flex: none; padding: 12px 22px 18px;">
+        <div onDragOver="{{ onInputDragOver }}" onDrop="{{ onInputDrop }}" onDragLeave="{{ onInputDragLeave }}" style="background: {{ inputBg }}; border: {{ inputBorder }}; border-radius: 11px; padding: 10px 12px 10px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(15,30,42,0.05);">
+          <sc-if value="{{ hasAttach }}" hint-placeholder-val="{{ false }}">
+            <div ref="{{ chipRowRef }}" onMouseDown="{{ onChipRowDown }}" onMouseMove="{{ onChipRowMove }}" onMouseUp="{{ onChipRowUp }}" onMouseLeave="{{ onChipRowUp }}" style="display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; max-width: 100%; min-width: 0; padding-bottom: 3px; cursor: {{ chipRowCursor }}; user-select: none; scrollbar-width: thin;">
+              <sc-for list="{{ attachChips }}" as="ac" hint-placeholder-count="1">
+                <div style="display: flex; align-items: center; gap: 7px; padding: 5px 8px 5px 10px; border-radius: 7px; background: #F0F7F8; border: 1px solid #C4E0E5; flex: none; max-width: 250px;">
+                  <svg width="13" height="11" viewBox="0 0 16 14" fill="none" style="flex: none;"><path d="M1.5 3.5 a2 2 0 0 1 2-2 h3 l1.8 2 h5.2 a1.5 1.5 0 0 1 1.5 1.5 v6 a2 2 0 0 1-2 2 h-9.5 a2 2 0 0 1-2-2 z" fill="#E2F0F2" stroke="{{ accent }}" stroke-width="1.2"></path></svg>
+                  <span style="font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; color: #0B5E63; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ ac.path }}</span>
+                  <span style="font-size: 10.5px; color: #55808A; flex: none; white-space: nowrap;">{{ ac.size }}</span>
+                  <div onClick="{{ ac.onRemove }}" style="width: 16px; height: 16px; flex: none; border-radius: 5px; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: #D9EBEE">
+                    <svg width="8" height="8" viewBox="0 0 10 10"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="#0B5E63" stroke-width="1.3"></path></svg>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ attachNotice }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size: 11.5px; color: #9A5B00; background: #FBF0DC; border: 1px solid #EBD9B4; padding: 5px 10px; border-radius: 7px;">{{ attachNotice }}</div>
+          </sc-if>
+          <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+          <input placeholder="{{ inputPlaceholder }}" style="flex: 1; border: none; outline: none; font-size: 13px; font-family: inherit; color: #1A2530; background: transparent;">
+          <div onClick="{{ onPickFolder }}" title="从系统选择文件夹交给 AI 分析" style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid #E1E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: #F2F4F6">
+            <svg width="15" height="13" viewBox="0 0 16 14" fill="none"><path d="M1.5 3.5 a2 2 0 0 1 2-2 h3 l1.8 2 h5.2 a1.5 1.5 0 0 1 1.5 1.5 v6 a2 2 0 0 1-2 2 h-9.5 a2 2 0 0 1-2-2 z" fill="none" stroke="#6B8090" stroke-width="1.3"></path><path d="M8 6.2 L8 10 M6.1 8.1 L9.9 8.1" stroke="#6B8090" stroke-width="1.3" stroke-linecap="round"></path></svg>
+          </div>
+          <div style="height: 30px; padding: 0 16px; border-radius: 8px; background: {{ accent }}; color: #FFFFFF; display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer;" style-hover="filter: brightness(1.08)">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6 L11 1 L7.5 11 L5.8 6.8 L1 6 Z" fill="#FFFFFF"></path></svg>
+            发送
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==== RIGHT: recommendations ==== -->
+    <div style="border-left: 1px solid #E1E7EB; background: #FFFFFF; display: flex; flex-direction: column; min-height: 0;" data-screen-label="智能推荐">
+      <div style="flex: none; padding: 16px 18px 10px; display: flex; align-items: baseline; justify-content: space-between;">
+        <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.04em;">{{ recTitle }}</span>
+        <span style="font-size: 11.5px; color: #6B8090;">{{ recSubtitle }}</span>
+      </div>
+
+      <!-- pre-scan proactive suggestions -->
+      <sc-if value="{{ isPre }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: none; margin: 0 18px 10px; padding: 9px 12px; border-radius: 8px; background: #F2F4F6; border: 1px solid #E1E7EB; font-size: 12px; line-height: 1.6; color: #42586A;">
+          根据已安装的软件与常见占用点，AI 预判了以下清理方向。扫描后将给出准确大小并支持一键清理。
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 8px;">
+          <sc-for list="{{ preCards }}" as="pc" hint-placeholder-count="5">
+            <div style="border: 1px solid #E1E7EB; background: #FFFFFF; border-radius: 10px; padding: 13px 14px; display: flex; gap: 12px;" style-hover="border-color: #9FB4BF">
+              <div style="width: 34px; height: 34px; flex: none; border-radius: 9px; background: {{ pc.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: {{ pc.iconColor }}; font-family: 'IBM Plex Mono', monospace;">{{ pc.mono }}</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 13px; font-weight: 600;">{{ pc.title }}</span>
+                  <span style="font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: {{ pc.chipBg }}; color: {{ pc.chipColor }};">{{ pc.chip }}</span>
+                </div>
+                <div style="font-size: 11.5px; color: #6B8090; line-height: 1.6; margin-top: 3px;">{{ pc.desc }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex: none; border-top: 1px solid #E9EEF1; padding: 12px 18px 14px; font-size: 11.5px; color: #8CA0AD; text-align: center; background: #FBFCFD;">扫描完成后此处将变为可勾选的清理队列</div>
+      </sc-if>
+
+      <!-- post-scan actionable cards -->
+      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+        <div style="flex: none; margin: 0 18px 10px; padding: 9px 12px; border-radius: 8px; background: #F0F7F8; border: 1px solid #D8E9EC; font-size: 12px; line-height: 1.6; color: #0B5E63;">
+          AI 主动发现的可清理项，勾选后在底部一键执行。每项删除前都会再次做沙盒安全评估。
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 8px;">
+          <sc-for list="{{ recCards }}" as="card" hint-placeholder-count="5">
+            <div onClick="{{ card.onExpand }}" style="border: 1px solid {{ card.borderColor }}; background: {{ card.bg }}; border-radius: 10px; padding: 12px 12px 12px 14px; cursor: pointer;" style-hover="border-color: #9FB4BF">
+              <div style="display: flex; gap: 11px;">
+                <div onClick="{{ card.onToggle }}" style="width: 18px; height: 18px; flex: none; margin-top: 2px; border-radius: 5px; border: 1.5px solid {{ card.checkBorder }}; background: {{ card.checkBg }}; display: flex; align-items: center; justify-content: center;">
+                  <sc-if value="{{ card.selected }}" hint-placeholder-val="{{ false }}">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5.2 L4 7.7 L8.5 2.3" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  </sc-if>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 13px; font-weight: 600; color: #1A2530;">{{ card.title }}</span>
+                    <span style="font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: {{ card.tagBg }}; color: {{ card.tagColor }}; white-space: nowrap;">{{ card.tag }}</span>
+                    <span style="font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 10px; background: #EDF1F4; color: #5E7485; white-space: nowrap;">{{ card.source }}</span>
+                  </div>
+                  <div style="font-size: 11.5px; color: #6B8090; line-height: 1.6; margin-top: 3px;">{{ card.desc }}</div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+                    <span style="font-size: 13px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #22323F;">{{ card.size }}</span>
+                    <span style="display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; color: {{ accent }};">{{ card.actionLabel }}
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="transform: rotate({{ card.chevRot }}); transition: transform 0.15s;"><path d="M3 1.5 L7 5 L3 8.5" stroke="{{ accent }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <sc-if value="{{ card.expanded }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top: 11px; border-top: 1px dashed #DCE3E8; padding-top: 11px; display: flex; flex-direction: column; gap: 8px;">
+                  <sc-for list="{{ card.files }}" as="f" hint-placeholder-count="3">
+                    <div style="display: flex; align-items: center; gap: 9px;">
+                      <div style="width: 5px; height: 5px; border-radius: 50%; background: {{ f.dot }}; flex: none;"></div>
+                      <div style="flex: 1; min-width: 0;">
+                        <div style="font-size: 11.5px; font-weight: 600; color: #22323F;">{{ f.name }}</div>
+                        <div style="font-size: 10.5px; font-family: 'IBM Plex Mono', monospace; color: #8CA0AD; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ f.meta }}</div>
+                      </div>
+                      <span style="flex: none; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #42586A;">{{ f.size }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="display: flex; gap: 8px; margin-top: 3px;">
+                    <span style="font-size: 11px; font-weight: 600; color: {{ accent }}; border: 1px solid #C4E0E5; background: #F0F7F8; padding: 4px 10px; border-radius: 6px;" style-hover="background: #E2F0F2">在存储结构中定位</span>
+                    <span style="font-size: 11px; font-weight: 600; color: #42586A; border: 1px solid #D5DDE2; padding: 4px 10px; border-radius: 6px;" style-hover="background: #F2F4F6">打开所在文件夹</span>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex: none; border-top: 1px solid #E9EEF1; padding: 14px 18px 16px; background: #FBFCFD;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+            <span style="font-size: 12px; color: #42586A;">已选 {{ selCount }} 项</span>
+            <span style="font-size: 15px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: {{ accent }};">{{ selSize }}</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button onClick="{{ onDeleteRecycle }}" style="flex: 1; padding: 10px 0; border-radius: 8px; border: none; background: {{ accent }}; color: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">移到回收站</button>
+            <button onClick="{{ onDeletePerm }}" style="flex: none; padding: 10px 14px; border-radius: 8px; border: 1px solid #E3C9CE; background: #FFFFFF; color: #A63A4B; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="background: #FBF1F2">永久删除</button>
+          </div>
+          <div style="font-size: 11px; color: #8CA0AD; margin-top: 8px; text-align: center;">执行前将逐项进行安全评估，可随时中止</div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div style="height: 30px; flex: none; display: flex; align-items: center; gap: 18px; padding: 0 20px; background: #10202C; color: #7E93A2; font-size: 11px; font-family: 'IBM Plex Mono', monospace;">
+    <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: {{ statusDot }}; animation: acv-pulse 2s infinite;"></span>{{ statusText }}</span>
+    <span>{{ statusDrive }}</span>
+    <div style="flex: 1;"></div>
+    <span>OpenAI 兼容接口 · /v1/chat/completions</span>
+    <span>MIT License</span>
+  </div>
+
+  <!-- ============ TREE CONTEXT MENU ============ -->
+  <sc-if value="{{ ctxOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ onCloseCtx }}" onContextMenu="{{ onCloseCtx }}" style="position: fixed; inset: 0; z-index: 60;"></div>
+    <div style="position: fixed; left: {{ ctxX }}; top: {{ ctxY }}; z-index: 61; width: 232px; background: #FFFFFF; border: 1px solid #D5DDE2; border-radius: 10px; box-shadow: 0 16px 40px rgba(15,30,42,0.22); padding: 5px; font-family: 'IBM Plex Sans', 'Noto Sans SC', sans-serif;">
+      <div style="padding: 7px 11px 6px; font-size: 10.5px; font-family: 'IBM Plex Mono', monospace; color: #8CA0AD; border-bottom: 1px solid #EFF3F5; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ ctxPath }}</div>
+      <sc-for list="{{ ctxItems }}" as="ci" hint-placeholder-count="4">
+        <div onClick="{{ ci.onClick }}" style="padding: 8px 11px; border-radius: 7px; font-size: 12.5px; font-weight: 500; color: {{ ci.color }}; cursor: pointer;" style-hover="background: #F2F6F8">{{ ci.label }}</div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <!-- ============ SETTINGS MODAL ============ -->
+  <sc-if value="{{ settingsOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(16,32,44,0.45); display: flex; align-items: center; justify-content: center; z-index: 20;" data-screen-label="设置">
+      <div style="width: 620px; max-height: 84%; background: #FFFFFF; border-radius: 14px; box-shadow: 0 24px 64px rgba(15,30,42,0.35); display: flex; flex-direction: column; overflow: hidden;">
+        <div style="flex: none; padding: 18px 24px 14px; border-bottom: 1px solid #E9EEF1; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <div style="font-size: 15px; font-weight: 700;">设置</div>
+            <div style="font-size: 11.5px; color: #6B8090; margin-top: 2px;">配置保存在本地，下次打开自动加载</div>
+          </div>
+          <div onClick="{{ onCloseSettings }}" style="width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: #F0F3F5">
+            <svg width="12" height="12" viewBox="0 0 10 10"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="#42586A" stroke-width="1.3"></path></svg>
+          </div>
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 22px;">
+
+          <!-- AI section -->
+          <div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <div>
+                <div style="font-size: 13px; font-weight: 700;">AI 智能建议</div>
+                <div style="font-size: 11.5px; color: #6B8090; margin-top: 2px;">关闭后将使用本地规则给出清理建议</div>
+              </div>
+              <div onClick="{{ onToggleAi }}" style="width: 38px; height: 21px; border-radius: 11px; background: {{ aiTogBg }}; position: relative; cursor: pointer; transition: background 0.15s;">
+                <div style="width: 17px; height: 17px; border-radius: 50%; background: #FFFFFF; position: absolute; top: 2px; left: {{ aiKnobLeft }}; transition: left 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.25);"></div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 600; color: #42586A;">配置档案</span>
+              <span onClick="{{ onSaveProfile }}" style="font-size: 11.5px; font-weight: 600; color: {{ accent }}; cursor: pointer;">+ 另存当前为档案</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
+              <sc-for list="{{ profileRows }}" as="pf" hint-placeholder-count="2">
+                <div onClick="{{ pf.onApply }}" style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid {{ pf.border }}; background: {{ pf.bg }}; border-radius: 9px; cursor: pointer;" style-hover="border-color: #9FB4BF">
+                  <div style="width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid {{ pf.radioBorder }}; display: flex; align-items: center; justify-content: center; flex: none;">
+                    <div style="width: 7px; height: 7px; border-radius: 50%; background: {{ pf.dot }};"></div>
+                  </div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 12.5px; font-weight: 600; color: #22323F; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ pf.name }}</div>
+                    <div style="font-size: 10.5px; color: #8CA0AD; font-family: 'IBM Plex Mono', monospace; margin-top: 1px;">{{ pf.meta }}</div>
+                  </div>
+                  <div onClick="{{ pf.onDelete }}" title="删除档案" style="width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex: none;" style-hover="background: #FBF1F2">
+                    <svg width="11" height="12" viewBox="0 0 14 15" fill="none"><path d="M2 3.5 h10 M5 3.5 V2 a1 1 0 0 1 1-1 h2 a1 1 0 0 1 1 1 v1.5 M3.5 3.5 l0.7 9 a1.5 1.5 0 0 0 1.5 1.4 h2.6 a1.5 1.5 0 0 0 1.5-1.4 l0.7-9" stroke="#A63A4B" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 8px;">AI 服务商</div>
+            <div style="position: relative; margin-bottom: 14px;">
+              <div onClick="{{ onToggleProviderMenu }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid {{ provTriggerBorder }}; background: #FFFFFF; border-radius: 9px; cursor: pointer;" style-hover="border-color: #9FB4BF">
+                <span style="font-size: 12.5px; font-weight: 600; flex: none; color: #22323F;">{{ curProviderName }}</span>
+                <span style="font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #8CA0AD; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ curProviderUrl }}</span>
+                <span style="font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: {{ curChipBg }}; color: {{ curChipColor }}; flex: none; white-space: nowrap;">{{ curProviderChip }}</span>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="flex: none; transform: rotate({{ provChevRot }}); transition: transform 0.15s;"><path d="M2 3.5 L5 6.5 L8 3.5" stroke="#6B8090" stroke-width="1.4" stroke-linecap="round"></path></svg>
+              </div>
+              <sc-if value="{{ providerOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; top: 100%; left: 0; right: 0; margin-top: 6px; background: #FFFFFF; border: 1px solid #D5DDE2; border-radius: 10px; box-shadow: 0 16px 40px rgba(15,30,42,0.2); z-index: 30; max-height: 236px; overflow-y: auto; padding: 5px;">
+                  <sc-for list="{{ providerRows }}" as="pr" hint-placeholder-count="4">
+                    <div onClick="{{ pr.onClick }}" style="display: flex; align-items: center; gap: 10px; padding: 9px 11px; background: {{ pr.bg }}; border-radius: 7px; cursor: pointer;" style-hover="background: #F2F6F8">
+                      <svg width="12" height="12" viewBox="0 0 10 10" fill="none" style="flex: none; opacity: {{ pr.checkOpacity }};"><path d="M1.5 5.2 L4 7.7 L8.5 2.3" stroke="{{ accent }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                      <span style="font-size: 12.5px; font-weight: 600; flex: none; color: #22323F;">{{ pr.name }}</span>
+                      <span style="font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #8CA0AD; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;">{{ pr.url }}</span>
+                      <span style="font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: {{ pr.chipBg }}; color: {{ pr.chipColor }}; flex: none; white-space: nowrap;">{{ pr.chip }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <sc-if value="{{ isCustom }}" hint-placeholder-val="{{ false }}">
+                <div>
+                  <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">接口地址</div>
+                  <input value="http://127.0.0.1:3000/v1" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                  <div style="font-size: 11px; color: #8CA0AD; margin-top: 5px;">支持根地址、/v1、或完整 /v1/chat/completions</div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ showKey }}" hint-placeholder-val="{{ true }}">
+                <div>
+                  <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">API Key</div>
+                  <input type="password" value="sk-............................" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                </div>
+              </sc-if>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div>
+                  <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">模型名称</div>
+                  <input value="{{ modelName }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                </div>
+                <div>
+                  <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">建议条数上限</div>
+                  <input value="30" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                </div>
+              </div>
+              <div>
+                <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">清理风格（系统提示词预设）</div>
+                <div style="position: relative;">
+                  <div onClick="{{ onTogglePromptMenu }}" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid {{ promptTriggerBorder }}; background: #FFFFFF; border-radius: 9px; cursor: pointer;" style-hover="border-color: #9FB4BF">
+                    <span style="font-size: 12.5px; font-weight: 600; color: #22323F; flex: none;">{{ curPromptName }}</span>
+                    <span style="font-size: 11px; color: #8CA0AD; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ curPromptHint }}</span>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="flex: none; transform: rotate({{ promptChevRot }}); transition: transform 0.15s;"><path d="M2 3.5 L5 6.5 L8 3.5" stroke="#6B8090" stroke-width="1.4" stroke-linecap="round"></path></svg>
+                  </div>
+                  <sc-if value="{{ promptOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="position: absolute; top: 100%; left: 0; right: 0; margin-top: 6px; background: #FFFFFF; border: 1px solid #D5DDE2; border-radius: 10px; box-shadow: 0 16px 40px rgba(15,30,42,0.2); z-index: 30; max-height: 236px; overflow-y: auto; padding: 5px;">
+                      <sc-for list="{{ promptRows }}" as="pp" hint-placeholder-count="6">
+                        <div onClick="{{ pp.onClick }}" style="display: flex; align-items: center; gap: 9px; padding: 8px 11px; background: {{ pp.bg }}; border-radius: 7px; cursor: pointer;" style-hover="background: #F2F6F8">
+                          <svg width="12" height="12" viewBox="0 0 10 10" fill="none" style="flex: none; opacity: {{ pp.checkOpacity }};"><path d="M1.5 5.2 L4 7.7 L8.5 2.3" stroke="{{ accent }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                          <span style="font-size: 12.5px; font-weight: 600; color: #22323F; flex: none; white-space: nowrap;">{{ pp.name }}</span>
+                          <span style="font-size: 11px; color: #8CA0AD; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ pp.hint }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ isCustomPrompt }}" hint-placeholder-val="{{ false }}">
+                  <textarea rows="4" style="width: 100%; margin-top: 8px; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none; resize: vertical; line-height: 1.6;">你是 Windows 磁盘清理审核助手。只允许从候选清单中选择明确可再生成的缓存、临时文件、日志和安装残留……</textarea>
+                </sc-if>
+                <sc-if value="{{ notCustomPrompt }}" hint-placeholder-val="{{ true }}">
+                  <div style="margin-top: 8px; padding: 9px 12px; border-radius: 8px; background: #F7F9FA; border: 1px solid #E9EEF1; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #6B8090; line-height: 1.7; max-height: 62px; overflow: hidden;">{{ promptPreview }}</div>
+                </sc-if>
+                <div style="font-size: 11px; color: #8CA0AD; margin-top: 5px;">发送时会自动限定当前盘符范围（{{ promptDriveHint }}）</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height: 1px; background: #E9EEF1;"></div>
+
+          <!-- cleaning section -->
+          <div>
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 14px;">清理行为</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 12.5px; font-weight: 600; color: #22323F;">默认删除方式</div>
+                  <div style="font-size: 11.5px; color: #6B8090; margin-top: 2px;">一键清理时的默认动作</div>
+                </div>
+                <div style="display: flex; border: 1px solid #D5DDE2; border-radius: 8px; overflow: hidden;">
+                  <div onClick="{{ onDefRecycle }}" style="padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; background: {{ defRecBg }}; color: {{ defRecColor }};">移到回收站</div>
+                  <div onClick="{{ onDefPerm }}" style="padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; background: {{ defPermBg }}; color: {{ defPermColor }}; border-left: 1px solid #D5DDE2;">永久删除</div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 12.5px; font-weight: 600; color: #22323F;">完全权限模式</div>
+                  <div style="font-size: 11.5px; color: #6B8090; margin-top: 2px;">以更高权限处理受保护的系统文件</div>
+                </div>
+                <div onClick="{{ onTogglePerm }}" style="width: 38px; height: 21px; border-radius: 11px; background: {{ permBg }}; position: relative; cursor: pointer; transition: background 0.15s;">
+                  <div style="width: 17px; height: 17px; border-radius: 50%; background: #FFFFFF; position: absolute; top: 2px; left: {{ permKnobLeft2 }}; transition: left 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.25);"></div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 12.5px; font-weight: 600; color: #22323F;">删除前沙盒安全评估</div>
+                  <div style="font-size: 11.5px; color: #6B8090; margin-top: 2px;">逐项检查进程占用与系统依赖（建议开启）</div>
+                </div>
+                <div style="width: 38px; height: 21px; border-radius: 11px; background: {{ accent }}; position: relative; opacity: 0.55;">
+                  <div style="width: 17px; height: 17px; border-radius: 50%; background: #FFFFFF; position: absolute; top: 2px; left: 19px; box-shadow: 0 1px 2px rgba(0,0,0,0.25);"></div>
+                </div>
+              </div>
+              <div>
+                <div style="font-size: 12.5px; font-weight: 600; color: #22323F; margin-bottom: 2px;">沙盒白名单（允许删除的根目录）</div>
+                <div style="font-size: 11.5px; color: #6B8090; margin-bottom: 8px;">未开启完全权限模式时，删除操作只允许发生在这些根目录内。每行一条。</div>
+                <textarea rows="5" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none; resize: vertical; line-height: 1.7;">C:\Users\iyuca\AppData\Local\Temp
+C:\Windows\Temp
+C:\Windows\SoftwareDistribution\Download
+C:\Windows\Prefetch
+C:\Users\iyuca\AppData\Local\Microsoft\Windows\INetCache</textarea>
+              </div>
+            </div>
+          </div>
+
+          <div style="height: 1px; background: #E9EEF1;"></div>
+
+          <!-- scan section -->
+          <div>
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 14px;">扫描选项</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div>
+                <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">最小体积阈值（MB）</div>
+                <input value="-1" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                <div style="font-size: 11px; color: #8CA0AD; margin-top: 5px;">小于该值的条目不进入结果，-1 为不限</div>
+              </div>
+              <div>
+                <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">每层最多条目</div>
+                <input value="512" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                <div style="font-size: 11px; color: #8CA0AD; margin-top: 5px;">每层目录最多展示的子项数量</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <div style="font-size: 12.5px; font-weight: 600; color: #22323F;">排序依据</div>
+                <div style="font-size: 11.5px; color: #6B8090; margin-top: 2px;">实际占用含簇对齐与压缩，更接近真实磁盘用量</div>
+              </div>
+              <div style="display: flex; border: 1px solid #D5DDE2; border-radius: 8px; overflow: hidden;">
+                <div onClick="{{ onSortAllocated }}" style="padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; background: {{ sortAllocBg }}; color: {{ sortAllocColor }};">实际占用</div>
+                <div onClick="{{ onSortLogical }}" style="padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; background: {{ sortLogicBg }}; color: {{ sortLogicColor }}; border-left: 1px solid #D5DDE2;">逻辑大小</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex: none; padding: 14px 24px; border-top: 1px solid #E9EEF1; display: flex; justify-content: flex-end; gap: 10px; background: #FBFCFD;">
+          <button onClick="{{ onCloseSettings }}" style="padding: 9px 20px; border-radius: 8px; border: 1px solid #D5DDE2; background: #FFFFFF; color: #42586A; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="background: #F2F4F6">取消</button>
+          <button onClick="{{ onCloseSettings }}" style="padding: 9px 24px; border-radius: 8px; border: none; background: {{ accent }}; color: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">保存配置</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ DELETE CONFIRM MODAL ============ -->
+  <sc-if value="{{ deleteOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(16,32,44,0.45); display: flex; align-items: center; justify-content: center; z-index: 20;" data-screen-label="删除确认">
+      <div style="width: 560px; max-height: 84%; background: #FFFFFF; border-radius: 14px; box-shadow: 0 24px 64px rgba(15,30,42,0.35); display: flex; flex-direction: column; overflow: hidden;">
+        <div style="flex: none; padding: 18px 24px 14px; border-bottom: 1px solid #E9EEF1; display: flex; align-items: center; gap: 12px;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: {{ delHeadBg }}; display: flex; align-items: center; justify-content: center;">
+            <svg width="16" height="17" viewBox="0 0 14 15" fill="none"><path d="M2 3.5 h10 M5 3.5 V2 a1 1 0 0 1 1-1 h2 a1 1 0 0 1 1 1 v1.5 M3.5 3.5 l0.7 9 a1.5 1.5 0 0 0 1.5 1.4 h2.6 a1.5 1.5 0 0 0 1.5-1.4 l0.7-9" stroke="{{ delHeadIcon }}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 15px; font-weight: 700;">{{ delTitle }}</div>
+            <div style="font-size: 11.5px; color: #6B8090; margin-top: 2px;">{{ delSubtitle }}</div>
+          </div>
+          <span style="font-size: 16px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: {{ accent }};">{{ delSize }}</span>
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding: 14px 24px; display: flex; flex-direction: column; gap: 8px;">
+          <sc-if value="{{ delPhaseConfirm }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ deleteItems }}" as="di" hint-placeholder-count="3">
+              <div style="border: 1px solid #E9EEF1; border-radius: 10px; padding: 11px 14px; display: flex; align-items: center; gap: 12px;">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex: none;"><circle cx="8" cy="8" r="7" fill="{{ di.dotBg }}"></circle><path d="{{ di.dotPath }}" stroke="{{ di.dotStroke }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 13px; font-weight: 600;">{{ di.title }}</div>
+                  <div style="font-size: 11px; color: {{ di.verdictColor }}; margin-top: 2px;">{{ di.verdict }}</div>
+                </div>
+                <span style="flex: none; font-size: 12.5px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; color: #42586A;">{{ di.size }}</span>
+              </div>
+            </sc-for>
+            <sc-if value="{{ delPermWarn }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top: 4px; padding: 10px 14px; border-radius: 9px; background: #FBF1F2; border: 1px solid #E3C9CE; font-size: 12px; line-height: 1.6; color: #A63A4B;">永久删除不经过回收站，无法恢复。含「需确认」项时建议先逐项核对。</div>
+            </sc-if>
+          </sc-if>
+          <sc-if value="{{ delPhaseResult }}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 10px 14px; border-radius: 9px; background: #F0F7F8; border: 1px solid #D8E9EC; font-size: 12.5px; font-weight: 600; color: #0B5E63;">{{ delResultSummary }}</div>
+            <sc-for list="{{ resultItems }}" as="ri" hint-placeholder-count="3">
+              <div style="border: 1px solid #E9EEF1; border-radius: 10px; padding: 11px 14px; display: flex; align-items: center; gap: 12px;">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex: none;"><circle cx="8" cy="8" r="7" fill="{{ ri.dotBg }}"></circle><path d="{{ ri.dotPath }}" stroke="{{ ri.dotStroke }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 13px; font-weight: 600;">{{ ri.title }}</span>
+                    <span style="font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: {{ ri.dotBg }}; color: {{ ri.statusColor }}; white-space: nowrap;">{{ ri.statusText }}</span>
+                  </div>
+                  <sc-if value="{{ ri.err }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size: 11px; color: #A63A4B; margin-top: 2px;">{{ ri.err }}</div>
+                  </sc-if>
+                </div>
+                <span style="flex: none; font-size: 12.5px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; color: #42586A;">{{ ri.size }}</span>
+              </div>
+            </sc-for>
+          </sc-if>
+        </div>
+        <div style="flex: none; padding: 14px 24px; border-top: 1px solid #E9EEF1; display: flex; justify-content: flex-end; gap: 10px; background: #FBFCFD;">
+          <sc-if value="{{ delPhaseConfirm }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ onCloseDelete }}" style="padding: 9px 20px; border-radius: 8px; border: 1px solid #D5DDE2; background: #FFFFFF; color: #42586A; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="background: #F2F4F6">取消</button>
+            <button onClick="{{ onConfirmDelete }}" style="padding: 9px 24px; border-radius: 8px; border: none; background: {{ delConfirmBg }}; color: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">{{ delConfirmLabel }}</button>
+          </sc-if>
+          <sc-if value="{{ delPhaseResult }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ onCloseDelete }}" style="padding: 9px 28px; border-radius: 8px; border: none; background: {{ accent }}; color: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">完成</button>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 1640, &quot;height&quot;: 1080 },
+  &quot;accentColor&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#0E7490&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;options&quot;: [&quot;#0E7490&quot;, &quot;#2563A8&quot;, &quot;#4F58C4&quot;, &quot;#1F8A5B&quot;], &quot;section&quot;: &quot;主题&quot; }
+}">
+class Component extends DCLogic {
+  state = {
+    view: this.props.view ?? 'done', // 'empty' | 'scanning' | 'done'
+    permOn: false,
+    settingsOpen: this.props.panel === 'settings',
+    deleteOpen: this.props.panel === 'delete',
+    deleteMode: this.props.deleteMode ?? 'recycle', // 'recycle' | 'perm'
+    provider: 'deepseek',
+    providerOpen: false,
+    expandedRec: null,
+    drive: 'C',
+    driveOpen: false,
+    scannedDrives: { C: (this.props.view ?? 'done') === 'done' },
+    openNodes: { users: true },
+    treeSelected: {},
+    deleteSource: 'rec', // 'rec' | 'tree'
+    attached: [],
+    dropHover: false,
+    elevBannerDismissed: false,
+    ctx: null, // {id, path, name, size, gb, kind, x, y}
+    ctxTarget: null,
+    deletePhase: 'confirm', // 'confirm' | 'result'
+    promptPreset: 'standard',
+    promptOpen: false,
+    profileSel: 0,
+    profiles: [
+      { name: '默认 · deepseek-chat', providerId: 'deepseek', model: 'deepseek-chat', max: 30, savedAt: '2026-06-28 21:04' },
+      { name: '办公机 · 保守清理', providerId: 'openai', model: 'gpt-4o-mini', max: 20, savedAt: '2026-05-14 10:22' },
+    ],
+    sortMode: 'allocated',
+    aiEnabled: true,
+    defMode: 'recycle',
+    selected: { wechat: true, temp: true, recycle: true, steam: false, pkg: false, installers: false },
+  };
+
+  promptPresets() {
+    if (this._promptPresets) return this._promptPresets;
+    const mk = (id, name, hint, body) => ({ id, name, hint, preview: '你是 Windows 磁盘清理审核助手。' + body + '只输出严格 JSON 字符串数组，数组元素必须完全等于候选 path，不要输出解释。' });
+    this._promptPresets = [
+      mk('standard', '标准清理', '只删可再生成的缓存 / 临时 / 日志 / 安装残留', '只允许从候选清单中选择明确可再生成、删除后可自动恢复或可重新下载的缓存、临时文件、日志、崩溃转储和安装残留。禁止选择系统核心目录、应用程序主体、用户文档和任何用途不确定的数据。'),
+      mk('conservative', '保守清理', '只选低风险常见项，任何不确定都不删', '只选择候选清单中明确可再生成、低风险且常见的缓存、临时文件、浏览器缓存和崩溃转储。任何不确定、用户生成或业务数据都不要建议删除。'),
+      mk('cache_aggressive', '激进缓存', '优先大型可再生成缓存与构建缓存', '优先建议候选清单里的大型可再生成缓存、构建缓存、包管理缓存、浏览器缓存、临时下载和安装残留。不要选择用户文档、媒体、源码或应用主体。'),
+      mk('developer', '开发环境', 'node_modules / NuGet / Gradle / pip 等可重建缓存', '优先识别可重建的 node_modules 缓存、NuGet、Gradle、Maven、pip、npm/yarn/pnpm 缓存、构建输出和 IDE 缓存。不要删除源码、配置、数据库或密钥。'),
+      mk('system_temp', '仅系统临时', '只清 Temp / INetCache / 更新缓存', '只建议 Windows Temp、用户 Temp、INetCache、SoftwareDistribution 下载缓存、崩溃转储和明确的临时文件。'),
+      mk('logs_first', '日志优先', '大型日志、轮转日志、旧崩溃转储优先', '优先选择大型日志、轮转日志、旧崩溃转储、诊断报告和应用运行临时日志。'),
+      mk('installer_leftovers', '安装残留', '安装包缓存、升级残留、失败安装临时文件', '优先识别安装包缓存、安装临时目录、升级残留、解压残留和失败安装产生的临时文件。'),
+      mk('browser_cache', '浏览器缓存', 'GPUCache / Code Cache 等，不动书签密码', '优先选择浏览器缓存、GPUCache、Code Cache、Service Worker Cache 和崩溃报告。不要删除书签、历史数据库、扩展数据和密码。'),
+      mk('media_safe', '媒体保护', '不碰图片 / 视频 / 音频 / 文档 / 工程文件', '可以建议删除临时文件、缓存、日志和崩溃转储，但不要删除图片、视频、音频、文档、压缩包、设计素材和工程文件。'),
+      mk('large_files_review', '大文件审查', '只挑明显可再生成的大型缓存与残留', '只从候选清单中挑选明显可再生成或无业务价值的大型缓存、临时文件、日志和残留文件；对下载、文档、项目目录和媒体保持高风险。'),
+      mk('recycle_bin_safe', '回收站友好', '优先可进回收站且不影响系统的项', '优先选择放入回收站后不影响系统运行的缓存、日志、临时文件和安装残留。'),
+      mk('enterprise_safe', '办公电脑', '不碰企业应用数据 / 邮件 / 同步盘 / 证书', '只建议删除缓存、临时文件、日志和安装残留。不要删除企业应用数据、邮件数据、同步盘、证书、密钥和配置文件。'),
+      { id: 'custom', name: '自定义', hint: '自行编辑系统提示词', preview: '' },
+    ];
+    return this._promptPresets;
+  }
+
+  formatBytes(bytes) {
+    if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + ' GB';
+    if (bytes >= 1e6) return (bytes / 1e6).toFixed(1) + ' MB';
+    if (bytes >= 1e3) return (bytes / 1e3).toFixed(0) + ' KB';
+    return bytes + ' B';
+  }
+
+  notifyAttach(msg) {
+    clearTimeout(this._noticeT);
+    this.setState({ attachNotice: msg });
+    this._noticeT = setTimeout(() => this.setState({ attachNotice: null }), 2600);
+  }
+
+  attachBlockReason(path, attached) {
+    if (attached.some((a) => a.path === path)) return 'dup';
+    if (attached.length >= 4) return '最多同时附加 4 个文件夹';
+    const parent = attached.find((a) => path.indexOf(a.path + '\\') === 0);
+    if (parent) return '其上级文件夹「' + parent.path + '」已附加，无需重复添加';
+    return null;
+  }
+
+  addAttachment(item) {
+    const reason = this.attachBlockReason(item.path, this.state.attached);
+    if (reason === 'dup') return;
+    if (reason) { this.notifyAttach(reason); return; }
+    const swallowed = this.state.attached.filter((a) => a.path.indexOf(item.path + '\\') === 0).length;
+    this.setState((s) => ({
+      // adding a parent replaces any attached descendants
+      attached: [...s.attached.filter((a) => a.path.indexOf(item.path + '\\') !== 0), item],
+    }));
+    if (swallowed > 0) this.notifyAttach('已附加上级文件夹，自动合并了 ' + swallowed + ' 个子文件夹');
+  }
+
+  async pickFolder() {
+    // System folder picker: File System Access API first, webkitdirectory fallback
+    if (window.showDirectoryPicker) {
+      try {
+        const dir = await window.showDirectoryPicker();
+        let total = 0, count = 0;
+        const walkDir = async (d) => {
+          for await (const entry of d.values()) {
+            if (count > 5000) return;
+            if (entry.kind === 'file') {
+              try { const f = await entry.getFile(); total += f.size; count++; } catch (err) {}
+            } else if (entry.kind === 'directory') {
+              await walkDir(entry);
+            }
+          }
+        };
+        await walkDir(dir);
+        this.addAttachment({ path: dir.name, size: this.formatBytes(total) + (count > 5000 ? '+' : '') });
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // user cancelled
+        // SecurityError etc. → fall through to input fallback
+      }
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.webkitdirectory = true;
+    input.onchange = () => {
+      const files = Array.from(input.files || []);
+      if (!files.length) return;
+      const total = files.reduce((sum, f) => sum + f.size, 0);
+      const rel = files[0].webkitRelativePath || files[0].name;
+      this.addAttachment({ path: rel.split('/')[0], size: this.formatBytes(total) });
+    };
+    input.click();
+  }
+
+  renderVals() {
+    const accent = this.props.accentColor ?? '#0E7490';
+    const { view, permOn, selected, settingsOpen, deleteOpen, deleteMode, aiEnabled, defMode, provider, providerOpen, expandedRec, drive, driveOpen, scannedDrives, openNodes, treeSelected, deleteSource, attached, dropHover, elevBannerDismissed, ctx, ctxTarget, deletePhase, promptPreset, promptOpen, profileSel, profiles, sortMode } = this.state;
+    const isEmpty = view === 'empty', isScanning = view === 'scanning', isDone = view === 'done';
+
+    const tagStyles = {
+      safe:    { bg: '#E4F3EC', color: '#0F7A56', text: '可安全清理' },
+      confirm: { bg: '#FBF0DC', color: '#9A5B00', text: '需确认' },
+      system:  { bg: '#EDF1F4', color: '#5E7485', text: '系统保留' },
+    };
+
+    // ---- state switcher pills ----
+    const pillDefs = [
+      { id: 'empty', label: '未扫描' },
+      { id: 'scanning', label: '扫描中' },
+      { id: 'done', label: '扫描完成' },
+      { id: 'settings', label: '设置' },
+      { id: 'delete', label: '删除确认' },
+    ];
+    const pills = pillDefs.map((p) => {
+      const active = p.id === view || (p.id === 'settings' && settingsOpen) || (p.id === 'delete' && deleteOpen);
+      return {
+        label: p.label,
+        bg: active ? '#10202C' : 'transparent',
+        color: active ? '#FFFFFF' : '#42586A',
+        onClick: () => {
+          if (p.id === 'settings') this.setState({ settingsOpen: true, deleteOpen: false });
+          else if (p.id === 'delete') this.setState({ deleteOpen: true, settingsOpen: false, view: 'done' });
+          else this.setState({ view: p.id, settingsOpen: false, deleteOpen: false });
+        },
+      };
+    });
+
+    // ---- drives ----
+    const drives = [
+      { id: 'C', name: '本地磁盘 (C:)', fs: 'NTFS', total: '476 GB', used: '391.4 GB', free: '84.6 GB', pct: 82 },
+      { id: 'D', name: '数据 (D:)', fs: 'NTFS', total: '954 GB', used: '512.8 GB', free: '441.2 GB', pct: 54 },
+      { id: 'E', name: '备份 (E:)', fs: 'exFAT', total: '1.8 TB', used: '620.1 GB', free: '1.2 TB', pct: 34 },
+    ];
+    const curDrive = drives.find((d) => d.id === drive) || drives[0];
+    const driveRows = drives.map((d) => ({
+      name: d.name, fs: d.fs,
+      usage: '已用 ' + d.used + ' / ' + d.total + ' · 可用 ' + d.free,
+      pctW: d.pct + '%',
+      scanned: !!scannedDrives[d.id],
+      checkOpacity: d.id === drive ? 1 : 0,
+      bg: d.id === drive ? '#F0F7F8' : '#FFFFFF',
+      onClick: () => this.setState((s) => ({
+        drive: d.id, driveOpen: false,
+        view: s.scannedDrives[d.id] ? 'done' : 'empty',
+        settingsOpen: false, deleteOpen: false,
+      })),
+    }));
+
+    // ---- left tree (nested, foldable) ----
+    const treeDefs = [
+      { id: 'windows', name: 'Windows', size: '68.2 GB', gb: 68.2, pct: 29, kind: 'system', children: [
+        { id: 'winsxs', name: 'WinSxS', size: '12.4 GB', gb: 12.4, pct: 5, kind: 'system' },
+        { id: 'sys32', name: 'System32', size: '9.8 GB', gb: 9.8, pct: 4, kind: 'system' },
+        { id: 'softdist', name: 'SoftwareDistribution \\ Download', size: '3.2 GB', gb: 3.2, pct: 1, kind: 'safe' },
+      ] },
+      { id: 'users', name: 'Users \\ iyuca', size: '54.6 GB', gb: 54.6, pct: 23, children: [
+        { id: 'downloads', name: 'Downloads', size: '21.3 GB', gb: 21.3, pct: 9, kind: 'confirm' },
+        { id: 'wechatf', name: 'WeChat Files', size: '12.8 GB', gb: 12.8, pct: 5, kind: 'safe' },
+        { id: 'temp', name: 'AppData \\ Local \\ Temp', size: '8.4 GB', gb: 8.4, pct: 4, kind: 'safe' },
+      ] },
+      { id: 'pf', name: 'Program Files', size: '41.7 GB', gb: 41.7, pct: 18, children: [
+        { id: 'nvidia', name: 'NVIDIA Corporation', size: '8.9 GB', gb: 8.9, pct: 4 },
+        { id: 'adobe', name: 'Adobe', size: '7.4 GB', gb: 7.4, pct: 3 },
+      ] },
+      { id: 'pd', name: 'ProgramData', size: '12.3 GB', gb: 12.3, pct: 5, children: [
+        { id: 'pkgcache', name: 'Package Cache', size: '4.5 GB', gb: 4.5, pct: 2, kind: 'safe' },
+      ] },
+      { id: 'recyclebin', name: '$Recycle.Bin', size: '6.9 GB', gb: 6.9, pct: 3, kind: 'safe' },
+      { id: 'pagefile', name: 'pagefile.sys', size: '16.0 GB', gb: 16.0, pct: 7, kind: 'system' },
+    ];
+    const flat = [];
+    const walk = (nodes, depth, parentPath) => nodes.forEach((n) => {
+      const hasCh = !!(n.children && n.children.length);
+      const open = !!openNodes[n.id];
+      const path = parentPath + '\\' + n.name.split(' \\ ').join('\\');
+      flat.push({ ...n, depth, hasCh, open, path });
+      if (hasCh && open) walk(n.children, depth + 1, path);
+    });
+    walk(treeDefs, 0, drive + ':');
+    const allNodes = [];
+    const collect = (nodes) => nodes.forEach((n) => { allNodes.push(n); if (n.children) collect(n.children); });
+    collect(treeDefs);
+    let treeSelCount = 0, treeSelGb = 0;
+    allNodes.forEach((n) => { if (treeSelected[n.id]) { treeSelCount++; treeSelGb += n.gb; } });
+    const treeRows = flat.map((t) => {
+      const tag = t.kind ? tagStyles[t.kind] : null;
+      const isChecked = !!treeSelected[t.id];
+      return {
+        name: t.name, size: t.size,
+        selected: isChecked,
+        checkBg: isChecked ? accent : '#FFFFFF',
+        checkBorder: isChecked ? accent : '#C3CFD6',
+        onCheck: (e) => { e.stopPropagation(); this.setState((s) => ({ treeSelected: { ...s.treeSelected, [t.id]: !s.treeSelected[t.id] } })); },
+        onDragStart: (e) => {
+          this._dragNode = { path: t.path, size: t.size };
+          try { e.dataTransfer.setData('text/plain', t.path); e.dataTransfer.effectAllowed = 'copy'; } catch (err) {}
+        },
+        onContext: (e) => {
+          e.preventDefault(); e.stopPropagation();
+          this.setState({ ctx: { id: t.id, path: t.path, name: t.name, size: t.size, gb: t.gb, kind: t.kind, x: e.clientX, y: e.clientY } });
+        },
+        pct: t.pct * 3.2 + '%',
+        pad: (10 + t.depth * 22) + 'px',
+        weight: t.depth === 0 ? 600 : 400,
+        chevOpacity: t.hasCh ? 1 : 0,
+        chevRot: t.open ? '90deg' : '0deg',
+        folderFill: t.kind === 'safe' ? '#E2F0F2' : '#EDF1F4',
+        folderStroke: t.kind === 'safe' ? accent : '#8CA0AD',
+        barColor: t.kind === 'safe' ? accent : (t.kind === 'confirm' ? '#C99A3B' : '#33475A'),
+        tag: tag ? tag.text : false,
+        tagBg: tag ? tag.bg : '', tagColor: tag ? tag.color : '',
+        onToggle: t.hasCh
+          ? () => this.setState((s) => ({ openNodes: { ...s.openNodes, [t.id]: !s.openNodes[t.id] } }))
+          : () => {},
+      };
+    });
+
+    const skeletonRows = [
+      { w: '42%' }, { w: '58%' }, { w: '35%' }, { w: '64%' }, { w: '48%' },
+      { w: '55%' }, { w: '38%' }, { w: '60%' }, { w: '45%' }, { w: '52%' },
+      { w: '40%' }, { w: '57%' }, { w: '33%' },
+    ].map((s, i) => ({ ...s, delay: (i * 0.12) + 's' }));
+
+    // ---- pre-scan proactive cards ----
+    const preCards = [
+      { mono: 'WX', iconBg: '#E4F3EC', iconColor: '#0F7A56', title: '微信 PC 版', chip: '已检测到安装', chipBg: '#EDF1F4', chipColor: '#5E7485', desc: '缓存目录通常占用 5–20 GB，扫描后给出准确大小与可清理明细。' },
+      { mono: 'ST', iconBg: '#EDF1F4', iconColor: '#42586A', title: 'Steam 游戏库', chip: '已检测到安装', chipBg: '#EDF1F4', chipColor: '#5E7485', desc: '将分析各游戏最后启动时间，找出长期未玩的大体积游戏。' },
+      { mono: '>_', iconBg: '#F0F7F8', iconColor: '#0B5E63', title: '长期未使用的大文件', chip: 'AI 预判', chipBg: '#F0F7F8', chipColor: '#0B5E63', desc: '扫描后列出超过 180 天未访问且大于 500 MB 的文件，逐个给出处置建议。' },
+      { mono: 'TMP', iconBg: '#FBF6EC', iconColor: '#9A5B00', title: '系统临时文件', chip: '常见占用点', chipBg: '#EDF1F4', chipColor: '#5E7485', desc: 'Temp、更新残留、崩溃转储等，通常可安全清理数 GB。' },
+      { mono: 'DL', iconBg: '#EDF1F4', iconColor: '#42586A', title: 'Downloads 安装包', chip: 'AI 预判', chipBg: '#F0F7F8', chipColor: '#0B5E63', desc: '识别已完成安装的安装包与已解压的压缩包，安全移除原文件。' },
+    ];
+
+    // ---- AI providers ----
+    const providers = [
+      { id: 'deepseek', name: 'DeepSeek', url: 'https://api.deepseek.com/v1', model: 'deepseek-chat', chip: '需要 Key', needsKey: true },
+      { id: 'openai', name: 'OpenAI', url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', chip: '需要 Key', needsKey: true },
+      { id: 'anthropic', name: 'Anthropic', url: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-5', chip: '需要 Key', needsKey: true },
+      { id: 'kimi', name: '月之暗面 Kimi', url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', chip: '需要 Key', needsKey: true },
+      { id: 'glm', name: '智谱 GLM', url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', chip: '需要 Key', needsKey: true },
+      { id: 'qwen', name: '阿里云通义', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', chip: '需要 Key', needsKey: true },
+      { id: 'ollama', name: 'Ollama', url: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:14b', chip: '本地 · 免 Key', needsKey: false },
+      { id: 'custom', name: '自定义…', url: '自行输入接口地址', model: 'deepseek-chat', chip: '手动配置', needsKey: true },
+    ];
+    const curProvider = providers.find((p) => p.id === provider) || providers[0];
+    const chipStyle = (p) => ({
+      bg: p.id === 'ollama' ? '#E4F3EC' : (p.id === 'custom' ? '#F0F7F8' : '#EDF1F4'),
+      color: p.id === 'ollama' ? '#0F7A56' : (p.id === 'custom' ? '#0B5E63' : '#5E7485'),
+    });
+    const providerRows = providers.map((p) => {
+      const sel = p.id === provider;
+      const cs = chipStyle(p);
+      return {
+        name: p.name, url: p.url, chip: p.chip,
+        chipBg: cs.bg, chipColor: cs.color,
+        bg: sel ? '#F0F7F8' : '#FFFFFF',
+        checkOpacity: sel ? 1 : 0,
+        onClick: () => this.setState({ provider: p.id, providerOpen: false }),
+      };
+    });
+    const curChip = chipStyle(curProvider);
+
+    // ---- post-scan rec cards ----
+    const recDefs = [
+      { id: 'wechat', title: '微信缓存文件', gb: 12.8, kind: 'safe', risk: 'low', source: 'AI 建议', desc: '图片 / 视频 / 文件缓存，聊天记录不受影响。3 个月增长 8.1 GB。', action: '查看明细', files: [
+        { name: '图片缓存', meta: 'WeChat Files\\wxid_…\\FileStorage\\Image', size: '6.2 GB', dot: '#0F9A6D' },
+        { name: '视频缓存', meta: 'WeChat Files\\wxid_…\\FileStorage\\Video', size: '4.9 GB', dot: '#0F9A6D' },
+        { name: '接收的文件（已另存）', meta: 'WeChat Files\\wxid_…\\FileStorage\\File', size: '1.7 GB', dot: '#0F9A6D' },
+      ] },
+      { id: 'temp', title: '系统临时文件', gb: 8.4, kind: 'safe', risk: 'low', source: '本地规则', desc: 'Temp 目录中 61 天前的安装残留与日志，均无进程占用。', action: '查看明细', files: [
+        { name: 'NVIDIA 驱动安装残留', meta: 'Temp\\nv_dispi.inf_amd64 · 61 天前', size: '2.1 GB', dot: '#0F9A6D' },
+        { name: '日志文件 × 1,204', meta: 'Temp\\*.log · 最早 8 个月前', size: '1.8 GB', dot: '#0F9A6D' },
+        { name: 'Package Cache 残留', meta: 'ProgramData\\Package Cache · 已失效', size: '4.5 GB', dot: '#0F9A6D' },
+      ] },
+      { id: 'recycle', title: '回收站', gb: 6.9, kind: 'safe', risk: 'low', source: '本地规则', desc: '38 个已删除项目，最早为 5 个月前。', action: '查看明细', files: [
+        { name: '旧项目备份.zip 等 38 项', meta: '$Recycle.Bin · 最早 2026-02-11', size: '6.9 GB', dot: '#0F9A6D' },
+      ] },
+      { id: 'installers', title: '已安装的安装包', gb: 9.2, kind: 'safe', risk: 'medium', source: 'AI 建议', desc: 'Downloads 中 9 个安装包，对应软件均已安装且可正常运行。', action: '逐项核对', files: [
+        { name: 'VSCodeSetup-x64-1.101.exe', meta: 'Downloads · 对应软件已安装', size: '96 MB', dot: '#0F9A6D' },
+        { name: 'wechat_setup_3.9.12.exe', meta: 'Downloads · 对应软件已安装', size: '289 MB', dot: '#0F9A6D' },
+        { name: 'cuda_12.8_windows.exe 等 7 项', meta: 'Downloads · 逐项核对后移除', size: '8.8 GB', dot: '#0F9A6D' },
+      ] },
+      { id: 'steam', title: 'Steam 长期未玩游戏', gb: 23.5, kind: 'confirm', risk: 'high', source: 'AI 建议', desc: '2 款游戏超过 180 天未启动，卸载后可随时重新下载。', action: '逐项核对', files: [
+        { name: '荒野大镖客 2', meta: 'steamapps\\common · 最后启动 2025-11-03', size: '116 GB → 压缩后 18.2 GB', dot: '#C99A3B' },
+        { name: 'Cities: Skylines II', meta: 'steamapps\\common · 最后启动 2025-12-21', size: '5.3 GB', dot: '#C99A3B' },
+      ] },
+      { id: 'pkg', title: 'npm / pip 包缓存', gb: 4.1, kind: 'confirm', risk: 'medium', source: '本地规则', desc: '开发工具缓存，删除后首次安装依赖会变慢。', action: '查看明细', files: [
+        { name: 'npm 缓存', meta: 'AppData\\Local\\npm-cache', size: '2.6 GB', dot: '#C99A3B' },
+        { name: 'pip 缓存', meta: 'AppData\\Local\\pip\\cache', size: '1.5 GB', dot: '#C99A3B' },
+      ] },
+    ];
+    let selCount = 0, selGb = 0;
+    const recCards = recDefs.map((r) => {
+      const isSel = !!selected[r.id];
+      if (isSel) { selCount++; selGb += r.gb; }
+      const tag = tagStyles[r.kind];
+      const isExp = expandedRec === r.id;
+      const riskStyles = {
+        low: { bg: '#E4F3EC', color: '#0F7A56', text: '低风险' },
+        medium: { bg: '#FBF0DC', color: '#9A5B00', text: '中风险' },
+        high: { bg: '#FBF1F2', color: '#A63A4B', text: '高风险' },
+      };
+      const risk = riskStyles[r.risk] || riskStyles.low;
+      return {
+        title: r.title, desc: r.desc,
+        size: r.gb.toFixed(1) + ' GB',
+        tag: risk.text,
+        tagBg: risk.bg, tagColor: risk.color,
+        source: r.source,
+        selected: isSel,
+        expanded: isExp,
+        files: r.files,
+        actionLabel: isExp ? '收起明细' : r.action,
+        chevRot: isExp ? '90deg' : '0deg',
+        bg: isSel ? '#F7FBFC' : '#FFFFFF',
+        borderColor: isExp ? '#9FC4CC' : (isSel ? '#BBD9DE' : '#E1E7EB'),
+        checkBg: isSel ? accent : '#FFFFFF',
+        checkBorder: isSel ? accent : '#C3CFD6',
+        onToggle: (e) => { e.stopPropagation(); this.setState((s) => ({ selected: { ...s.selected, [r.id]: !s.selected[r.id] } })); },
+        onExpand: () => this.setState((s) => ({ expandedRec: s.expandedRec === r.id ? null : r.id })),
+      };
+    });
+
+    // ---- delete modal items ----
+    const verdictOf = (kind) => {
+      if (kind === 'safe') return { dotBg: '#E4F3EC', dotStroke: '#0F7A56', dotPath: 'M5 8.2 L7.2 10.4 L11 5.8', verdict: '评估通过 · 无进程占用 · 无系统依赖', verdictColor: '#0F7A56', warn: false };
+      if (kind === 'system') return { dotBg: '#FBF1F2', dotStroke: '#A63A4B', dotPath: 'M8 4.5 L8 8.8 M8 11.2 L8 11.3', verdict: '系统保留 · 不建议删除', verdictColor: '#A63A4B', warn: true };
+      if (kind === 'confirm') return { dotBg: '#FBF0DC', dotStroke: '#9A5B00', dotPath: 'M8 4.5 L8 8.8 M8 11.2 L8 11.3', verdict: '需人工确认 · 建议先逐项核对', verdictColor: '#9A5B00', warn: true };
+      return { dotBg: '#EDF1F4', dotStroke: '#5E7485', dotPath: 'M8 4.5 L8 8.8 M8 11.2 L8 11.3', verdict: '待评估 · 执行前将进行沙盒评估', verdictColor: '#5E7485', warn: false };
+    };
+    let hasConfirmItem = false;
+    let delCount = 0, delGb = 0;
+    const delSrcItems = deleteSource === 'ctx'
+      ? (ctxTarget ? [{ title: ctxTarget.name, gb: ctxTarget.gb, kind: ctxTarget.kind }] : [])
+      : (deleteSource === 'tree'
+        ? allNodes.filter((n) => treeSelected[n.id]).map((n) => ({ title: n.name, gb: n.gb, kind: n.kind }))
+        : recDefs.filter((r) => selected[r.id]).map((r) => ({ title: r.title, gb: r.gb, kind: r.kind })));
+    const deleteItems = delSrcItems.map((it) => {
+      const v = verdictOf(it.kind);
+      if (v.warn) hasConfirmItem = true;
+      delCount++; delGb += it.gb;
+      return { title: it.title, size: it.gb.toFixed(1) + ' GB', ...v };
+    });
+    const isPerm = deleteMode === 'perm';
+
+    // ---- delete results (after 确认执行) ----
+    let freedGb = 0, nDel = 0, nSkip = 0, nFail = 0;
+    const resultItems = delSrcItems.map((it) => {
+      let st;
+      if (it.kind === 'system') { st = 'fail'; nFail++; }
+      else if (it.kind === 'confirm') { st = 'skip'; nSkip++; }
+      else { st = 'del'; nDel++; freedGb += it.gb; }
+      return {
+        title: it.title,
+        size: it.gb.toFixed(1) + ' GB',
+        statusText: st === 'del' ? '已删除' : (st === 'skip' ? '已跳过' : '失败'),
+        statusColor: st === 'del' ? '#0F7A56' : (st === 'skip' ? '#9A5B00' : '#A63A4B'),
+        dotBg: st === 'del' ? '#E4F3EC' : (st === 'skip' ? '#FBF0DC' : '#FBF1F2'),
+        dotStroke: st === 'del' ? '#0F7A56' : (st === 'skip' ? '#9A5B00' : '#A63A4B'),
+        dotPath: st === 'del' ? 'M5 8.2 L7.2 10.4 L11 5.8' : (st === 'skip' ? 'M8 4.5 L8 8.8 M8 11.2 L8 11.3' : 'M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5'),
+        err: st === 'fail' ? '拒绝访问：文件受系统保护（0x5），可尝试完全权限模式' : (st === 'skip' ? '需人工确认的项默认跳过，可在明细中单独处理' : false),
+      };
+    });
+
+    return {
+      accent, pills,
+      showSwitcher: this.props.showSwitcher ?? true,
+      isEmpty, isScanning, isDone,
+      isPre: isEmpty || isScanning,
+      treeRows, skeletonRows, preCards, recCards,
+      recTitle: isDone ? '智能推荐' : '清理方向预判',
+      recSubtitle: isDone ? recDefs.length + ' 项建议' : preCards.length + ' 个方向',
+      recCount: recDefs.length,
+      selCount, selSize: selGb.toFixed(1) + ' GB',
+      scanPct: '67%',
+
+      // toolbar
+      scanLabel: isScanning ? '扫描中…' : (isDone ? '重新扫描' : '开始扫描'),
+      scanBtnBg: isScanning ? '#8CA0AD' : accent,
+      scanIconAnim: isScanning ? 'acv-spin 1.2s linear infinite' : 'none',
+      onScan: () => {
+        if (this.state.view === 'scanning') return;
+        this.setState({ view: 'scanning', driveOpen: false });
+        clearTimeout(this._scanT);
+        this._scanT = setTimeout(() => this.setState((s) => ({
+          view: 'done',
+          scannedDrives: { ...s.scannedDrives, [s.drive]: true },
+        })), 2600);
+      },
+
+      // drives
+      driveOpen, driveRows,
+      onToggleDriveMenu: () => this.setState((s) => ({ driveOpen: !s.driveOpen })),
+      curDriveName: curDrive.name,
+      curDriveMeta: curDrive.fs + ' · ' + curDrive.total,
+      driveChevRot: driveOpen ? '180deg' : '0deg',
+      driveTriggerBorder: driveOpen ? accent : '#D5DDE2',
+      driveUsageLabel: '已用 ' + curDrive.used + ' / ' + curDrive.total,
+      statusDrive: curDrive.id + ': · ' + curDrive.used + ' / ' + curDrive.total,
+      permOn,
+      permBg: permOn ? accent : '#C3CFD6',
+      permKnobLeft: permOn ? '17px' : '2px',
+      permKnobLeft2: permOn ? '19px' : '2px',
+      onTogglePerm: () => this.setState((s) => ({ permOn: !s.permOn })),
+      aiChipBg: aiEnabled ? '#EDF6F7' : '#F2F4F6',
+      aiChipBorder: aiEnabled ? '#CFE6E9' : '#E1E7EB',
+      aiChipColor: aiEnabled ? '#0B5E63' : '#6B8090',
+      aiChipText: aiEnabled ? 'AI 已连接' : '本地规则模式',
+      aiDot: aiEnabled ? '#0F9A6D' : '#9FB4BF',
+      inputPlaceholder: dropHover ? '松开即可把文件夹交给 AI 分析' : (attached.length > 0 ? '针对已附加的文件夹提问，例如：这些能删吗？' : (isDone ? '询问任意文件或文件夹，或把左侧条目拖到这里…' : '扫描完成后即可提问…')),
+
+      // folder attach / drag-drop
+      hasAttach: attached.length > 0,
+      attachNotice: this.state.attachNotice || false,
+      chipRowRef: (this._chipRowRef = this._chipRowRef || React.createRef()),
+      chipRowCursor: this._chipDrag ? 'grabbing' : 'grab',
+      onChipRowDown: (e) => {
+        const el = this._chipRowRef && this._chipRowRef.current;
+        if (!el) return;
+        this._chipDrag = { x: e.clientX, left: el.scrollLeft };
+        this.forceUpdate();
+      },
+      onChipRowMove: (e) => {
+        const el = this._chipRowRef && this._chipRowRef.current;
+        if (!el || !this._chipDrag) return;
+        el.scrollLeft = this._chipDrag.left - (e.clientX - this._chipDrag.x);
+      },
+      onChipRowUp: () => {
+        if (this._chipDrag) { this._chipDrag = null; this.forceUpdate(); }
+      },
+      attachChips: attached.map((a, i) => ({
+        path: a.path, size: a.size,
+        onRemove: () => this.setState((s) => ({ attached: s.attached.filter((_, j) => j !== i) })),
+      })),
+      inputBg: dropHover ? '#F0F7F8' : '#FFFFFF',
+      inputBorder: dropHover ? '1.5px dashed ' + accent : '1px solid #D5DDE2',
+      onInputDragOver: (e) => {
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = 'copy'; } catch (err) {}
+        if (!this.state.dropHover) this.setState({ dropHover: true });
+      },
+      onInputDragLeave: () => this.setState({ dropHover: false }),
+      onInputDrop: (e) => {
+        e.preventDefault();
+        const n = this._dragNode;
+        this._dragNode = null;
+        this.setState({ dropHover: false });
+        if (n) this.addAttachment(n);
+      },
+      onPickFolder: () => this.pickFolder(),
+
+      // status bar
+      statusDot: isScanning ? '#C99A3B' : (isDone ? '#0F9A6D' : '#5E7485'),
+      statusText: isScanning ? '正在扫描 C:\\ …' : (isDone ? '扫描完成' : '就绪 · 等待扫描'),
+
+      // settings
+      settingsOpen,
+      onOpenSettings: () => this.setState({ settingsOpen: true }),
+      onCloseSettings: () => this.setState({ settingsOpen: false }),
+      aiTogBg: aiEnabled ? accent : '#C3CFD6',
+      aiKnobLeft: aiEnabled ? '19px' : '2px',
+      onToggleAi: () => this.setState((s) => ({ aiEnabled: !s.aiEnabled })),
+      providerRows,
+      providerOpen,
+      onToggleProviderMenu: () => this.setState((s) => ({ providerOpen: !s.providerOpen, promptOpen: false })),
+      curProviderName: curProvider.name,
+      curProviderUrl: curProvider.url,
+      curProviderChip: curProvider.chip,
+      curChipBg: curChip.bg, curChipColor: curChip.color,
+      provChevRot: providerOpen ? '180deg' : '0deg',
+      provTriggerBorder: providerOpen ? accent : '#D5DDE2',
+      isCustom: provider === 'custom',
+      showKey: curProvider.needsKey,
+      modelName: curProvider.model,
+
+      // AI profiles
+      profileRows: profiles.map((p, i) => {
+        const sel = i === profileSel;
+        return {
+          name: p.name,
+          meta: '模型 ' + p.model + ' · 建议 ' + p.max + ' 条 · 保存 ' + p.savedAt,
+          bg: sel ? '#F7FBFC' : '#FFFFFF',
+          border: sel ? '#BBD9DE' : '#E1E7EB',
+          radioBorder: sel ? accent : '#C3CFD6',
+          dot: sel ? accent : 'transparent',
+          onApply: () => this.setState({ profileSel: i, provider: p.providerId }),
+          onDelete: (e) => {
+            e.stopPropagation();
+            this.setState((s) => ({
+              profiles: s.profiles.filter((_, j) => j !== i),
+              profileSel: s.profileSel === i ? 0 : (s.profileSel > i ? s.profileSel - 1 : s.profileSel),
+            }));
+          },
+        };
+      }),
+      onSaveProfile: () => {
+        const now = new Date();
+        const stamp = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        this.setState((s) => ({
+          profiles: [...s.profiles, { name: curProvider.model + ' · ' + stamp, providerId: s.provider, model: curProvider.model, max: 30, savedAt: stamp }],
+          profileSel: s.profiles.length,
+        }));
+      },
+
+      // prompt presets
+      promptOpen,
+      onTogglePromptMenu: () => this.setState((s) => ({ promptOpen: !s.promptOpen, providerOpen: false })),
+      promptTriggerBorder: promptOpen ? accent : '#D5DDE2',
+      promptChevRot: promptOpen ? '180deg' : '0deg',
+      curPromptName: (this.promptPresets().find((p) => p.id === promptPreset) || this.promptPresets()[0]).name,
+      curPromptHint: (this.promptPresets().find((p) => p.id === promptPreset) || this.promptPresets()[0]).hint,
+      promptRows: this.promptPresets().map((p) => ({
+        name: p.name, hint: p.hint,
+        bg: p.id === promptPreset ? '#F0F7F8' : '#FFFFFF',
+        checkOpacity: p.id === promptPreset ? 1 : 0,
+        onClick: () => this.setState({ promptPreset: p.id, promptOpen: false }),
+      })),
+      isCustomPrompt: promptPreset === 'custom',
+      notCustomPrompt: promptPreset !== 'custom',
+      promptPreview: (this.promptPresets().find((p) => p.id === promptPreset) || this.promptPresets()[0]).preview,
+      promptDriveHint: curDrive.id + ':\\',
+
+      // scan options
+      sortAllocBg: sortMode === 'allocated' ? '#10202C' : '#FFFFFF',
+      sortAllocColor: sortMode === 'allocated' ? '#FFFFFF' : '#42586A',
+      sortLogicBg: sortMode === 'logical' ? '#10202C' : '#FFFFFF',
+      sortLogicColor: sortMode === 'logical' ? '#FFFFFF' : '#42586A',
+      onSortAllocated: () => this.setState({ sortMode: 'allocated' }),
+      onSortLogical: () => this.setState({ sortMode: 'logical' }),
+      defRecBg: defMode === 'recycle' ? '#10202C' : '#FFFFFF',
+      defRecColor: defMode === 'recycle' ? '#FFFFFF' : '#42586A',
+      defPermBg: defMode === 'perm' ? '#10202C' : '#FFFFFF',
+      defPermColor: defMode === 'perm' ? '#FFFFFF' : '#42586A',
+      onDefRecycle: () => this.setState({ defMode: 'recycle' }),
+      onDefPerm: () => this.setState({ defMode: 'perm' }),
+
+      // tree multi-select
+      treeHasSel: treeSelCount > 0,
+      treeNoSel: treeSelCount === 0,
+      treeSelCount,
+      treeSelSize: treeSelGb.toFixed(1) + ' GB',
+      onClearTreeSel: (e) => { e.stopPropagation(); this.setState({ treeSelected: {} }); },
+      onTreeDeleteRecycle: () => this.setState({ deleteOpen: true, deleteMode: 'recycle', deleteSource: 'tree', deletePhase: 'confirm' }),
+      onTreeDeletePerm: () => this.setState({ deleteOpen: true, deleteMode: 'perm', deleteSource: 'tree', deletePhase: 'confirm' }),
+
+      // elevation banner
+      showElevateBanner: !elevBannerDismissed,
+      onDismissBanner: () => this.setState({ elevBannerDismissed: true }),
+      onElevate: () => this.setState({ elevBannerDismissed: true }),
+
+      // tree context menu
+      ctxOpen: !!ctx,
+      ctxX: ctx ? ctx.x + 'px' : '0px',
+      ctxY: ctx ? ctx.y + 'px' : '0px',
+      ctxPath: ctx ? ctx.path : '',
+      onCloseCtx: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ ctx: null }); },
+      ctxItems: ctx ? [
+        { label: '在文件资源管理器中打开', color: '#22323F', onClick: () => this.setState({ ctx: null }) },
+        { label: '加入 AI 对话', color: '#22323F', onClick: () => { this.addAttachment({ path: ctx.path, size: ctx.size }); this.setState({ ctx: null }); } },
+        { label: '移到回收站', color: '#22323F', onClick: () => this.setState({ ctx: null, ctxTarget: ctx, deleteSource: 'ctx', deleteMode: 'recycle', deleteOpen: true, deletePhase: 'confirm' }) },
+        { label: '永久删除', color: '#A63A4B', onClick: () => this.setState({ ctx: null, ctxTarget: ctx, deleteSource: 'ctx', deleteMode: 'perm', deleteOpen: true, deletePhase: 'confirm' }) },
+      ] : [],
+
+      // delete modal
+      deleteOpen, deleteItems, resultItems,
+      delCount,
+      delSize: delGb.toFixed(1) + ' GB',
+      delPhaseConfirm: deletePhase === 'confirm',
+      delPhaseResult: deletePhase === 'result',
+      delSubtitle: deletePhase === 'confirm' ? '已对 ' + delCount + ' 项完成沙盒安全评估' : '执行完毕',
+      delResultSummary: '已释放 ' + freedGb.toFixed(1) + ' GB · 删除 ' + nDel + ' 项 · 跳过 ' + nSkip + ' 项 · 失败 ' + nFail + ' 项',
+      onConfirmDelete: () => this.setState({ deletePhase: 'result' }),
+      onDeleteRecycle: () => this.setState({ deleteOpen: true, deleteMode: 'recycle', deleteSource: 'rec', deletePhase: 'confirm' }),
+      onDeletePerm: () => this.setState({ deleteOpen: true, deleteMode: 'perm', deleteSource: 'rec', deletePhase: 'confirm' }),
+      onCloseDelete: () => {
+        const wasResult = this.state.deletePhase === 'result';
+        this.setState((s) => {
+          const next = { deleteOpen: false, deletePhase: 'confirm', ctxTarget: null };
+          if (wasResult) {
+            if (s.deleteSource === 'rec') {
+              const sel = { ...s.selected };
+              recDefs.forEach((r) => { if (sel[r.id] && r.kind === 'safe') sel[r.id] = false; });
+              next.selected = sel;
+            } else if (s.deleteSource === 'tree') {
+              next.treeSelected = {};
+            }
+          }
+          return next;
+        });
+      },
+      delTitle: isPerm ? '永久删除确认' : '移到回收站',
+      delHeadBg: isPerm ? '#FBF1F2' : '#F0F7F8',
+      delHeadIcon: isPerm ? '#A63A4B' : accent,
+      delConfirmBg: isPerm ? '#A63A4B' : accent,
+      delConfirmLabel: isPerm ? '确认永久删除 ' + delCount + ' 项' : '确认移入回收站',
+      delPermWarn: isPerm || hasConfirmItem,
+    };
+  }
+}
+</script>
+</body>
+</html>
