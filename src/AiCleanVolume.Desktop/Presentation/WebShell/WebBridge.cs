@@ -11,6 +11,7 @@ using AiCleanVolume.Core.Domain.Settings;
 using AiCleanVolume.Core.Domain.Storage;
 using AiCleanVolume.Desktop.Composition;
 using AiCleanVolume.Desktop.Infrastructure.Ai;
+using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 
 namespace AiCleanVolume.Desktop.Presentation.WebShell
@@ -48,6 +49,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                 case "window.dragMove": host.DragMove(); return null;
 
                 case "env.info": return EnvInfo();
+                case "env.precheck": return EnvPrecheck();
                 case "env.openPath": dependencies.ExplorerService.OpenPath(Str(parameters, "path"), false); return null;
                 case "env.restartElevated": host.RestartElevated(); return null;
 
@@ -90,6 +92,172 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                 version = typeof(WebBridge).Assembly.GetName().Version.ToString(3),
                 drives
             };
+        }
+
+        // 扫描前的方向预判：只做路径存在性与第一层浅枚举，跳过无权限项，整体控制在数秒内。
+        // title/chip/desc 在此组装成设计稿卡片文案，前端按 key 分配配色。
+        private object EnvPrecheck()
+        {
+            List<object> items = new List<object>();
+
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+            if (DirExists(Path.Combine(documents, "WeChat Files"))
+                || DirExists(Path.Combine(documents, "xwechat_files"))
+                || DirExists(Path.Combine(userProfile, "Documents", "WeChat Files"))
+                || DirExists(Path.Combine(userProfile, "Documents", "xwechat_files")))
+            {
+                items.Add(new
+                {
+                    key = "wechat",
+                    title = "微信 PC 版",
+                    chip = "已检测到安装",
+                    desc = "缓存目录通常占用 5–20 GB，扫描后给出准确大小与可清理明细。",
+                    installed = true
+                });
+            }
+
+            string steamRoot = TrySteamRoot();
+            if (steamRoot != null && DirExists(Path.Combine(steamRoot, "steamapps")))
+            {
+                items.Add(new
+                {
+                    key = "steam",
+                    title = "Steam 游戏库",
+                    chip = "已检测到安装",
+                    desc = "将分析各游戏最后启动时间，找出长期未玩的大体积游戏。",
+                    installed = true
+                });
+            }
+
+            long tempBytes = ShallowBytes(Path.GetTempPath())
+                + ShallowBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Temp"));
+            if (tempBytes > 0)
+            {
+                items.Add(new
+                {
+                    key = "temp",
+                    title = "系统临时文件",
+                    chip = "常见占用点",
+                    desc = "Temp、更新残留、崩溃转储等，仅第一层文件已约 " + StorageFormatting.FormatBytes(tempBytes) + "，通常可安全清理。",
+                    installed = true
+                });
+            }
+
+            int dlCount;
+            long dlBytes;
+            CountInstallers(Path.Combine(userProfile, "Downloads"), out dlCount, out dlBytes);
+            if (dlCount > 0)
+            {
+                items.Add(new
+                {
+                    key = "downloads",
+                    title = "Downloads 安装包",
+                    chip = "常见占用点",
+                    desc = "下载目录有 " + dlCount + " 个安装包 / 压缩包，合计 " + StorageFormatting.FormatBytes(dlBytes) + "，已安装的可安全移除。",
+                    installed = true
+                });
+            }
+
+            bool chrome = DirExists(Path.Combine(localApp, "Google", "Chrome", "User Data", "Default", "Cache"));
+            bool edge = DirExists(Path.Combine(localApp, "Microsoft", "Edge", "User Data", "Default", "Cache"));
+            if (chrome || edge)
+            {
+                string which = chrome && edge ? "Chrome 与 Edge" : (chrome ? "Chrome" : "Edge");
+                items.Add(new
+                {
+                    key = "browser",
+                    title = "浏览器缓存",
+                    chip = "常见占用点",
+                    desc = which + " 的缓存目录（Cache / Code Cache 等），可安全清理并会自动重建。",
+                    installed = true
+                });
+            }
+
+            return new { items = items.ToArray() };
+        }
+
+        private static bool DirExists(string path)
+        {
+            try { return !string.IsNullOrEmpty(path) && Directory.Exists(path); }
+            catch { return false; }
+        }
+
+        private static string TrySteamRoot()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
+                {
+                    string p = key != null ? key.GetValue("SteamPath") as string : null;
+                    if (!string.IsNullOrWhiteSpace(p) && DirExists(p)) return p;
+                }
+            }
+            catch
+            {
+                // 无注册表项或读取受限时退回盘符探测
+            }
+
+            foreach (DriveInfo d in DriveInfo.GetDrives())
+            {
+                try
+                {
+                    if (d.DriveType != DriveType.Fixed || !d.IsReady) continue;
+                    string a = Path.Combine(d.Name, "Steam");
+                    if (DirExists(a)) return a;
+                    string b = Path.Combine(d.Name, "Program Files (x86)", "Steam");
+                    if (DirExists(b)) return b;
+                }
+                catch
+                {
+                    // 跳过异常盘符
+                }
+            }
+            return null;
+        }
+
+        // 只累加目录第一层文件的字节，不递归；无权限或异常项跳过。
+        private static long ShallowBytes(string dir)
+        {
+            long total = 0;
+            try
+            {
+                DirectoryInfo di = new DirectoryInfo(dir);
+                if (!di.Exists) return 0;
+                foreach (FileInfo f in di.EnumerateFiles())
+                {
+                    try { total += f.Length; } catch { }
+                }
+            }
+            catch
+            {
+                // 目录不可访问时按 0 处理
+            }
+            return total;
+        }
+
+        // 统计目录第一层的安装包 / 压缩包数量与合计字节。
+        private static void CountInstallers(string dir, out int count, out long bytes)
+        {
+            count = 0;
+            bytes = 0;
+            string[] exts = { ".exe", ".msi", ".zip", ".7z", ".rar" };
+            try
+            {
+                DirectoryInfo di = new DirectoryInfo(dir);
+                if (!di.Exists) return;
+                foreach (FileInfo f in di.EnumerateFiles())
+                {
+                    if (Array.IndexOf(exts, f.Extension.ToLowerInvariant()) < 0) continue;
+                    try { bytes += f.Length; count++; } catch { }
+                }
+            }
+            catch
+            {
+                // 目录不可访问时保持 0
+            }
         }
 
         private object SaveSettings(JObject parameters)

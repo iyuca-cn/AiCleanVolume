@@ -779,10 +779,12 @@ class Component extends DCLogic {
     // ---- bridge-backed real data (populated when running inside WebView2) ----
     versionText: 'v0.2.0',
     realDrives: null,
+    preCheck: null,            // env.precheck items | null(无桥/未返回时用演示卡片)
     realElevated: false,
     aiModel: 'deepseek-chat',
     appSettings: null,
     rootInfo: null,            // { path, bytes, totalFiles, totalDirs, rootNodeId, sessionId }
+    driveData: {},             // 磁盘字母 -> 该盘扫描/报告/推荐快照，切盘时保存与恢复
     nodeChildren: {},          // path -> [child node]
     openPaths: {},             // path -> bool
     treeTags: {},              // path -> 'safe'|'confirm'|'system'
@@ -905,6 +907,9 @@ class Component extends DCLogic {
       const drive = first ? first.name.replace(':', '') : 'C';
       this.setState({ realDrives: env.drives || [], versionText: 'v' + (env.version || ''), realElevated: !!env.elevated, drive });
     }).catch(() => {});
+    this.call('env.precheck').then((r) => {
+      this.setState({ preCheck: (r && r.items) || [] });
+    }).catch(() => {});
     this.call('settings.get').then((s) => {
       this.setState({
         appSettings: s,
@@ -955,6 +960,35 @@ class Component extends DCLogic {
   }
 
   // ================= scan flow =================
+
+  // 切换磁盘：把当前盘的扫描树/报告/推荐快照存入 driveData，再恢复目标盘的快照；
+  // 目标盘没扫过则回到空态。会话标识随快照一起保留，懒加载 scan.children 因此仍有效。
+  switchDrive(id) {
+    this.setState((st) => {
+      if (id === st.drive) return { driveOpen: false };
+      const snap = {
+        rootInfo: st.rootInfo, nodeChildren: st.nodeChildren, openPaths: st.openPaths,
+        report: st.report, reportTime: st.reportTime,
+        recItems: st.recItems, recSelPath: st.recSelPath, expandedRecPath: st.expandedRecPath,
+        treeTags: st.treeTags, treeSelPath: st.treeSelPath,
+        chatBubbles: st.chatBubbles, chatTokens: st.chatTokens,
+      };
+      const driveData = { ...st.driveData, [st.drive]: snap };
+      const saved = driveData[id];
+      const base = {
+        driveData, drive: id, driveOpen: false, settingsOpen: false, deleteOpen: false,
+        view: st.scannedDrives[id] ? 'done' : 'empty',
+      };
+      return saved ? { ...base, ...saved } : {
+        ...base,
+        rootInfo: null, nodeChildren: {}, openPaths: {},
+        report: null, reportTime: '',
+        recItems: null, recSelPath: {}, expandedRecPath: null,
+        treeTags: {}, treeSelPath: {},
+        chatBubbles: [], chatTokens: 0,
+      };
+    });
+  }
 
   startScan() {
     const s = this.state;
@@ -1226,7 +1260,7 @@ class Component extends DCLogic {
       scanned: !!s.scannedDrives[d.id],
       checkOpacity: d.id === letter ? 1 : 0,
       bg: d.id === letter ? '#F0F7F8' : '#FFFFFF',
-      onClick: () => this.setState((st) => ({ drive: d.id, driveOpen: false, view: st.scannedDrives[d.id] ? 'done' : 'empty', settingsOpen: false, deleteOpen: false })),
+      onClick: () => this.switchDrive(d.id),
     }));
 
     // scan button
@@ -1463,11 +1497,7 @@ class Component extends DCLogic {
       scanned: !!scannedDrives[d.id],
       checkOpacity: d.id === drive ? 1 : 0,
       bg: d.id === drive ? '#F0F7F8' : '#FFFFFF',
-      onClick: () => this.setState((s) => ({
-        drive: d.id, driveOpen: false,
-        view: s.scannedDrives[d.id] ? 'done' : 'empty',
-        settingsOpen: false, deleteOpen: false,
-      })),
+      onClick: () => this.switchDrive(d.id),
     }));
 
     // ---- left tree (nested, foldable) ----
@@ -1546,13 +1576,32 @@ class Component extends DCLogic {
     ].map((s, i) => ({ ...s, delay: (i * 0.12) + 's' }));
 
     // ---- pre-scan proactive cards ----
-    const preCards = [
+    // 无桥或预检未返回时用演示卡片；返回后按 key 映射本机真实检测结果，配色沿用设计稿。
+    const preCardStyle = {
+      wechat:    { mono: 'WX',  iconBg: '#E4F3EC', iconColor: '#0F7A56' },
+      steam:     { mono: 'ST',  iconBg: '#EDF1F4', iconColor: '#42586A' },
+      temp:      { mono: 'TMP', iconBg: '#FBF6EC', iconColor: '#9A5B00' },
+      downloads: { mono: 'DL',  iconBg: '#EDF1F4', iconColor: '#42586A' },
+      browser:   { mono: 'WEB', iconBg: '#F0F7F8', iconColor: '#0B5E63' },
+    };
+    const demoPreCards = [
       { mono: 'WX', iconBg: '#E4F3EC', iconColor: '#0F7A56', title: '微信 PC 版', chip: '已检测到安装', chipBg: '#EDF1F4', chipColor: '#5E7485', desc: '缓存目录通常占用 5–20 GB，扫描后给出准确大小与可清理明细。' },
       { mono: 'ST', iconBg: '#EDF1F4', iconColor: '#42586A', title: 'Steam 游戏库', chip: '已检测到安装', chipBg: '#EDF1F4', chipColor: '#5E7485', desc: '将分析各游戏最后启动时间，找出长期未玩的大体积游戏。' },
       { mono: '>_', iconBg: '#F0F7F8', iconColor: '#0B5E63', title: '长期未使用的大文件', chip: 'AI 预判', chipBg: '#F0F7F8', chipColor: '#0B5E63', desc: '扫描后列出超过 180 天未访问且大于 500 MB 的文件，逐个给出处置建议。' },
       { mono: 'TMP', iconBg: '#FBF6EC', iconColor: '#9A5B00', title: '系统临时文件', chip: '常见占用点', chipBg: '#EDF1F4', chipColor: '#5E7485', desc: 'Temp、更新残留、崩溃转储等，通常可安全清理数 GB。' },
       { mono: 'DL', iconBg: '#EDF1F4', iconColor: '#42586A', title: 'Downloads 安装包', chip: 'AI 预判', chipBg: '#F0F7F8', chipColor: '#0B5E63', desc: '识别已完成安装的安装包与已解压的压缩包，安全移除原文件。' },
     ];
+    let preCards;
+    if (this.state.preCheck === null) {
+      preCards = demoPreCards; // 无桥环境保留演示数据
+    } else if (this.state.preCheck.length === 0) {
+      preCards = [{ mono: '·', iconBg: '#F0F4F6', iconColor: '#8CA0AD', title: '未检测到常见占用点', chip: '待扫描', chipBg: '#EDF1F4', chipColor: '#5E7485', desc: '未发现微信 / Steam / 浏览器缓存等常见目标，扫描后仍会按实际占用给出清理建议。' }];
+    } else {
+      preCards = this.state.preCheck.map((it) => {
+        const st = preCardStyle[it.key] || { mono: '··', iconBg: '#EDF1F4', iconColor: '#42586A' };
+        return { mono: st.mono, iconBg: st.iconBg, iconColor: st.iconColor, title: it.title, chip: it.chip, chipBg: '#EDF1F4', chipColor: '#5E7485', desc: it.desc };
+      });
+    }
 
     // ---- AI providers ----
     const providers = [

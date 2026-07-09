@@ -21,17 +21,21 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
     {
         private const int DefaultChildWindowSize = 512;
 
-        private void ClearCurrentTreeSessionNoLock()
+        private void ClearAllTreeSessionsNoLock()
         {
-            if (currentTreeSession == null) return;
-            currentTreeSession.Dispose();
-            currentTreeSession = null;
+            foreach (ScanSession session in treeSessions.Values)
+            {
+                session.Dispose();
+            }
+            treeSessions.Clear();
+            sessionUsageOrder.Clear();
         }
 
         private sealed class ScanSession : IDisposable
         {
             public string RootPath { get; set; }
             public string TemplateKey { get; set; }
+            public string CacheKey { get; set; }
             public string SessionIdentity { get; set; }
             public int RootNodeId { get; set; }
             public NativeMftScanSession NativeSession { get; set; }

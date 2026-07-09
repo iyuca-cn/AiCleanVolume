@@ -67,16 +67,10 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
                 request.PerLevelLimit.ToString());
         }
 
-        private static bool IsCompatibleTreeSession(ScanSession session, string templateKey, ScanRequest request)
+        // 缓存键把模板与根路径拼在一起，使不同磁盘（同一套排序 / 尺寸参数）各占一个会话槽位。
+        private static string BuildSessionCacheKey(string templateKey, string rootPath)
         {
-            if (session == null) return false;
-            if (!string.Equals(session.TemplateKey, templateKey, StringComparison.Ordinal)) return false;
-            if (!string.IsNullOrWhiteSpace(request.SessionIdentity))
-            {
-                return string.Equals(session.SessionIdentity, request.SessionIdentity, StringComparison.Ordinal);
-            }
-
-            return IsSamePath(session.RootPath, request.Location);
+            return templateKey + "|" + NormalizePathKey(rootPath);
         }
     }
 }

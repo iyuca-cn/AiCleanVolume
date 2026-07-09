@@ -21,7 +21,11 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
     {
         private readonly object syncRoot = new object();
 
-        private ScanSession currentTreeSession;
+        // 每种模板（排序 / 最小尺寸 / 每层上限）+ 根路径缓存一个原生扫描会话，
+        // 按最近使用顺序保留至多 MaxCachedSessions 个，便于在多个磁盘间来回切换时复用已扫描结果。
+        private const int MaxCachedSessions = 3;
+        private readonly Dictionary<string, ScanSession> treeSessions = new Dictionary<string, ScanSession>(StringComparer.Ordinal);
+        private readonly List<string> sessionUsageOrder = new List<string>();
 
         public FolderSizeRankerScanProvider()
         {
@@ -40,7 +44,7 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
         {
             lock (syncRoot)
             {
-                ClearCurrentTreeSessionNoLock();
+                ClearAllTreeSessionsNoLock();
             }
         }
 
@@ -103,18 +107,20 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
 
             lock (syncRoot)
             {
-                if (IsCompatibleTreeSession(currentTreeSession, templateKey, request))
+                ScanSession cached = FindCachedSessionNoLock(templateKey, request);
+                if (cached != null)
                 {
-                    return currentTreeSession;
+                    TouchSessionNoLock(cached.CacheKey);
+                    return cached;
                 }
 
                 ScanSession session = null;
                 try
                 {
                     session = BuildTreeSession(request, templateKey);
-                    ClearCurrentTreeSessionNoLock();
-                    currentTreeSession = session;
-                    return currentTreeSession;
+                    session.CacheKey = BuildSessionCacheKey(templateKey, session.RootPath);
+                    StoreSessionNoLock(session);
+                    return session;
                 }
                 catch
                 {
@@ -122,6 +128,52 @@ namespace AiCleanVolume.Desktop.Infrastructure.Scanning
                     throw;
                 }
             }
+        }
+
+        // 懒加载子目录（scan.children）带着会话标识，按标识在所有缓存会话中定位；
+        // 首次扫描（scan.start）无标识，按模板 + 根路径命中已扫描过的同一磁盘。
+        private ScanSession FindCachedSessionNoLock(string templateKey, ScanRequest request)
+        {
+            if (!string.IsNullOrWhiteSpace(request.SessionIdentity))
+            {
+                foreach (ScanSession session in treeSessions.Values)
+                {
+                    if (string.Equals(session.TemplateKey, templateKey, StringComparison.Ordinal) &&
+                        string.Equals(session.SessionIdentity, request.SessionIdentity, StringComparison.Ordinal))
+                    {
+                        return session;
+                    }
+                }
+                return null;
+            }
+
+            ScanSession match;
+            return treeSessions.TryGetValue(BuildSessionCacheKey(templateKey, request.Location), out match) ? match : null;
+        }
+
+        private void StoreSessionNoLock(ScanSession session)
+        {
+            treeSessions[session.CacheKey] = session;
+            TouchSessionNoLock(session.CacheKey);
+
+            while (sessionUsageOrder.Count > MaxCachedSessions)
+            {
+                string oldestKey = sessionUsageOrder[0];
+                sessionUsageOrder.RemoveAt(0);
+
+                ScanSession evicted;
+                if (treeSessions.TryGetValue(oldestKey, out evicted))
+                {
+                    treeSessions.Remove(oldestKey);
+                    evicted.Dispose();
+                }
+            }
+        }
+
+        private void TouchSessionNoLock(string cacheKey)
+        {
+            sessionUsageOrder.Remove(cacheKey);
+            sessionUsageOrder.Add(cacheKey);
         }
 
         private ScanSession BuildTreeSession(ScanRequest request, string templateKey)
