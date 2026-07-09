@@ -1,13 +1,9 @@
-using System;
+﻿using System;
 using AiCleanVolume.Core.Application.CleanupPlanning;
 using AiCleanVolume.Core.Application.Deletion;
 using AiCleanVolume.Core.Application.Scanning;
 using AiCleanVolume.Core.Kernel.Ports;
 using AiCleanVolume.Desktop.Infrastructure.Ai;
-using AiCleanVolume.Desktop.Infrastructure.Scanning;
-using AiCleanVolume.Desktop.Infrastructure.Settings;
-using AiCleanVolume.Desktop.Infrastructure.Windows;
-using AiCleanVolume.Desktop.Presentation.Shared;
 
 namespace AiCleanVolume.Desktop.Composition
 {
@@ -15,9 +11,7 @@ namespace AiCleanVolume.Desktop.Composition
     {
         public ISettingsStore SettingsStore { get; set; }
         public IScanProvider ScanProvider { get; set; }
-        public ReusableBackgroundWorker BackgroundWorker { get; set; }
         public CandidatePlanner CandidatePlanner { get; set; }
-        public ConfiguredPathCleanupPlanner ConfiguredPathCleanupPlanner { get; set; }
         public IAiCleanupAdvisor LocalAdvisor { get; set; }
         public Func<Action<string>, OpenAiCompatibleAdvisor> AiAdvisorFactory { get; set; }
         public CleanupDeletionWorkflow DeletionWorkflow { get; set; }

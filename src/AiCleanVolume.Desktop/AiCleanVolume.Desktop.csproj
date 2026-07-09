@@ -43,7 +43,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AiCleanVolume.Core\AiCleanVolume.Core.csproj" />
-    <ProjectReference Include="..\..\third_party\AntdUI-v2.3.0\src\AntdUI\AntdUI.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
@@ -57,7 +56,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="Microsoft.VisualBasic" />
     <Reference Include="AiCleanVolume.NativeBridge">
       <HintPath>$(NativeBridgeOutput)</HintPath>
       <Private>true</Private>

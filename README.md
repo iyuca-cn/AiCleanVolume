@@ -70,7 +70,8 @@ src/AiCleanVolume.Core/          # 核心逻辑
 src/AiCleanVolume.Desktop/       # 桌面程序
   ├── Composition/               # 程序组装，把各个部件连起来
   ├── Infrastructure/            # 具体实现（native 扫描、AI接口、删除操作等）
-  └── Presentation/              # 界面显示和用户交互
+  ├── WebUi/                     # 设计稿前端（index.html，WebView2 加载渲染）
+  └── Presentation/WebShell/     # WebView2 宿主窗体与 JS 桥（驱动前端调后端）
 
 src/AiCleanVolume.NativeBridge/  # C++/CLI 扫描桥接，静态链接 mftscan-core
 
