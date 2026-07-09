@@ -325,6 +325,53 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             return null;
         }
 
+        // 实测路径大小：文件取 Length，目录做受限递归（最多 2 层 / 5000 文件 / 1.5 秒），
+        // 任一超限即返回已累计值并置 approx=true（前端显示"约 X"）。全程 Try/Catch，失败回 0。
+        // ponytail: 不接扫描会话（需按路径解析 nodeId 的额外管线）；有界递归已够且不会卡住。
+        private static long MeasurePathBytes(string path, out bool approx)
+        {
+            approx = false;
+            try
+            {
+                if (File.Exists(path)) return new FileInfo(path).Length;
+                if (!Directory.Exists(path)) return 0;
+            }
+            catch { return 0; }
+
+            long total = 0;
+            int files = 0;
+            DateTime deadline = DateTime.UtcNow.AddMilliseconds(1500);
+            Queue<KeyValuePair<string, int>> queue = new Queue<KeyValuePair<string, int>>();
+            queue.Enqueue(new KeyValuePair<string, int>(path, 0));
+            while (queue.Count > 0)
+            {
+                if (DateTime.UtcNow > deadline || files >= 5000) { approx = true; break; }
+                KeyValuePair<string, int> cur = queue.Dequeue();
+                DirectoryInfo di;
+                try { di = new DirectoryInfo(cur.Key); if (!di.Exists) continue; } catch { continue; }
+                try
+                {
+                    foreach (FileInfo f in di.EnumerateFiles())
+                    {
+                        try { total += f.Length; files++; } catch { }
+                        if (files >= 5000) { approx = true; break; }
+                    }
+                }
+                catch { }
+                if (cur.Value < 2)
+                {
+                    try { foreach (DirectoryInfo sub in di.EnumerateDirectories()) queue.Enqueue(new KeyValuePair<string, int>(sub.FullName, cur.Value + 1)); }
+                    catch { }
+                }
+                else
+                {
+                    try { using (IEnumerator<DirectoryInfo> e = di.EnumerateDirectories().GetEnumerator()) { if (e.MoveNext()) approx = true; } }
+                    catch { }
+                }
+            }
+            return total;
+        }
+
         // 只累加目录第一层文件的字节，不递归；无权限或异常项跳过。
         private static long ShallowBytes(string dir)
         {
@@ -536,12 +583,16 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                 if (string.IsNullOrWhiteSpace(name)) name = path;
                 string risk = (it["risk"]?.ToString() ?? "caution").Trim().ToLowerInvariant();
                 SandboxEvaluation ev = dependencies.DeletionWorkflow.Evaluate(path, settings.Sandbox);
+                bool approx;
+                long measured = MeasurePathBytes(path, out approx);
+                long bytes = measured > 0 ? measured : ReadLong(it as JObject, "bytes");
                 result.Add(new
                 {
                     path,
                     name,
                     risk,
-                    bytes = ReadLong(it as JObject, "bytes"),
+                    bytes,
+                    approx = measured > 0 && approx,
                     reason = it["reason"]?.ToString(),
                     sandboxOk = ev != null && ev.Action == SandboxAction.Allow,
                     sandboxNote = ev == null ? null : ev.Message
@@ -586,7 +637,11 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                     string path = it["path"]?.ToString();
                     string tag = it["tag"]?.ToString();
                     if (!string.IsNullOrWhiteSpace(path) && !string.IsNullOrWhiteSpace(tag))
-                        classified.Add(new { path = path.TrimEnd('\\'), tag = tag.Trim().ToLowerInvariant() });
+                    {
+                        bool approx;
+                        long bytes = MeasurePathBytes(path, out approx);
+                        classified.Add(new { path = path.TrimEnd('\\'), tag = tag.Trim().ToLowerInvariant(), bytes, approx = bytes > 0 && approx });
+                    }
                 }
             }
 

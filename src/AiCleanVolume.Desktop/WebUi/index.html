@@ -151,11 +151,9 @@
           <div style="height: 8px; border-radius: 4px; background: #EAEEF1; overflow: hidden; position: relative;">
             <div style="position: absolute; inset: 0; width: 30%; border-radius: 4px; background: {{ accent }}; animation: acv-sweep 1.4s ease-in-out infinite;"></div>
           </div>
-          <div style="margin-top: 10px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #8CA0AD; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">C:\Users\iyuca\AppData\Local\Packages\…</div>
+          <div style="margin-top: 10px; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #8CA0AD; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ scanTarget }}</div>
           <div style="display: flex; gap: 18px; margin-top: 8px; font-size: 11.5px; color: #6B8090;">
-            <span>已发现 <b style="color: #22323F;">86,412</b> 文件</span>
-            <span><b style="color: #22323F;">17,203</b> 文件夹</span>
-            <span>用时 <b style="color: #22323F;">2.8s</b></span>
+            <span>正在遍历 NTFS 主文件表（MFT），完成后显示完整文件与文件夹统计。</span>
           </div>
         </div>
         <div style="height: 1px; background: #E9EEF1; flex: none;"></div>
@@ -399,7 +397,7 @@
       <sc-if value="{{ showRec }}" hint-placeholder-val="{{ true }}">
         <sc-if value="{{ recHasDir }}" hint-placeholder-val="{{ false }}">
           <div style="flex: none; margin: 0 18px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #8CA0AD;">清理方向 · 点击向 AI 提问</div>
-          <div style="flex: none; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;">
+          <div style="flex: none; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto;">
             <sc-for list="{{ preGroups }}" as="g" hint-placeholder-count="3">
               <sc-if value="{{ g.showHeader }}" hint-placeholder-val="{{ true }}">
                 <div onClick="{{ g.onToggle }}" style="display: flex; align-items: center; gap: 8px; padding: 4px 4px 0; cursor: pointer; user-select: none;" style-hover="opacity: 0.7">
@@ -429,7 +427,7 @@
         <div style="flex: none; margin: 0 18px 10px; padding: 9px 12px; border-radius: 8px; background: #F0F7F8; border: 1px solid #D8E9EC; font-size: 12px; line-height: 1.6; color: #0B5E63;">
           AI 主动发现的可清理项，勾选后在底部一键执行。每项删除前都会再次做沙盒安全评估。
         </div>
-        <div style="flex: 1; overflow-y: auto; padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 8px;">
+        <div ref="{{ recScrollRef }}" style="flex: 1; overflow-y: auto; padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 8px;">
           <sc-for list="{{ recCards }}" as="card" hint-placeholder-count="5">
             <div onClick="{{ card.onExpand }}" style="border: 1px solid {{ card.borderColor }}; background: {{ card.bg }}; border-radius: 10px; padding: 12px 12px 12px 14px; cursor: pointer; animation: {{ card.flash }};" style-hover="border-color: #9FB4BF">
               <div style="display: flex; gap: 11px;">
@@ -854,6 +852,8 @@ class Component extends DCLogic {
     delResults: null,          // del.run results
     delProgress: null,         // { done, total }
     delRunning: false,
+    scanStartAt: 0,            // 扫描开始时间戳，配合 scanNow 显示真实经过时长
+    scanNow: 0,
   };
 
   promptPresets() {
@@ -1089,14 +1089,20 @@ class Component extends DCLogic {
     const s = this.state;
     if (s.view === 'scanning') return;
     const loc = s.drive + ':\\';
-    this.setState({ view: 'scanning', driveOpen: false, treeTags: {}, treeSelPath: {}, report: null, chatBubbles: [], chatTokens: 0, recItems: null, recSelPath: {}, openPaths: {} });
+    const now = Date.now();
+    this.setState({ view: 'scanning', driveOpen: false, treeTags: {}, treeSelPath: {}, report: null, chatBubbles: [], chatTokens: 0, recItems: null, recSelPath: {}, openPaths: {}, preGroupsOpen: {}, scanStartAt: now, scanNow: now });
+    // 扫描是一次阻塞式桥调用，没有逐文件进度；用真实经过时长做反馈，不再硬编码文件数。
+    clearInterval(this._scanTimer);
+    this._scanTimer = setInterval(() => this.setState({ scanNow: Date.now() }), 200);
     this.call('scan.start', { location: loc, sortMode: s.sortMode }).then((r) => {
+      clearInterval(this._scanTimer);
       const rootInfo = { path: r.path, bytes: r.bytes, totalFiles: r.totalFiles, totalDirs: r.totalDirs, rootNodeId: r.rootNodeId, sessionId: r.sessionId };
       this.setState((st) => ({ view: 'done', rootInfo, nodeChildren: { [r.path]: r.children || [] }, openPaths: {}, scannedDrives: { ...st.scannedDrives, [st.drive]: true } }));
       this.runReport();
       this.runSuggest(loc);
       if (typeof onDone === 'function') onDone();
     }).catch((e) => {
+      clearInterval(this._scanTimer);
       this.setState({ view: 'empty' });
       const msg = e.message || '';
       alert(/NOT_ADMIN|管理员/i.test(msg) ? ('需要管理员权限：请点击右上角「以管理员身份重新启动」后再扫描。\n\n' + msg) : ('扫描失败：' + msg));
@@ -1168,8 +1174,22 @@ class Component extends DCLogic {
   }
 
   runSuggest(loc) {
-    this.call('suggest.analyze', { location: loc }).then((r) => this.setState({ recItems: r.items || [] }))
-      .catch(() => this.setState({ recItems: [] }));
+    this.call('suggest.analyze', { location: loc }).then((r) => {
+      this.setState({ recItems: r.items || [] });
+      if ((r.items || []).length) this.collapsePredictions();
+    }).catch(() => this.setState({ recItems: [] }));
+  }
+
+  // 有推荐结论时，预判分组自动全部折叠让位（替换整份状态，一次性生效，不打断后续手动展开）。
+  collapsePredictions() {
+    const cats = {};
+    (this.state.preCheck || []).forEach((it) => { if (it.category) cats[it.category] = false; });
+    this.setState({ preGroupsOpen: cats });
+  }
+
+  scrollRecTop() {
+    const el = this._recScrollRef && this._recScrollRef.current;
+    if (el) el.scrollTop = 0;
   }
 
   // 发送一轮对话：追加用户气泡，带历史与系统提示词调用 ai.chat，回填 AI 气泡。
@@ -1196,7 +1216,9 @@ class Component extends DCLogic {
     const mapped = items.map((it) => ({
       path: it.path,
       name: it.name || (it.path || '').split('\\').pop() || it.path,
-      bytes: it.bytes || 0,
+      // 后端已实测大小；万一为 0 再退回已扫描树里的节点大小，都没有才留 0（显示"大小待定"）。
+      bytes: it.bytes || (this.findNode(it.path) ? this.findNode(it.path).bytes : 0),
+      approx: !!it.approx,
       isDir: true,
       risk: riskMap[it.risk] || 'medium',
       source: 'AI 分析',
@@ -1205,7 +1227,9 @@ class Component extends DCLogic {
       sandboxNote: it.sandboxNote || null,
     }));
     const paths = mapped.map((m) => m.path);
-    this.setState((st) => ({ recItems: (st.recItems || []).filter((r) => paths.indexOf(r.path) < 0).concat(mapped), flashPaths: paths }));
+    // 新结论放到推荐区顶部，落地后滚到顶让用户看见。
+    this.setState((st) => ({ recItems: mapped.concat((st.recItems || []).filter((r) => paths.indexOf(r.path) < 0)), flashPaths: paths }), () => this.scrollRecTop());
+    this.collapsePredictions();
     clearTimeout(this._flashT);
     this._flashT = setTimeout(() => this.setState({ flashPaths: [] }), 1400);
   }
@@ -1264,7 +1288,8 @@ class Component extends DCLogic {
       .filter((c) => c.tag === 'safe' && c.path && !have[norm(c.path)])
       .map((c) => {
         const n = this.findNode(c.path);
-        return { path: c.path, name: (c.path.split('\\').pop() || c.path), bytes: n ? n.bytes : 0, isDir: true, risk: 'low', source: 'AI 报告', reason: 'AI 整盘报告判定可安全清理。', sandboxOk: false, sandboxNote: null };
+        // 后端已给 classified 实测 bytes/approx；为 0 再退回树节点大小。
+        return { path: c.path, name: (c.path.split('\\').pop() || c.path), bytes: c.bytes || (n ? n.bytes : 0), approx: !!c.approx, isDir: true, risk: 'low', source: 'AI 报告', reason: 'AI 整盘报告判定可安全清理。', sandboxOk: false, sandboxNote: null };
       });
     return base.concat(extra);
   }
@@ -1503,8 +1528,10 @@ class Component extends DCLogic {
       onClick: () => this.switchDrive(d.id),
     }));
 
-    // scan button
+    // scan button + 扫描中真实反馈（经过时长 + 当前扫描目标，替代设计稿里的硬编码文件数）
     out.onScan = () => this.startScan();
+    out.scanPct = s.scanStartAt ? ((s.scanNow - s.scanStartAt) / 1000).toFixed(1) + 's' : '';
+    out.scanTarget = s.drive + ':\\';
 
     // left done header (reclaim + bar)
     const safeB = (s.report && s.report.safeBytes) || 0;
@@ -1607,14 +1634,15 @@ class Component extends DCLogic {
       if (isSel) { selCount++; selGb += r.bytes; }
       const risk = riskStyles[r.risk] || riskStyles.low;
       const isExp = s.expandedRecPath === r.path;
+      const sizeText = r.bytes > 0 ? ((r.approx ? '约 ' : '') + fmt(r.bytes)) : '大小待定';
       return {
         title: r.name, desc: (r.reason || '') + (r.sandboxNote ? (' · ' + r.sandboxNote) : ''),
-        size: r.bytes > 0 ? fmt(r.bytes) : '大小待定',
+        size: sizeText,
         tag: risk.text, tagBg: risk.bg, tagColor: risk.color,
         source: r.source || '',
         selected: isSel, expanded: isExp,
         flash: flash.indexOf(r.path) >= 0 ? 'acv-slidein 0.45s ease' : 'none',
-        files: [{ name: r.path, meta: r.sandboxOk ? '沙盒评估通过' : '删除前需确认', size: r.bytes > 0 ? fmt(r.bytes) : '大小待定', dot: r.sandboxOk ? '#0F9A6D' : '#C99A3B' }],
+        files: [{ name: r.path, meta: r.sandboxOk ? '沙盒评估通过' : '删除前需确认', size: sizeText, dot: r.sandboxOk ? '#0F9A6D' : '#C99A3B' }],
         actionLabel: isExp ? '收起明细' : '查看明细',
         chevRot: isExp ? '90deg' : '0deg',
         bg: isSel ? '#F7FBFC' : '#FFFFFF',
@@ -1641,6 +1669,7 @@ class Component extends DCLogic {
     out.recHasDir = !out.isPre && Array.isArray(s.preCheck) && s.preCheck.length > 0;
     out.selCount = selCount;
     out.selSize = fmt(selGb);
+    out.recScrollRef = (this._recScrollRef = this._recScrollRef || React.createRef());
     out.onDeleteRecycle = () => this.openDelete('rec', 'recycle');
     out.onDeletePerm = () => this.openDelete('rec', 'perm');
 
@@ -2046,7 +2075,7 @@ class Component extends DCLogic {
       recSubtitle: isDone ? recDefs.length + ' 项建议' : preCards.length + ' 个方向',
       recCount: recDefs.length,
       selCount, selSize: selGb.toFixed(1) + ' GB',
-      scanPct: '67%',
+      scanPct: '67%', scanTarget: 'C:\\',
 
       // toolbar
       scanLabel: isScanning ? '扫描中…' : (isDone ? '重新扫描' : '开始扫描'),
@@ -2291,7 +2320,7 @@ class Component extends DCLogic {
       treeFooter: '共 128,443 个文件 · 24,891 个文件夹',
       treeFooterMeta: 'MFT 扫描 · 4.2s',
       onSaveSettings: () => this.setState({ settingsOpen: false }),
-      onTestAi: () => {}, aiTestShow: false, aiTestText: '', aiTestColor: '#6B8090',
+      onTestAi: () => {}, aiTestShow: false, aiTestText: '', aiTestColor: '#6B8090', recScrollRef: null,
       endpointRef: null, keyRef: null, modelRef: null, maxRef: null,
       minSizeRef: null, perLevelRef: null, whitelistRef: null, customPromptRef: null,
     };
