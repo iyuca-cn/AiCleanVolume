@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using AiCleanVolume.Core.Application.Scanning;
 using AiCleanVolume.Core.Domain.Ai;
@@ -107,78 +108,67 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            string systemDrive = Path.GetPathRoot(windows) ?? "C:\\";
 
+            // ---- 日常社交 ----
             string wechatDir = FirstExisting(
                 Path.Combine(documents, "WeChat Files"),
                 Path.Combine(documents, "xwechat_files"),
                 Path.Combine(userProfile, "Documents", "WeChat Files"),
                 Path.Combine(userProfile, "Documents", "xwechat_files"));
-            if (wechatDir != null)
-            {
-                items.Add(new
-                {
-                    key = "wechat",
-                    title = "微信 PC 版",
-                    chip = "已检测到安装",
-                    desc = "缓存目录通常占用 5–20 GB，扫描后给出准确大小与可清理明细。",
-                    installed = true,
-                    targetPath = wechatDir,
-                    drive = DriveLetterOf(wechatDir)
-                });
-            }
+            if (wechatDir != null) AddItem(items, "wechat", "social", "微信 PC 版", "已检测到安装", "缓存目录通常占用 5–20 GB，扫描后给出准确大小与可清理明细。", wechatDir);
 
+            string qqDir = FirstExisting(
+                Path.Combine(documents, "Tencent Files"),
+                Path.Combine(userProfile, "Documents", "Tencent Files"),
+                Path.Combine(documents, "QQ"),
+                Path.Combine(userProfile, "Documents", "QQ"),
+                Path.Combine(appData, "Tencent", "QQ"),
+                Path.Combine(localApp, "QQ"));
+            if (qqDir != null) AddItem(items, "qq", "social", "QQ / QQNT", "已检测到安装", "聊天图片、文件与语音缓存，可安全清理且不影响消息记录。", qqDir);
+
+            string dingtalkDir = FirstExisting(Path.Combine(appData, "DingTalk"), Path.Combine(localApp, "DingTalk"));
+            if (dingtalkDir != null) AddItem(items, "dingtalk", "social", "钉钉", "已检测到安装", "钉钉缓存与临时文件，清理后不影响登录与消息。", dingtalkDir);
+
+            string wxworkDir = FirstExisting(Path.Combine(appData, "Tencent", "WXWork"), Path.Combine(documents, "WXWork"));
+            if (wxworkDir != null) AddItem(items, "wxwork", "social", "企业微信", "已检测到安装", "企业微信文件与图片缓存，可安全清理。", wxworkDir);
+
+            // ---- 游戏 ----
             string steamRoot = TrySteamRoot();
             string steamApps = steamRoot != null ? Path.Combine(steamRoot, "steamapps") : null;
             if (steamApps != null && DirExists(steamApps))
             {
                 string steamCommon = Path.Combine(steamApps, "common");
-                string steamTarget = DirExists(steamCommon) ? steamCommon : steamApps;
-                items.Add(new
-                {
-                    key = "steam",
-                    title = "Steam 游戏库",
-                    chip = "已检测到安装",
-                    desc = "将分析各游戏最后启动时间，找出长期未玩的大体积游戏。",
-                    installed = true,
-                    targetPath = steamTarget,
-                    drive = DriveLetterOf(steamRoot)
-                });
+                AddItem(items, "steam", "game", "Steam 游戏库", "已检测到安装", "将分析各游戏最后启动时间，找出长期未玩的大体积游戏。", DirExists(steamCommon) ? steamCommon : steamApps);
             }
 
+            string epicDir = FirstExistingOnDrives("Program Files\\Epic Games", "Epic Games") ?? FirstExisting(Path.Combine(programData, "Epic"));
+            if (epicDir != null) AddItem(items, "epic", "game", "Epic 游戏库", "已检测到安装", "分析 Epic 已安装游戏，找出长期未玩的大体积游戏。", epicDir);
+
+            string wegameDir = FirstExistingOnDrives("WeGame", "WeGameApps", "Program Files\\WeGame", "Program Files (x86)\\WeGame");
+            if (wegameDir != null) AddItem(items, "wegame", "game", "WeGame 游戏库", "已检测到安装", "分析 WeGame 已安装游戏与缓存，找出可清理的大体积内容。", wegameDir);
+
+            string mihoyoDir = FirstExisting(Path.Combine(appData, "miHoYo")) ?? FirstExistingOnDrives("Genshin Impact Game", "Star Rail", "miHoYo Launcher", "Program Files\\Genshin Impact");
+            if (mihoyoDir != null) AddItem(items, "mihoyo", "game", "米哈游游戏", "已检测到安装", "原神 / 崩坏：星穹铁道等，含大量可清理的缓存与日志。", mihoyoDir);
+
+            // ---- 开发缓存（合并成一张卡列出检测到的种类）----
+            List<string> devKinds = new List<string>();
+            string devTarget = null;
+            Action<string, string> dev = (name, path) => { if (path != null) { devKinds.Add(name); if (devTarget == null) devTarget = path; } };
+            dev("npm", FirstExisting(Path.Combine(appData, "npm-cache"), Path.Combine(localApp, "npm-cache")));
+            dev("NuGet", FirstExisting(Path.Combine(userProfile, ".nuget", "packages")));
+            dev("Gradle", FirstExisting(Path.Combine(userProfile, ".gradle")));
+            dev("pip", FirstExisting(Path.Combine(localApp, "pip", "Cache")));
+            dev("pnpm", FirstExistingOnDrives(".pnpm-store"));
+            if (devKinds.Count > 0) AddItem(items, "devcache", "dev", "开发缓存", "可重新拉取", "检测到 " + string.Join(" / ", devKinds) + " 缓存，删除后可自动重新下载，通常占用数 GB。", devTarget);
+
+            // ---- 系统 ----
             string tempDir = Path.GetTempPath();
-            long tempBytes = ShallowBytes(tempDir)
-                + ShallowBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Temp"));
-            if (tempBytes > 0)
-            {
-                items.Add(new
-                {
-                    key = "temp",
-                    title = "系统临时文件",
-                    chip = "常见占用点",
-                    desc = "Temp、更新残留、崩溃转储等，仅第一层文件已约 " + StorageFormatting.FormatBytes(tempBytes) + "，通常可安全清理。",
-                    installed = true,
-                    targetPath = tempDir,
-                    drive = DriveLetterOf(tempDir)
-                });
-            }
-
-            string downloadsDir = Path.Combine(userProfile, "Downloads");
-            int dlCount;
-            long dlBytes;
-            CountInstallers(downloadsDir, out dlCount, out dlBytes);
-            if (dlCount > 0)
-            {
-                items.Add(new
-                {
-                    key = "downloads",
-                    title = "Downloads 安装包",
-                    chip = "常见占用点",
-                    desc = "下载目录有 " + dlCount + " 个安装包 / 压缩包，合计 " + StorageFormatting.FormatBytes(dlBytes) + "，已安装的可安全移除。",
-                    installed = true,
-                    targetPath = downloadsDir,
-                    drive = DriveLetterOf(downloadsDir)
-                });
-            }
+            long tempBytes = ShallowBytes(tempDir) + ShallowBytes(Path.Combine(windows, "Temp"));
+            if (tempBytes > 0) AddItem(items, "temp", "system", "系统临时文件", "常见占用点", "Temp、更新残留、崩溃转储等，仅第一层文件已约 " + StorageFormatting.FormatBytes(tempBytes) + "，通常可安全清理。", tempDir);
 
             string chromeCache = Path.Combine(localApp, "Google", "Chrome", "User Data", "Default", "Cache");
             string edgeCache = Path.Combine(localApp, "Microsoft", "Edge", "User Data", "Default", "Cache");
@@ -187,20 +177,85 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             if (chrome || edge)
             {
                 string which = chrome && edge ? "Chrome 与 Edge" : (chrome ? "Chrome" : "Edge");
-                string browserTarget = chrome ? chromeCache : edgeCache;
-                items.Add(new
-                {
-                    key = "browser",
-                    title = "浏览器缓存",
-                    chip = "常见占用点",
-                    desc = which + " 的缓存目录（Cache / Code Cache 等），可安全清理并会自动重建。",
-                    installed = true,
-                    targetPath = browserTarget,
-                    drive = DriveLetterOf(browserTarget)
-                });
+                AddItem(items, "browser", "system", "浏览器缓存", "常见占用点", which + " 的缓存目录（Cache / Code Cache 等），可安全清理并会自动重建。", chrome ? chromeCache : edgeCache);
             }
 
+            long rbBytes, rbItems;
+            QueryRecycleBin(out rbBytes, out rbItems);
+            if (rbItems > 0) AddItem(items, "recyclebin", "system", "回收站", "可清空", "回收站有 " + rbItems + " 个项目，合计 " + StorageFormatting.FormatBytes(rbBytes) + "，确认后可清空释放。", Path.Combine(systemDrive, "$Recycle.Bin"));
+
+            string winOld = Path.Combine(systemDrive, "Windows.old");
+            if (DirExists(winOld)) AddItem(items, "winold", "system", "Windows.old", "升级残留", "上次系统升级保留的旧系统，通常占用 10–30 GB，确认无需回滚后可删除。", winOld);
+
+            string wuCache = Path.Combine(windows, "SoftwareDistribution", "Download");
+            if (DirExists(wuCache))
+            {
+                long wuBytes = ShallowBytes(wuCache);
+                string size = wuBytes > 0 ? "（第一层约 " + StorageFormatting.FormatBytes(wuBytes) + "）" : "";
+                AddItem(items, "winupdate", "system", "Windows 更新缓存", "常见占用点", "Windows 更新下载缓存" + size + "，更新完成后可安全清理。", wuCache);
+            }
+
+            // ---- 下载 ----
+            string downloadsDir = Path.Combine(userProfile, "Downloads");
+            int dlCount;
+            long dlBytes;
+            CountInstallers(downloadsDir, out dlCount, out dlBytes);
+            if (dlCount > 0) AddItem(items, "downloads", "download", "Downloads 安装包", "常见占用点", "下载目录有 " + dlCount + " 个安装包 / 压缩包，合计 " + StorageFormatting.FormatBytes(dlBytes) + "，已安装的可安全移除。", downloadsDir);
+
             return new { items = items.ToArray() };
+        }
+
+        private static void AddItem(List<object> items, string key, string category, string title, string chip, string desc, string targetPath)
+        {
+            items.Add(new { key, category, title, chip, desc, installed = true, targetPath, drive = DriveLetterOf(targetPath) });
+        }
+
+        // 遍历固定盘符，返回第一个存在的 <盘符>\relative；用于探测装在非系统盘的游戏/缓存。
+        private static string FirstExistingOnDrives(params string[] relatives)
+        {
+            foreach (DriveInfo d in DriveInfo.GetDrives())
+            {
+                try { if (d.DriveType != DriveType.Fixed || !d.IsReady) continue; }
+                catch { continue; }
+                for (int i = 0; i < relatives.Length; i++)
+                {
+                    string p = Path.Combine(d.Name, relatives[i]);
+                    if (DirExists(p)) return p;
+                }
+            }
+            return null;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SHQUERYRBINFO
+        {
+            public int cbSize;
+            public long i64Size;
+            public long i64NumItems;
+        }
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        private static extern int SHQueryRecycleBin(string pszRootPath, ref SHQUERYRBINFO pSHQueryRBInfo);
+
+        // 全部盘符的回收站合计大小与项数；失败时返回 0（静默）。
+        private static void QueryRecycleBin(out long bytes, out long count)
+        {
+            bytes = 0;
+            count = 0;
+            try
+            {
+                SHQUERYRBINFO info = new SHQUERYRBINFO();
+                info.cbSize = Marshal.SizeOf(typeof(SHQUERYRBINFO));
+                if (SHQueryRecycleBin(null, ref info) == 0)
+                {
+                    bytes = info.i64Size;
+                    count = info.i64NumItems;
+                }
+            }
+            catch
+            {
+                // P/Invoke 不可用时按空回收站处理
+            }
         }
 
         private static bool DirExists(string path)

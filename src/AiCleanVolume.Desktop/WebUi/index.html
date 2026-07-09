@@ -367,17 +367,28 @@
           根据已安装的软件与常见占用点，AI 预判了以下清理方向。扫描后将给出准确大小并支持一键清理。
         </div>
         <div style="flex: 1; overflow-y: auto; padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 8px;">
-          <sc-for list="{{ preCards }}" as="pc" hint-placeholder-count="5">
-            <div onClick="{{ pc.onClick }}" style="border: 1px solid #E1E7EB; background: #FFFFFF; border-radius: 10px; padding: 13px 14px; display: flex; gap: 12px; cursor: {{ pc.cursor }};" style-hover="border-color: #9FB4BF">
-              <div style="width: 34px; height: 34px; flex: none; border-radius: 9px; background: {{ pc.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: {{ pc.iconColor }}; font-family: 'IBM Plex Mono', monospace;">{{ pc.mono }}</div>
-              <div style="flex: 1; min-width: 0;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 13px; font-weight: 600;">{{ pc.title }}</span>
-                  <span style="font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: {{ pc.chipBg }}; color: {{ pc.chipColor }};">{{ pc.chip }}</span>
-                </div>
-                <div style="font-size: 11.5px; color: #6B8090; line-height: 1.6; margin-top: 3px;">{{ pc.desc }}</div>
+          <sc-for list="{{ preGroups }}" as="g" hint-placeholder-count="3">
+            <sc-if value="{{ g.showHeader }}" hint-placeholder-val="{{ true }}">
+              <div onClick="{{ g.onToggle }}" style="display: flex; align-items: center; gap: 8px; padding: 6px 4px 2px; cursor: pointer; user-select: none;" style-hover="opacity: 0.7">
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="transform: rotate({{ g.chevRot }}); transition: transform 0.15s;"><path d="M3 1.5 L7 5 L3 8.5" stroke="#8CA0AD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <span style="font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; color: #42586A;">{{ g.name }}</span>
+                <span style="font-size: 10.5px; color: #8CA0AD; font-family: 'IBM Plex Mono', monospace;">{{ g.count }}</span>
               </div>
-            </div>
+            </sc-if>
+            <sc-if value="{{ g.open }}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{ g.cards }}" as="pc" hint-placeholder-count="3">
+                <div onClick="{{ pc.onClick }}" style="border: 1px solid #E1E7EB; background: #FFFFFF; border-radius: 10px; padding: 13px 14px; display: flex; gap: 12px; cursor: {{ pc.cursor }};" style-hover="border-color: #9FB4BF">
+                  <div style="width: 34px; height: 34px; flex: none; border-radius: 9px; background: {{ pc.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: {{ pc.iconColor }}; font-family: 'IBM Plex Mono', monospace;">{{ pc.mono }}</div>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 13px; font-weight: 600;">{{ pc.title }}</span>
+                      <span style="font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: {{ pc.chipBg }}; color: {{ pc.chipColor }};">{{ pc.chip }}</span>
+                    </div>
+                    <div style="font-size: 11.5px; color: #6B8090; line-height: 1.6; margin-top: 3px;">{{ pc.desc }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </sc-if>
           </sc-for>
         </div>
         <div style="flex: none; border-top: 1px solid #E9EEF1; padding: 12px 18px 14px; font-size: 11.5px; color: #8CA0AD; text-align: center; background: #FBFCFD;">扫描完成后此处将变为可勾选的清理队列</div>
@@ -387,18 +398,29 @@
       <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
         <sc-if value="{{ recHasDir }}" hint-placeholder-val="{{ false }}">
           <div style="flex: none; margin: 0 18px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #8CA0AD;">清理方向 · 点击向 AI 提问</div>
-          <div style="flex: none; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 8px; max-height: 210px; overflow-y: auto;">
-            <sc-for list="{{ preCards }}" as="pc" hint-placeholder-count="3">
-              <div onClick="{{ pc.onClick }}" style="border: 1px solid #E1E7EB; background: #FFFFFF; border-radius: 10px; padding: 11px 12px; display: flex; gap: 11px; cursor: {{ pc.cursor }};" style-hover="border-color: #9FB4BF">
-                <div style="width: 30px; height: 30px; flex: none; border-radius: 8px; background: {{ pc.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: {{ pc.iconColor }}; font-family: 'IBM Plex Mono', monospace;">{{ pc.mono }}</div>
-                <div style="flex: 1; min-width: 0;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 12.5px; font-weight: 600;">{{ pc.title }}</span>
-                    <span style="font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; background: {{ pc.chipBg }}; color: {{ pc.chipColor }};">{{ pc.chip }}</span>
-                  </div>
-                  <div style="font-size: 11px; color: #6B8090; line-height: 1.5; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ pc.desc }}</div>
+          <div style="flex: none; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;">
+            <sc-for list="{{ preGroups }}" as="g" hint-placeholder-count="3">
+              <sc-if value="{{ g.showHeader }}" hint-placeholder-val="{{ true }}">
+                <div onClick="{{ g.onToggle }}" style="display: flex; align-items: center; gap: 8px; padding: 4px 4px 0; cursor: pointer; user-select: none;" style-hover="opacity: 0.7">
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="transform: rotate({{ g.chevRot }}); transition: transform 0.15s;"><path d="M3 1.5 L7 5 L3 8.5" stroke="#8CA0AD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #42586A;">{{ g.name }}</span>
+                  <span style="font-size: 10px; color: #8CA0AD; font-family: 'IBM Plex Mono', monospace;">{{ g.count }}</span>
                 </div>
-              </div>
+              </sc-if>
+              <sc-if value="{{ g.open }}" hint-placeholder-val="{{ true }}">
+                <sc-for list="{{ g.cards }}" as="pc" hint-placeholder-count="3">
+                  <div onClick="{{ pc.onClick }}" style="border: 1px solid #E1E7EB; background: #FFFFFF; border-radius: 10px; padding: 11px 12px; display: flex; gap: 11px; cursor: {{ pc.cursor }};" style-hover="border-color: #9FB4BF">
+                    <div style="width: 30px; height: 30px; flex: none; border-radius: 8px; background: {{ pc.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: {{ pc.iconColor }}; font-family: 'IBM Plex Mono', monospace;">{{ pc.mono }}</div>
+                    <div style="flex: 1; min-width: 0;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 12.5px; font-weight: 600;">{{ pc.title }}</span>
+                        <span style="font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; background: {{ pc.chipBg }}; color: {{ pc.chipColor }};">{{ pc.chip }}</span>
+                      </div>
+                      <div style="font-size: 11px; color: #6B8090; line-height: 1.5; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ pc.desc }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </sc-if>
             </sc-for>
           </div>
           <div style="flex: none; height: 1px; background: #E9EEF1; margin: 0 18px 10px;"></div>
@@ -790,6 +812,7 @@ class Component extends DCLogic {
     deletePhase: 'confirm', // 'confirm' | 'result'
     promptPreset: 'standard',
     promptOpen: false,
+    preGroupsOpen: {},         // 预判分类抽屉折叠状态 category->false(收起)，默认全展开
     profileSel: 0,
     profiles: [
       { name: '默认 · deepseek-chat', providerId: 'deepseek', model: 'deepseek-chat', max: 30, savedAt: '2026-06-28 21:04' },
@@ -1794,10 +1817,20 @@ class Component extends DCLogic {
     // 无桥或预检未返回时用演示卡片；返回后按 key 映射本机真实检测结果，配色沿用设计稿。
     const preCardStyle = {
       wechat:    { mono: 'WX',  iconBg: '#E4F3EC', iconColor: '#0F7A56' },
+      qq:        { mono: 'QQ',  iconBg: '#E4F3EC', iconColor: '#0F7A56' },
+      dingtalk:  { mono: 'DT',  iconBg: '#E4F3EC', iconColor: '#0F7A56' },
+      wxwork:    { mono: 'WW',  iconBg: '#E4F3EC', iconColor: '#0F7A56' },
       steam:     { mono: 'ST',  iconBg: '#EDF1F4', iconColor: '#42586A' },
+      epic:      { mono: 'EP',  iconBg: '#EDF1F4', iconColor: '#42586A' },
+      wegame:    { mono: 'WG',  iconBg: '#EDF1F4', iconColor: '#42586A' },
+      mihoyo:    { mono: 'MH',  iconBg: '#EDF1F4', iconColor: '#42586A' },
+      devcache:  { mono: '>_',  iconBg: '#F0F7F8', iconColor: '#0B5E63' },
       temp:      { mono: 'TMP', iconBg: '#FBF6EC', iconColor: '#9A5B00' },
       downloads: { mono: 'DL',  iconBg: '#EDF1F4', iconColor: '#42586A' },
       browser:   { mono: 'WEB', iconBg: '#F0F7F8', iconColor: '#0B5E63' },
+      recyclebin:{ mono: 'RB',  iconBg: '#FBF6EC', iconColor: '#9A5B00' },
+      winold:    { mono: 'W.O', iconBg: '#F2F4F6', iconColor: '#42586A' },
+      winupdate: { mono: 'WU',  iconBg: '#FBF6EC', iconColor: '#9A5B00' },
     };
     const demoPreCards = [
       { mono: 'WX', iconBg: '#E4F3EC', iconColor: '#0F7A56', title: '微信 PC 版', chip: '已检测到安装', chipBg: '#EDF1F4', chipColor: '#5E7485', desc: '缓存目录通常占用 5–20 GB，扫描后给出准确大小与可清理明细。' },
@@ -1814,11 +1847,28 @@ class Component extends DCLogic {
     } else {
       preCards = this.state.preCheck.map((it) => {
         const st = preCardStyle[it.key] || { mono: '··', iconBg: '#EDF1F4', iconColor: '#42586A' };
-        return { mono: st.mono, iconBg: st.iconBg, iconColor: st.iconColor, title: it.title, chip: it.chip, chipBg: '#EDF1F4', chipColor: '#5E7485', desc: it.desc, cursor: 'pointer', onClick: () => this.prescan(it) };
+        return { mono: st.mono, iconBg: st.iconBg, iconColor: st.iconColor, title: it.title, chip: it.chip, chipBg: '#EDF1F4', chipColor: '#5E7485', desc: it.desc, category: it.category, cursor: 'pointer', onClick: () => this.prescan(it) };
       });
     }
     // 每张卡片都要有 onClick/cursor 供模板绑定；演示卡片与空态卡片默认不可点。
     preCards = preCards.map((c) => ({ cursor: 'default', onClick: () => {}, ...c }));
+
+    // 按 category 分组成可折叠抽屉；不足 2 组时不显示分组头（showHeader=false，恒展开）。
+    const catNames = { social: '日常社交', game: '游戏', dev: '开发', system: '系统', download: '下载' };
+    const catOrder = ['social', 'game', 'dev', 'system', 'download'];
+    const byCat = {};
+    preCards.forEach((c) => { const k = c.category || 'system'; (byCat[k] = byCat[k] || []).push(c); });
+    const presentCats = catOrder.filter((k) => byCat[k] && byCat[k].length);
+    const grouped = presentCats.length >= 2;
+    const preGroups = presentCats.map((k) => {
+      const open = grouped ? (this.state.preGroupsOpen[k] !== false) : true;
+      return {
+        name: catNames[k] || k, count: byCat[k].length + ' 项',
+        showHeader: grouped, open, chevRot: open ? '90deg' : '0deg',
+        onToggle: () => this.setState((st) => ({ preGroupsOpen: { ...st.preGroupsOpen, [k]: st.preGroupsOpen[k] === false } })),
+        cards: byCat[k],
+      };
+    });
 
     // ---- AI providers ----
     const providers = [
@@ -1957,7 +2007,7 @@ class Component extends DCLogic {
       isEmpty, isScanning, isDone,
       centerEmpty: isEmpty, centerScanning: isScanning, centerDone: isDone,
       isPre: isEmpty || isScanning,
-      treeRows, skeletonRows, preCards, recCards,
+      treeRows, skeletonRows, preCards, preGroups, recCards,
       recTitle: isDone ? '智能推荐' : '清理方向预判',
       recSubtitle: isDone ? recDefs.length + ' 项建议' : preCards.length + ' 个方向',
       recCount: recDefs.length,
