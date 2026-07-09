@@ -313,7 +313,7 @@
                 <div style="width: 26px; height: 26px; flex: none; border-radius: 7px; background: linear-gradient(135deg, #14B8C4, #0E7490); display: flex; align-items: center; justify-content: center; margin-top: 2px;">
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1 L8.4 5.6 L13 7 L8.4 8.4 L7 13 L5.6 8.4 L1 7 L5.6 5.6 Z" fill="#FFFFFF"></path></svg>
                 </div>
-                <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 3px 12px 12px 12px; padding: 13px 16px; font-size: 13px; line-height: 1.75; color: #33475A; white-space: pre-wrap; animation: {{ b.anim }};">{{ b.text }}</div>
+                <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 3px 12px 12px 12px; padding: 13px 16px; font-size: 13px; line-height: 1.75; color: #33475A; white-space: pre-wrap; animation: {{ b.anim }};">{{ b.body }}</div>
               </div>
             </sc-if>
           </sc-for>
@@ -850,6 +850,45 @@ class Component extends DCLogic {
       { id: 'custom', name: '自定义', hint: '自行编辑系统提示词', preview: '' },
     ];
     return this._promptPresets;
+  }
+
+  // 迷你 Markdown → HTML：先整体转义防注入，再按序转代码块/行内码/粗体/斜体/标题/列表/分隔线/换行。
+  mdToHtml(src) {
+    const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const codeStyle = 'font-family:\'IBM Plex Mono\',monospace;background:#EEF2F4;border-radius:4px;padding:1px 5px;font-size:12px;';
+    const preStyle = 'font-family:\'IBM Plex Mono\',monospace;background:#F2F5F7;border:1px solid #E1E7EB;border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;overflow-x:auto;margin:6px 0;white-space:pre;';
+    const blocks = [];
+    let s = String(src || '').replace(/```[^\n]*\n?([\s\S]*?)```/g, (m, code) => {
+      blocks.push('<pre style="' + preStyle + '">' + esc(code.replace(/\n$/, '')) + '</pre>');
+      return ' ' + (blocks.length - 1) + ' ';
+    });
+    s = esc(s)
+      .replace(/`([^`\n]+)`/g, (m, c) => '<code style="' + codeStyle + '">' + c + '</code>')
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+    const lines = s.split('\n');
+    let html = '', listType = null, items = [];
+    const flush = () => {
+      if (!listType) return;
+      const pad = listType === 'ol' ? '' : '';
+      html += '<' + listType + ' style="margin:4px 0;padding-left:20px;">' + items.map((li) => '<li style="margin:2px 0;">' + li + '</li>').join('') + '</' + listType + '>';
+      listType = null; items = [];
+    };
+    for (const line of lines) {
+      if (/^\s*[-*+]\s+/.test(line)) { if (listType && listType !== 'ul') flush(); listType = 'ul'; items.push(line.replace(/^\s*[-*+]\s+/, '')); continue; }
+      if (/^\s*\d+\.\s+/.test(line)) { if (listType && listType !== 'ol') flush(); listType = 'ol'; items.push(line.replace(/^\s*\d+\.\s+/, '')); continue; }
+      flush();
+      if (/^#{1,6}\s+/.test(line)) { html += '<div style="font-weight:700;font-size:14px;margin:6px 0 2px;">' + line.replace(/^#{1,6}\s+/, '') + '</div>'; continue; }
+      if (/^(---|\*\*\*|___)\s*$/.test(line)) { html += '<hr style="border:none;border-top:1px solid #E1E7EB;margin:8px 0;">'; continue; }
+      html += line + '<br>';
+    }
+    flush();
+    return html.replace(/ (\d+) /g, (m, i) => blocks[+i]);
+  }
+
+  // AI 文本渲染成富文本 React 元素（x-dc 会直接渲染 {{}} 里的 React 元素）。
+  mdNode(src) {
+    return React.createElement('div', { style: { whiteSpace: 'normal' }, dangerouslySetInnerHTML: { __html: this.mdToHtml(src) } });
   }
 
   formatBytes(bytes) {
@@ -1489,13 +1528,17 @@ class Component extends DCLogic {
     out.reportSafeNum = hasNums ? safe.num : ph; out.reportSafeUnit = hasNums ? safe.unit : '';
     out.reportConfirmNum = hasNums ? conf.num : ph; out.reportConfirmUnit = hasNums ? conf.unit : '';
     out.reportSystemNum = hasNums ? sysd.num : ph; out.reportSystemUnit = hasNums ? sysd.unit : '';
-    out.reportSummary = sum;
+    out.reportSummary = (hasNums && s.report && s.report.summary) ? this.mdNode(s.report.summary) : sum;
     out.reportTime = s.reportTime;
     out.tokensText = s.chatTokens > 0 ? ('tokens ' + s.chatTokens.toLocaleString()) : '';
 
-    // chat（含 pending 时的"正在思考"气泡；每个气泡带 anim 供加载态脉冲）
+    // chat（含 pending 时的"正在思考"气泡；AI 气泡走 Markdown 富文本，用户气泡保持纯文本）
     const rawBubbles = s.chatPending ? s.chatBubbles.concat([{ ai: true, text: 'AI 正在思考…', loading: true }]) : s.chatBubbles;
-    out.chatBubbles = rawBubbles.map((b) => ({ ...b, anim: b.loading ? 'acv-pulse 1.2s ease-in-out infinite' : 'none' }));
+    out.chatBubbles = rawBubbles.map((b) => ({
+      ...b,
+      anim: b.loading ? 'acv-pulse 1.2s ease-in-out infinite' : 'none',
+      body: b.me ? b.text : (b.loading ? b.text : this.mdNode(b.text)),
+    }));
     out.chatInputRef = (this._chatInputRef = this._chatInputRef || React.createRef());
     out.onSend = () => this.sendChat();
     out.onChatKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendChat(); } };
@@ -2154,8 +2197,8 @@ class Component extends DCLogic {
       tokensText: 'tokens 1,284',
       recHasDir: false,
       chatBubbles: [
-        { me: true, text: 'Downloads 里 21.3 GB 都是什么？哪些可以删？', anim: 'none' },
-        { ai: true, text: 'Downloads 中主要是安装包、压缩包与文档图片三类，其中已安装的安装包可以安全移除，删除前会逐个做安全评估。', anim: 'none' },
+        { me: true, text: 'Downloads 里 21.3 GB 都是什么？哪些可以删？', anim: 'none', body: 'Downloads 里 21.3 GB 都是什么？哪些可以删？' },
+        { ai: true, text: 'Downloads 中主要是安装包、压缩包与文档图片三类，其中已安装的安装包可以安全移除，删除前会逐个做安全评估。', anim: 'none', body: 'Downloads 中主要是安装包、压缩包与文档图片三类，其中已安装的安装包可以安全移除，删除前会逐个做安全评估。' },
       ],
       chatInputRef: (this._chatInputRef = this._chatInputRef || React.createRef()),
       onSend: () => {}, onChatKey: () => {},
