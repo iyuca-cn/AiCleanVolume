@@ -1346,13 +1346,17 @@ class Component extends DCLogic {
     if (s.view === 'scanning') { this.notifyAttach('正在扫描，请稍候…'); return; }
     if (s.chatPending) { this.notifyAttach('AI 正在回答，请稍候…'); return; }
     const drive = (card && card.drive) || s.drive;
+    // 该盘已扫描直接问；未扫描则自动扫描该盘后再问。
+    const go = () => {
+      if (this.state.view === 'done' && this.state.rootInfo && this.state.scannedDrives[drive]) this.askPrecheck(card);
+      else this.startScan(() => this.askPrecheck(card));
+    };
     if (drive !== s.drive) {
-      if (s.scannedDrives[drive]) { this.switchDrive(drive); setTimeout(() => this.askPrecheck(card), 350); }
-      else this.notifyAttach('该方向在 ' + drive + ': 盘，请切到该盘点击「开始扫描」。');
-      return;
+      this.switchDrive(drive); // 快照当前盘（非破坏，切回即恢复）后切到目标盘
+      setTimeout(go, 60);
+    } else {
+      go();
     }
-    if (s.view === 'done' && s.rootInfo && s.scannedDrives[drive]) { this.askPrecheck(card); return; }
-    this.startScan(() => this.askPrecheck(card));
   }
 
   // recItems 与 AI 报告 classified 中判定 safe、但推荐未覆盖的目录合并成一份可执行推荐列表。
