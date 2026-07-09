@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using AiCleanVolume.Core.Application.Scanning;
 using AiCleanVolume.Core.Domain.Ai;
 using AiCleanVolume.Core.Domain.Cleanup;
@@ -478,13 +479,78 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
         // ---- ai ----
 
+        private const string ChatItemsConvention =
+            "\r\n\r\n如果你的回答里给出了具体可清理/有风险的路径结论，请在回答的最后追加一个 ```json 代码块：" +
+            "{\"items\":[{\"path\":\"完整路径\",\"name\":\"显示名\",\"risk\":\"safe|caution|danger\",\"bytes\":估算字节整数可选0,\"reason\":\"一句话理由\"}]}。" +
+            "safe=可安全清理，caution=需人工确认，danger=高风险。没有具体路径结论时不要输出该 JSON 块。";
+
         private object AiChat(JObject parameters)
         {
             ApplicationSettings settings = this.settings;
             List<AiChatMessage> messages = ReadMessages(parameters?["messages"] as JArray);
+            AppendItemsConvention(messages);
             AiChatResult result = Advisor.Complete(messages, settings);
             if (result == null || !result.Success) throw new InvalidOperationException(result == null ? "AI 无响应" : result.Error);
-            return new { content = result.Content, tokens = result.TotalTokens };
+
+            string content = result.Content ?? string.Empty;
+            object[] items = ExtractChatItems(ref content, settings);
+            return new { content, tokens = result.TotalTokens, items };
+        }
+
+        // 把结构化输出约定并入首个 system 消息；无 system 消息则插入一条。
+        private static void AppendItemsConvention(List<AiChatMessage> messages)
+        {
+            for (int i = 0; i < messages.Count; i++)
+            {
+                if (messages[i].Role == AiChatMessage.SystemRole)
+                {
+                    messages[i] = new AiChatMessage(AiChatMessage.SystemRole, messages[i].Content + ChatItemsConvention);
+                    return;
+                }
+            }
+            messages.Insert(0, new AiChatMessage(AiChatMessage.SystemRole, ChatItemsConvention.TrimStart()));
+        }
+
+        // 剥离正文末尾的 ```json {"items":[...]} 块，返回结构化项（每项补沙盒评估）；无块时返回空。
+        private object[] ExtractChatItems(ref string content, ApplicationSettings settings)
+        {
+            List<object> result = new List<object>();
+            if (string.IsNullOrWhiteSpace(content)) return result.ToArray();
+
+            Match m = Regex.Match(content, "```(?:json)?\\s*(\\{[\\s\\S]*?\\})\\s*```", RegexOptions.RightToLeft);
+            if (!m.Success) return result.ToArray();
+
+            JObject parsed;
+            try { parsed = JObject.Parse(m.Groups[1].Value); }
+            catch { return result.ToArray(); }
+
+            JArray arr = parsed["items"] as JArray;
+            if (arr == null) return result.ToArray();
+
+            foreach (JToken it in arr)
+            {
+                string path = it["path"]?.ToString();
+                if (string.IsNullOrWhiteSpace(path)) continue;
+                string name = it["name"]?.ToString();
+                if (string.IsNullOrWhiteSpace(name)) name = Path.GetFileName(path.TrimEnd('\\', '/'));
+                if (string.IsNullOrWhiteSpace(name)) name = path;
+                string risk = (it["risk"]?.ToString() ?? "caution").Trim().ToLowerInvariant();
+                SandboxEvaluation ev = dependencies.DeletionWorkflow.Evaluate(path, settings.Sandbox);
+                result.Add(new
+                {
+                    path,
+                    name,
+                    risk,
+                    bytes = ReadLong(it as JObject, "bytes"),
+                    reason = it["reason"]?.ToString(),
+                    sandboxOk = ev != null && ev.Action == SandboxAction.Allow,
+                    sandboxNote = ev == null ? null : ev.Message
+                });
+            }
+
+            // 只在成功解析出条目时才从正文剥离 JSON 块，避免误删无关代码块。
+            if (result.Count > 0) content = content.Remove(m.Index, m.Length).TrimEnd();
+            return result.ToArray();
         }
 
         private object AiReport(JObject parameters)
