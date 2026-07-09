@@ -28,10 +28,14 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
         private StorageItem lastRoot;
         private ScanRequest sessionTemplate;
 
+        // 进程内唯一的设置实例：启动时读一次，业务方法一律用它，避免每请求读文件放大并发冲突。
+        private ApplicationSettings settings;
+
         public WebBridge(MainWindowDependencies dependencies, WebShellWindow host)
         {
             this.dependencies = dependencies;
             this.host = host;
+            settings = dependencies.SettingsStore.Load();
         }
 
         private OpenAiCompatibleAdvisor Advisor
@@ -53,7 +57,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                 case "env.openPath": dependencies.ExplorerService.OpenPath(Str(parameters, "path"), false); return null;
                 case "env.restartElevated": host.RestartElevated(); return null;
 
-                case "settings.get": return dependencies.SettingsStore.Load();
+                case "settings.get": return settings;
                 case "settings.save": return SaveSettings(parameters);
                 case "settings.testAi": return TestAi(parameters);
 
@@ -104,10 +108,12 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
-            if (DirExists(Path.Combine(documents, "WeChat Files"))
-                || DirExists(Path.Combine(documents, "xwechat_files"))
-                || DirExists(Path.Combine(userProfile, "Documents", "WeChat Files"))
-                || DirExists(Path.Combine(userProfile, "Documents", "xwechat_files")))
+            string wechatDir = FirstExisting(
+                Path.Combine(documents, "WeChat Files"),
+                Path.Combine(documents, "xwechat_files"),
+                Path.Combine(userProfile, "Documents", "WeChat Files"),
+                Path.Combine(userProfile, "Documents", "xwechat_files"));
+            if (wechatDir != null)
             {
                 items.Add(new
                 {
@@ -115,24 +121,32 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                     title = "微信 PC 版",
                     chip = "已检测到安装",
                     desc = "缓存目录通常占用 5–20 GB，扫描后给出准确大小与可清理明细。",
-                    installed = true
+                    installed = true,
+                    targetPath = wechatDir,
+                    drive = DriveLetterOf(wechatDir)
                 });
             }
 
             string steamRoot = TrySteamRoot();
-            if (steamRoot != null && DirExists(Path.Combine(steamRoot, "steamapps")))
+            string steamApps = steamRoot != null ? Path.Combine(steamRoot, "steamapps") : null;
+            if (steamApps != null && DirExists(steamApps))
             {
+                string steamCommon = Path.Combine(steamApps, "common");
+                string steamTarget = DirExists(steamCommon) ? steamCommon : steamApps;
                 items.Add(new
                 {
                     key = "steam",
                     title = "Steam 游戏库",
                     chip = "已检测到安装",
                     desc = "将分析各游戏最后启动时间，找出长期未玩的大体积游戏。",
-                    installed = true
+                    installed = true,
+                    targetPath = steamTarget,
+                    drive = DriveLetterOf(steamRoot)
                 });
             }
 
-            long tempBytes = ShallowBytes(Path.GetTempPath())
+            string tempDir = Path.GetTempPath();
+            long tempBytes = ShallowBytes(tempDir)
                 + ShallowBytes(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Temp"));
             if (tempBytes > 0)
             {
@@ -142,13 +156,16 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                     title = "系统临时文件",
                     chip = "常见占用点",
                     desc = "Temp、更新残留、崩溃转储等，仅第一层文件已约 " + StorageFormatting.FormatBytes(tempBytes) + "，通常可安全清理。",
-                    installed = true
+                    installed = true,
+                    targetPath = tempDir,
+                    drive = DriveLetterOf(tempDir)
                 });
             }
 
+            string downloadsDir = Path.Combine(userProfile, "Downloads");
             int dlCount;
             long dlBytes;
-            CountInstallers(Path.Combine(userProfile, "Downloads"), out dlCount, out dlBytes);
+            CountInstallers(downloadsDir, out dlCount, out dlBytes);
             if (dlCount > 0)
             {
                 items.Add(new
@@ -157,22 +174,29 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                     title = "Downloads 安装包",
                     chip = "常见占用点",
                     desc = "下载目录有 " + dlCount + " 个安装包 / 压缩包，合计 " + StorageFormatting.FormatBytes(dlBytes) + "，已安装的可安全移除。",
-                    installed = true
+                    installed = true,
+                    targetPath = downloadsDir,
+                    drive = DriveLetterOf(downloadsDir)
                 });
             }
 
-            bool chrome = DirExists(Path.Combine(localApp, "Google", "Chrome", "User Data", "Default", "Cache"));
-            bool edge = DirExists(Path.Combine(localApp, "Microsoft", "Edge", "User Data", "Default", "Cache"));
+            string chromeCache = Path.Combine(localApp, "Google", "Chrome", "User Data", "Default", "Cache");
+            string edgeCache = Path.Combine(localApp, "Microsoft", "Edge", "User Data", "Default", "Cache");
+            bool chrome = DirExists(chromeCache);
+            bool edge = DirExists(edgeCache);
             if (chrome || edge)
             {
                 string which = chrome && edge ? "Chrome 与 Edge" : (chrome ? "Chrome" : "Edge");
+                string browserTarget = chrome ? chromeCache : edgeCache;
                 items.Add(new
                 {
                     key = "browser",
                     title = "浏览器缓存",
                     chip = "常见占用点",
                     desc = which + " 的缓存目录（Cache / Code Cache 等），可安全清理并会自动重建。",
-                    installed = true
+                    installed = true,
+                    targetPath = browserTarget,
+                    drive = DriveLetterOf(browserTarget)
                 });
             }
 
@@ -183,6 +207,33 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
         {
             try { return !string.IsNullOrEmpty(path) && Directory.Exists(path); }
             catch { return false; }
+        }
+
+        // 返回候选中第一个真实存在的目录，均不存在时返回 null。
+        private static string FirstExisting(params string[] candidates)
+        {
+            if (candidates == null) return null;
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (DirExists(candidates[i])) return candidates[i];
+            }
+            return null;
+        }
+
+        // 取路径所在盘符（不含冒号），无法解析时回退到系统盘 C。
+        private static string DriveLetterOf(string path)
+        {
+            try
+            {
+                string root = Path.GetPathRoot(path);
+                if (!string.IsNullOrEmpty(root) && char.IsLetter(root[0]))
+                    return char.ToUpperInvariant(root[0]).ToString();
+            }
+            catch
+            {
+                // 回退到系统盘
+            }
+            return "C";
         }
 
         private static string TrySteamRoot()
@@ -264,17 +315,18 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
         {
             JToken payload = parameters?["settings"];
             if (payload == null) throw new ArgumentException("settings payload missing");
-            ApplicationSettings settings = payload.ToObject<ApplicationSettings>();
-            dependencies.SettingsStore.Save(settings);
+            ApplicationSettings incoming = payload.ToObject<ApplicationSettings>();
+            dependencies.SettingsStore.Save(incoming);
+            settings = incoming;
             return null;
         }
 
         private object TestAi(JObject parameters)
         {
-            ApplicationSettings settings = parameters?["settings"] != null
+            ApplicationSettings testSettings = parameters?["settings"] != null
                 ? parameters["settings"].ToObject<ApplicationSettings>()
-                : dependencies.SettingsStore.Load();
-            AiConnectionTestResult result = Advisor.TestConnection(settings);
+                : settings;
+            AiConnectionTestResult result = Advisor.TestConnection(testSettings);
             return new { ok = result.Success, message = result.Message };
         }
 
@@ -282,7 +334,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
         private object ScanStart(JObject parameters)
         {
-            ApplicationSettings settings = dependencies.SettingsStore.Load();
+            ApplicationSettings settings = this.settings;
             string location = NormalizeLocation(Str(parameters, "location"));
             ScanRequest request = BuildScanRequest(location, settings, Str(parameters, "sortMode"), 1, -1L);
 
@@ -373,7 +425,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
         private object AiChat(JObject parameters)
         {
-            ApplicationSettings settings = dependencies.SettingsStore.Load();
+            ApplicationSettings settings = this.settings;
             List<AiChatMessage> messages = ReadMessages(parameters?["messages"] as JArray);
             AiChatResult result = Advisor.Complete(messages, settings);
             if (result == null || !result.Success) throw new InvalidOperationException(result == null ? "AI 无响应" : result.Error);
@@ -383,7 +435,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
         private object AiReport(JObject parameters)
         {
             if (lastRoot == null) throw new InvalidOperationException("尚未扫描，无法生成报告。");
-            ApplicationSettings settings = dependencies.SettingsStore.Load();
+            ApplicationSettings settings = this.settings;
 
             string structureSummary = BuildDirectorySummary(lastRoot.Path, 2, 40);
             string reportPrompt = "以下是刚完成的磁盘扫描目录统计。请输出严格 JSON（不要任何解释文字、不要代码块标记）：" +
@@ -516,7 +568,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
         private object SuggestAnalyze(JObject parameters)
         {
-            ApplicationSettings settings = dependencies.SettingsStore.Load();
+            ApplicationSettings settings = this.settings;
             bool aiEnabled = settings.Ai != null && settings.Ai.Enabled;
             string location = NormalizeLocation(Str(parameters, "location"));
 
@@ -563,7 +615,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
         private object DelEvaluate(JObject parameters)
         {
-            ApplicationSettings settings = dependencies.SettingsStore.Load();
+            ApplicationSettings settings = this.settings;
             List<object> results = new List<object>();
             JArray paths = parameters?["paths"] as JArray;
             if (paths != null)
@@ -586,7 +638,7 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
         private object DelRun(JObject parameters)
         {
-            ApplicationSettings settings = dependencies.SettingsStore.Load();
+            ApplicationSettings settings = this.settings;
             settings.Sandbox.UseRecycleBin = Bool(parameters, "useRecycleBin", settings.Sandbox.UseRecycleBin);
 
             JArray array = parameters?["items"] as JArray;

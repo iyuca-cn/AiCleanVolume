@@ -246,13 +246,13 @@
           <div style="font-size: 13.5px; font-weight: 700;">AI 解析</div>
           <div style="font-size: 11.5px; color: #6B8090;">基于扫描结果的智能清理分析 · 可把左侧任意文件夹拖进来提问</div>
         </div>
-        <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ centerDone }}" hint-placeholder-val="{{ true }}">
           <span style="font-size: 11px; color: #6B8090; font-family: 'IBM Plex Mono', monospace;">{{ tokensText }}</span>
         </sc-if>
       </div>
 
       <!-- empty center -->
-      <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ centerEmpty }}" hint-placeholder-val="{{ false }}">
         <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 48px;">
           <div style="width: 380px; border: 1.5px dashed #B9C7D0; border-radius: 14px; padding: 36px 32px; text-align: center; background: #FBFCFD;">
             <div style="width: 44px; height: 44px; margin: 0 auto 16px; border-radius: 11px; background: #F0F4F6; display: flex; align-items: center; justify-content: center;">
@@ -269,7 +269,7 @@
       </sc-if>
 
       <!-- scanning center -->
-      <sc-if value="{{ isScanning }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ centerScanning }}" hint-placeholder-val="{{ false }}">
         <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 48px;">
           <div style="width: 380px; border: 1px solid #E1E7EB; border-radius: 14px; padding: 32px; text-align: center; background: #FFFFFF; box-shadow: 0 1px 3px rgba(15,30,42,0.04);">
             <svg width="34" height="34" viewBox="0 0 14 14" fill="none" style="animation: acv-spin 1.2s linear infinite; margin-bottom: 14px;"><path d="M12 7 A5 5 0 1 1 9.5 2.7" stroke="{{ accent }}" stroke-width="1.4" stroke-linecap="round"></path></svg>
@@ -280,7 +280,7 @@
       </sc-if>
 
       <!-- done center -->
-      <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+      <sc-if value="{{ centerDone }}" hint-placeholder-val="{{ true }}">
         <div style="flex: 1; overflow-y: auto; padding: 4px 22px 12px; display: flex; flex-direction: column; gap: 14px;">
           <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(15,30,42,0.04);">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
@@ -368,7 +368,7 @@
         </div>
         <div style="flex: 1; overflow-y: auto; padding: 2px 12px 12px; display: flex; flex-direction: column; gap: 8px;">
           <sc-for list="{{ preCards }}" as="pc" hint-placeholder-count="5">
-            <div style="border: 1px solid #E1E7EB; background: #FFFFFF; border-radius: 10px; padding: 13px 14px; display: flex; gap: 12px;" style-hover="border-color: #9FB4BF">
+            <div onClick="{{ pc.onClick }}" style="border: 1px solid #E1E7EB; background: #FFFFFF; border-radius: 10px; padding: 13px 14px; display: flex; gap: 12px; cursor: {{ pc.cursor }};" style-hover="border-color: #9FB4BF">
               <div style="width: 34px; height: 34px; flex: none; border-radius: 9px; background: {{ pc.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: {{ pc.iconColor }}; font-family: 'IBM Plex Mono', monospace;">{{ pc.mono }}</div>
               <div style="flex: 1; min-width: 0;">
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -558,6 +558,12 @@
                   <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">建议条数上限</div>
                   <input ref="{{ maxRef }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
                 </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <button onClick="{{ onTestAi }}" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #C4E0E5; background: #F0F7F8; color: {{ accent }}; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; flex: none;" style-hover="background: #E2F0F2">测试连接</button>
+                <sc-if value="{{ aiTestShow }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size: 11.5px; color: {{ aiTestColor }}; flex: 1; min-width: 0; line-height: 1.5;">{{ aiTestText }}</span>
+                </sc-if>
               </div>
               <div>
                 <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">清理风格（系统提示词预设）</div>
@@ -783,6 +789,8 @@ class Component extends DCLogic {
     realElevated: false,
     aiModel: 'deepseek-chat',
     appSettings: null,
+    aiTestMsg: null,          // { text, color } | null，设置弹窗测试连接结果
+    pendingAsk: null,         // 预判卡片触发扫描后，待发送的针对性提问
     rootInfo: null,            // { path, bytes, totalFiles, totalDirs, rootNodeId, sessionId }
     driveData: {},             // 磁盘字母 -> 该盘扫描/报告/推荐快照，切盘时保存与恢复
     nodeChildren: {},          // path -> [child node]
@@ -947,10 +955,13 @@ class Component extends DCLogic {
   }
 
   chatSystemPrompt() {
-    const root = this.state.drive + ':\\';
-    return '你是 Windows 磁盘清理顾问，帮助用户理解磁盘占用并判断哪些内容可以安全清理。' +
+    const base = '你是 Windows 磁盘清理顾问，帮助用户理解磁盘占用并判断哪些内容可以安全清理。' +
       '回答用简体中文，简明扼要，重点给出可执行的清理建议与风险提示。' +
-      '只讨论 ' + root + ' 范围内的内容。不要建议删除系统核心文件、应用主体和用户文档。';
+      '不要建议删除系统核心文件、应用主体和用户文档。';
+    // 尚未扫描时没有盘符上下文，不做范围限定，允许直接对话。
+    if (this.state.view !== 'done' || !this.state.rootInfo) return base;
+    const root = this.state.drive + ':\\';
+    return base + '当前讨论范围限定在 ' + root + ' 之内。';
   }
 
   splitSize(bytes) {
@@ -990,7 +1001,7 @@ class Component extends DCLogic {
     });
   }
 
-  startScan() {
+  startScan(onDone) {
     const s = this.state;
     if (s.view === 'scanning') return;
     const loc = s.drive + ':\\';
@@ -1000,6 +1011,7 @@ class Component extends DCLogic {
       this.setState((st) => ({ view: 'done', rootInfo, nodeChildren: { [r.path]: r.children || [] }, openPaths: {}, scannedDrives: { ...st.scannedDrives, [st.drive]: true } }));
       this.runReport();
       this.runSuggest(loc);
+      if (typeof onDone === 'function') onDone();
     }).catch((e) => {
       this.setState({ view: 'empty' });
       const msg = e.message || '';
@@ -1062,32 +1074,72 @@ class Component extends DCLogic {
       .catch(() => this.setState({ recItems: [] }));
   }
 
+  // 发送一轮对话：追加用户气泡，带历史与系统提示词调用 ai.chat，回填 AI 气泡。
+  // display 为用户气泡展示文本，content 为实际发给模型的内容（可含附件路径）。
+  postChat(display, content) {
+    const history = [{ role: 'system', content: this.chatSystemPrompt() }];
+    this.state.chatBubbles.forEach((b) => history.push({ role: b.me ? 'user' : 'assistant', content: b.text }));
+    history.push({ role: 'user', content });
+    this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { me: true, text: display }] }));
+    this.call('ai.chat', { messages: history }).then((r) => {
+      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: r.content }], chatTokens: st.chatTokens + (r.tokens || 0) }));
+    }).catch((e) => {
+      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: '请求失败：' + e.message }] }));
+    });
+  }
+
   sendChat() {
     const s = this.state;
     const el = this._chatInputRef && this._chatInputRef.current;
     const typed = el ? (el.value || '').trim() : '';
     const atts = s.attached.slice();
     if (!typed && atts.length === 0) return;
-    if (!s.aiEnabled) {
-      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: 'AI 未启用，请在设置中开启后再对话。' }] }));
-      return;
-    }
     let display = typed || '请分析这些文件夹里哪些内容可以安全清理。';
     let content = display;
     if (atts.length) {
       display = display + '\n\n' + atts.map((a) => '📁 ' + a.path).join('\n');
       content = content + '\n\n附加文件夹：\n' + atts.map((a) => a.path).join('\n');
     }
-    const history = [{ role: 'system', content: this.chatSystemPrompt() }];
-    s.chatBubbles.forEach((b) => history.push({ role: b.me ? 'user' : 'assistant', content: b.text }));
-    history.push({ role: 'user', content });
     if (el) el.value = '';
-    this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { me: true, text: display }], attached: [] }));
-    this.call('ai.chat', { messages: history }).then((r) => {
-      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: r.content }], chatTokens: st.chatTokens + (r.tokens || 0) }));
-    }).catch((e) => {
-      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: '请求失败：' + e.message }] }));
-    });
+    this.setState({ attached: [] });
+    // 未扫描也允许对话：postChat 追加的气泡会让中栏切到聊天视图。
+    if (!s.aiEnabled) {
+      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { me: true, text: display }, { ai: true, text: 'AI 未启用，请在设置中开启后再对话。' }] }));
+      return;
+    }
+    this.postChat(display, content);
+  }
+
+  // 预判卡片点击：忽略扫描中；先扫描该项所在盘，扫描完成后按方向自动发起针对性提问。
+  prescan(card) {
+    if (this.state.view === 'scanning') return;
+    const ask = () => this.startScan(() => this.askPrecheck(card));
+    const drive = card && card.drive;
+    if (drive && drive !== this.state.drive) {
+      // ponytail: 直接切盘符再扫，不做上一盘快照存档——用户明确要扫这个方向的目标盘
+      this.setState({ drive, treeTags: {}, treeSelPath: {}, report: null, chatBubbles: [], chatTokens: 0, recItems: null, recSelPath: {}, openPaths: {}, nodeChildren: {}, rootInfo: null }, ask);
+    } else {
+      ask();
+    }
+  }
+
+  askPrecheck(card) {
+    const questions = {
+      wechat: '帮我分析微信缓存目录，哪些图片 / 视频 / 文件缓存可以安全清理，聊天记录会不会受影响？',
+      steam: '帮我分析 Steam 游戏库里长期未玩的大体积游戏，给出可卸载建议。',
+      temp: '帮我分析系统临时文件，哪些 Temp、更新残留、崩溃转储可以安全清理？',
+      downloads: '帮我分析 Downloads 目录，哪些已安装的安装包和已解压的压缩包可以安全删除？',
+      browser: '帮我分析浏览器缓存目录，哪些可以安全清理且不影响书签与登录状态？',
+    };
+    const q = questions[card && card.key] || '请分析这个目录里哪些内容可以安全清理，并给出可删除 / 可卸载建议。';
+    const target = card && card.targetPath;
+    if (!this.state.aiEnabled) {
+      this.notifyAttach('已扫描并生成本地推荐，可在设置中开启 AI 获取针对性分析。');
+      return;
+    }
+    const display = target ? (q + '\n\n📁 ' + target) : q;
+    const content = target ? (q + '\n\n附加文件夹：\n' + target) : q;
+    this.postChat(display, content);
   }
 
   // ================= delete flow =================
@@ -1178,7 +1230,9 @@ class Component extends DCLogic {
     if (s.promptPreset === 'custom') put(this._customPromptRef, a.SystemPrompt || '');
   }
 
-  saveSettings() {
+  // 把设置弹窗中的所有字段（含 Enabled / Endpoint / AccessMode）组装成后端可反序列化的 settings。
+  // 选择预设服务商时接口地址取预设 URL（此时地址输入框不显示）；自定义时才取输入框内容。
+  collectSettings() {
     const s = this.state;
     const a = (s.appSettings && s.appSettings.Ai) || {};
     const sb = (s.appSettings && s.appSettings.Sandbox) || {};
@@ -1187,12 +1241,16 @@ class Component extends DCLogic {
     const preset = this.promptPresets().find((p) => p.id === s.promptPreset);
     const val = (ref, d) => (ref && ref.current) ? ref.current.value : d;
     const num = (ref, d) => { const v = parseInt(val(ref, d), 10); return isNaN(v) ? d : v; };
-    const settings = {
+    const endpoint = s.provider === 'custom'
+      ? (val(this._endpointRef, a.Endpoint) || a.Endpoint || prov.url)
+      : (prov.url || a.Endpoint);
+    return {
       ...(s.appSettings || {}),
       Ai: {
         ...a,
         Enabled: s.aiEnabled,
-        Endpoint: val(this._endpointRef, a.Endpoint || prov.url),
+        AccessMode: a.AccessMode || 'standard_api',
+        Endpoint: endpoint,
         ApiKey: val(this._keyRef, a.ApiKey),
         Model: val(this._modelRef, a.Model || prov.model),
         MaxSuggestions: num(this._maxRef, a.MaxSuggestions || 30),
@@ -1211,9 +1269,45 @@ class Component extends DCLogic {
         SortMode: s.sortMode === 'logical' ? 'Logical' : 'Allocated',
       },
     };
+  }
+
+  saveSettings() {
+    const settings = this.collectSettings();
     this.call('settings.save', { settings }).then(() => {
-      this.setState({ settingsOpen: false, appSettings: settings, aiModel: settings.Ai.Model });
+      this.setState({ settingsOpen: false, appSettings: settings, aiEnabled: !!settings.Ai.Enabled, aiModel: settings.Ai.Model, aiTestMsg: null });
     }).catch((e) => alert('保存失败：' + e.message));
+  }
+
+  testAiConnection() {
+    this.setState({ aiTestMsg: { text: '正在测试连接…', color: '#6B8090' } });
+    const settings = this.collectSettings();
+    this.call('settings.testAi', { settings }).then((r) => {
+      this.setState({ aiTestMsg: { text: r.message || (r.ok ? '连接成功' : '连接失败'), color: r.ok ? '#0F7A56' : '#A63A4B' } });
+    }).catch((e) => this.setState({ aiTestMsg: { text: '测试失败：' + e.message, color: '#A63A4B' } }));
+  }
+
+  // 打开设置时按已存配置反查服务商与清理风格下拉；匹配不到则落到"自定义"。
+  openSettings() {
+    const s = this.state;
+    const a = (s.appSettings && s.appSettings.Ai) || {};
+    const sb = (s.appSettings && s.appSettings.Sandbox) || {};
+    const sc = (s.appSettings && s.appSettings.Scan) || {};
+    const host = (u) => { try { return new URL(u).host.toLowerCase(); } catch (e) { return (u || '').trim().replace(/\/+$/, '').toLowerCase(); } };
+    const ep = a.Endpoint || '';
+    const provider = (this.providerList().find((p) => p.id !== 'custom' && ep && host(p.url) === host(ep)) || { id: 'custom' }).id;
+    const sp = (a.SystemPrompt || '').trim();
+    const promptPreset = (this.promptPresets().find((p) => p.id !== 'custom' && p.preview && p.preview.trim() === sp) || { id: 'custom' }).id;
+    this.setState({
+      settingsOpen: true,
+      provider,
+      promptPreset,
+      aiEnabled: !!a.Enabled,
+      permOn: !!sb.FullyPrivilegedMode,
+      defMode: sb.UseRecycleBin === false ? 'perm' : 'recycle',
+      sortMode: (sc.SortMode === 'Logical' || sc.SortMode === 0) ? 'logical' : 'allocated',
+      aiTestMsg: null,
+    });
+    setTimeout(() => this.populateSettingsFields(), 0);
   }
 
   // ================= bridged render overrides =================
@@ -1342,7 +1436,7 @@ class Component extends DCLogic {
     out.chatInputRef = (this._chatInputRef = this._chatInputRef || React.createRef());
     out.onSend = () => this.sendChat();
     out.onChatKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendChat(); } };
-    out.inputPlaceholder = s.dropHover ? '松开即可把文件夹交给 AI 分析' : (s.attached.length > 0 ? '针对已附加的文件夹提问，例如：这些能删吗？' : (s.view === 'done' ? '询问任意文件或文件夹，或把左侧条目拖到这里…' : '扫描完成后即可提问…'));
+    out.inputPlaceholder = s.dropHover ? '松开即可把文件夹交给 AI 分析' : (s.attached.length > 0 ? '针对已附加的文件夹提问，例如：这些能删吗？' : (s.view === 'done' ? '询问任意文件或文件夹，或把左侧条目拖到这里…' : '直接提问，或选择磁盘开始扫描…'));
 
     // recommendations
     const riskStyles = {
@@ -1374,6 +1468,11 @@ class Component extends DCLogic {
       };
     });
     out.isPre = s.view === 'empty' || s.view === 'scanning';
+    // 中栏：只要有对话气泡就切到聊天视图，未扫描也能直接对话（报告卡片显示占位）。
+    const hasBubbles = s.chatBubbles.length > 0;
+    out.centerDone = s.view === 'done' || hasBubbles;
+    out.centerEmpty = s.view === 'empty' && !hasBubbles;
+    out.centerScanning = s.view === 'scanning' && !hasBubbles;
     out.recTitle = out.isPre ? '清理方向预判' : '智能推荐';
     out.recSubtitle = out.isPre ? '扫描后给出可清理项' : ((s.recItems ? s.recItems.length : 0) + ' 项建议');
     out.selCount = selCount;
@@ -1436,8 +1535,15 @@ class Component extends DCLogic {
     out.delPermWarn = isPerm || hasConfirm;
 
     // settings modal
-    out.onOpenSettings = () => { this.setState({ settingsOpen: true }); setTimeout(() => this.populateSettingsFields(), 0); };
+    out.onOpenSettings = () => this.openSettings();
     out.onSaveSettings = () => this.saveSettings();
+    out.onTestAi = () => this.testAiConnection();
+    out.aiTestShow = !!s.aiTestMsg;
+    out.aiTestText = s.aiTestMsg ? s.aiTestMsg.text : '';
+    out.aiTestColor = s.aiTestMsg ? s.aiTestMsg.color : '#6B8090';
+    // 顶栏 AI 芯片：已启用显示"AI 已连接"+模型名，未启用显示"AI 未启用"。
+    out.aiChipText = s.aiEnabled ? 'AI 已连接' : 'AI 未启用';
+    out.aiModelText = s.aiEnabled ? (s.aiModel || '') : '';
     out.endpointRef = (this._endpointRef = this._endpointRef || React.createRef());
     out.keyRef = (this._keyRef = this._keyRef || React.createRef());
     out.modelRef = (this._modelRef = this._modelRef || React.createRef());
@@ -1599,9 +1705,11 @@ class Component extends DCLogic {
     } else {
       preCards = this.state.preCheck.map((it) => {
         const st = preCardStyle[it.key] || { mono: '··', iconBg: '#EDF1F4', iconColor: '#42586A' };
-        return { mono: st.mono, iconBg: st.iconBg, iconColor: st.iconColor, title: it.title, chip: it.chip, chipBg: '#EDF1F4', chipColor: '#5E7485', desc: it.desc };
+        return { mono: st.mono, iconBg: st.iconBg, iconColor: st.iconColor, title: it.title, chip: it.chip, chipBg: '#EDF1F4', chipColor: '#5E7485', desc: it.desc, cursor: 'pointer', onClick: () => this.prescan(it) };
       });
     }
+    // 每张卡片都要有 onClick/cursor 供模板绑定；演示卡片与空态卡片默认不可点。
+    preCards = preCards.map((c) => ({ cursor: 'default', onClick: () => {}, ...c }));
 
     // ---- AI providers ----
     const providers = [
@@ -1738,6 +1846,7 @@ class Component extends DCLogic {
       accent, pills,
       showSwitcher: this.props.showSwitcher ?? true,
       isEmpty, isScanning, isDone,
+      centerEmpty: isEmpty, centerScanning: isScanning, centerDone: isDone,
       isPre: isEmpty || isScanning,
       treeRows, skeletonRows, preCards, recCards,
       recTitle: isDone ? '智能推荐' : '清理方向预判',
@@ -1988,6 +2097,7 @@ class Component extends DCLogic {
       treeFooter: '共 128,443 个文件 · 24,891 个文件夹',
       treeFooterMeta: 'MFT 扫描 · 4.2s',
       onSaveSettings: () => this.setState({ settingsOpen: false }),
+      onTestAi: () => {}, aiTestShow: false, aiTestText: '', aiTestColor: '#6B8090',
       endpointRef: null, keyRef: null, modelRef: null, maxRef: null,
       minSizeRef: null, perLevelRef: null, whitelistRef: null, customPromptRef: null,
     };
