@@ -21,7 +21,7 @@
 </style>
 </helmet>
 
-<div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 28px 32px; font-family: 'IBM Plex Sans', 'Noto Sans SC', sans-serif; color: #1A2530;">
+<div style="width: 100vw; height: 100vh; display: flex; flex-direction: column; font-family: 'IBM Plex Sans', 'Noto Sans SC', sans-serif; color: #1A2530;">
 
 <!-- ============ STATE SWITCHER (presentation only) ============ -->
 <sc-if value="{{ showSwitcher }}" hint-placeholder-val="{{ true }}">
@@ -34,21 +34,21 @@
 </sc-if>
 
 <!-- ============ APP WINDOW ============ -->
-<div style="width: 1560px; height: 940px; background: #F6F8F9; border-radius: 10px; box-shadow: 0 24px 64px rgba(15,30,42,0.28), 0 2px 8px rgba(15,30,42,0.12); overflow: hidden; display: flex; flex-direction: column; border: 1px solid rgba(15,30,42,0.08); position: relative;" data-screen-label="AiCleanVolume 主窗口">
+<div style="flex: 1; min-height: 0; background: #F6F8F9; border-radius: 0; box-shadow: none; overflow: hidden; display: flex; flex-direction: column; border: none; position: relative;" data-screen-label="AiCleanVolume 主窗口">
 
   <!-- Title bar -->
   <div style="height: 42px; flex: none; display: flex; align-items: center; padding: 0 0 0 16px; background: #10202C; color: #C7D3DC;">
-    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+    <div onMouseDown="{{ onTitleBarDown }}" style="display: flex; align-items: center; gap: 10px; flex: 1;">
       <div style="width: 20px; height: 20px; border-radius: 5px; background: linear-gradient(135deg, #14B8C4, #0E7490); display: flex; align-items: center; justify-content: center;">
         <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 7 L5 10 L10 2.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       </div>
       <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.02em;">AiCleanVolume</span>
-      <span style="font-size: 11px; color: #56707F; font-family: 'IBM Plex Mono', monospace;">v0.2.0</span>
+      <span style="font-size: 11px; color: #56707F; font-family: 'IBM Plex Mono', monospace;">{{ versionText }}</span>
     </div>
     <div style="display: flex; height: 100%;">
-      <div style="width: 46px; display: flex; align-items: center; justify-content: center;" style-hover="background: rgba(255,255,255,0.08)"><svg width="10" height="10" viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#C7D3DC" stroke-width="1.2"></line></svg></div>
-      <div style="width: 46px; display: flex; align-items: center; justify-content: center;" style-hover="background: rgba(255,255,255,0.08)"><svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="#C7D3DC" stroke-width="1.2"></rect></svg></div>
-      <div style="width: 46px; display: flex; align-items: center; justify-content: center;" style-hover="background: #C4314B"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="#C7D3DC" stroke-width="1.2"></path></svg></div>
+      <div onClick="{{ onWinMin }}" style="width: 46px; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: rgba(255,255,255,0.08)"><svg width="10" height="10" viewBox="0 0 10 10"><line x1="1" y1="5" x2="9" y2="5" stroke="#C7D3DC" stroke-width="1.2"></line></svg></div>
+      <div onClick="{{ onWinMax }}" style="width: 46px; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: rgba(255,255,255,0.08)"><svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="#C7D3DC" stroke-width="1.2"></rect></svg></div>
+      <div onClick="{{ onWinClose }}" style="width: 46px; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: #C4314B"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="#C7D3DC" stroke-width="1.2"></path></svg></div>
     </div>
   </div>
 
@@ -102,7 +102,7 @@
     <div style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: {{ aiChipBg }}; border: 1px solid {{ aiChipBorder }};">
       <div style="width: 7px; height: 7px; border-radius: 50%; background: {{ aiDot }};"></div>
       <span style="font-size: 12px; font-weight: 500; color: {{ aiChipColor }};">{{ aiChipText }}</span>
-      <span style="font-size: 11px; color: #55808A; font-family: 'IBM Plex Mono', monospace;">deepseek-chat</span>
+      <span style="font-size: 11px; color: #55808A; font-family: 'IBM Plex Mono', monospace;">{{ aiModelText }}</span>
     </div>
     <div onClick="{{ onOpenSettings }}" title="设置" style="height: 34px; padding: 0 12px; border-radius: 8px; display: flex; align-items: center; gap: 7px; cursor: pointer; border: 1px solid transparent; color: #42586A; font-size: 12.5px; font-weight: 600;" style-hover="background: #F0F3F5; border-color: #E1E7EB">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><line x1="2" y1="4" x2="14" y2="4" stroke="#42586A" stroke-width="1.4" stroke-linecap="round"></line><circle cx="6" cy="4" r="1.9" fill="#FFFFFF" stroke="#42586A" stroke-width="1.4"></circle><line x1="2" y1="8" x2="14" y2="8" stroke="#42586A" stroke-width="1.4" stroke-linecap="round"></line><circle cx="10.5" cy="8" r="1.9" fill="#FFFFFF" stroke="#42586A" stroke-width="1.4"></circle><line x1="2" y1="12" x2="14" y2="12" stroke="#42586A" stroke-width="1.4" stroke-linecap="round"></line><circle cx="5" cy="12" r="1.9" fill="#FFFFFF" stroke="#42586A" stroke-width="1.4"></circle></svg>
@@ -180,11 +180,11 @@
           <div style="margin-top: 12px;">
             <div style="display: flex; justify-content: space-between; font-size: 12px; color: #42586A; margin-bottom: 6px;">
               <span style="font-family: 'IBM Plex Mono', monospace;">{{ driveUsageLabel }}</span>
-              <span style="font-weight: 600; color: {{ accent }};">可释放约 34.2 GB</span>
+              <span style="font-weight: 600; color: {{ accent }};">{{ reclaimLabel }}</span>
             </div>
             <div style="height: 8px; border-radius: 4px; background: #EAEEF1; overflow: hidden; display: flex;">
-              <div style="width: 68%; background: #33475A;"></div>
-              <div style="width: 14%; background: {{ accent }};"></div>
+              <div style="width: {{ usedBarW }}; background: #33475A;"></div>
+              <div style="width: {{ safeBarW }}; background: {{ accent }};"></div>
             </div>
             <div style="display: flex; gap: 16px; margin-top: 6px; font-size: 11px; color: #6B8090;">
               <span style="display: flex; align-items: center; gap: 5px;"><span style="width: 8px; height: 8px; border-radius: 2px; background: #33475A;"></span>正常占用</span>
@@ -229,8 +229,8 @@
         </sc-if>
         <sc-if value="{{ treeNoSel }}" hint-placeholder-val="{{ true }}">
           <div style="flex: none; padding: 10px 18px; border-top: 1px solid #E9EEF1; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #6B8090;">
-            <span>共 128,443 个文件 · 24,891 个文件夹</span>
-            <span style="font-family: 'IBM Plex Mono', monospace;">MFT 扫描 · 4.2s</span>
+            <span>{{ treeFooter }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace;">{{ treeFooterMeta }}</span>
           </div>
         </sc-if>
       </sc-if>
@@ -247,7 +247,7 @@
           <div style="font-size: 11.5px; color: #6B8090;">基于扫描结果的智能清理分析 · 可把左侧任意文件夹拖进来提问</div>
         </div>
         <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
-          <span style="font-size: 11px; color: #6B8090; font-family: 'IBM Plex Mono', monospace;">tokens 1,284</span>
+          <span style="font-size: 11px; color: #6B8090; font-family: 'IBM Plex Mono', monospace;">{{ tokensText }}</span>
         </sc-if>
       </div>
 
@@ -285,43 +285,38 @@
           <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(15,30,42,0.04);">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
               <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: {{ accent }};">扫描解析报告</span>
-              <span style="font-size: 11px; color: #8CA0AD;">2026-07-05 14:32</span>
+              <span style="font-size: 11px; color: #8CA0AD;">{{ reportTime }}</span>
             </div>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px;">
               <div style="padding: 12px 14px; border-radius: 9px; background: #F0F7F8; border: 1px solid #D8E9EC;">
-                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: {{ accent }};">34.2 <span style="font-size: 12px; font-weight: 500;">GB</span></div>
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: {{ accent }};">{{ reportSafeNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportSafeUnit }}</span></div>
                 <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">可安全释放</div>
               </div>
               <div style="padding: 12px 14px; border-radius: 9px; background: #FBF6EC; border: 1px solid #EEE2C8;">
-                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #9A5B00;">44.8 <span style="font-size: 12px; font-weight: 500;">GB</span></div>
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #9A5B00;">{{ reportConfirmNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportConfirmUnit }}</span></div>
                 <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">需人工确认</div>
               </div>
               <div style="padding: 12px 14px; border-radius: 9px; background: #F2F4F6; border: 1px solid #E1E7EB;">
-                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #33475A;">96.2 <span style="font-size: 12px; font-weight: 500;">GB</span></div>
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #33475A;">{{ reportSystemNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportSystemUnit }}</span></div>
                 <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">系统保留 · 勿动</div>
               </div>
             </div>
-            <div style="font-size: 13px; line-height: 1.75; color: #33475A;">
-              本次扫描共分析 <b>128,443</b> 个文件。占用增长主要来自 <b>用户缓存</b>：微信 PC 端的图片与视频缓存 3 个月内增长了 8.1 GB；<span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; background: #F0F3F5; padding: 1px 6px; border-radius: 4px;">AppData\Local\Temp</span> 存在 61 天前的安装残留。建议优先执行右侧推荐的 3 项安全清理，预计 10 秒内完成。
-            </div>
+            <div style="font-size: 13px; line-height: 1.75; color: #33475A; white-space: pre-wrap;">{{ reportSummary }}</div>
           </div>
 
-          <div style="align-self: flex-end; max-width: 72%; background: {{ accent }}; color: #FFFFFF; border-radius: 12px 12px 3px 12px; padding: 11px 16px; font-size: 13px; line-height: 1.7;">
-            Downloads 里 21.3 GB 都是什么？哪些可以删？
-          </div>
-
-          <div style="align-self: flex-start; max-width: 82%; display: flex; gap: 10px;">
-            <div style="width: 26px; height: 26px; flex: none; border-radius: 7px; background: linear-gradient(135deg, #14B8C4, #0E7490); display: flex; align-items: center; justify-content: center; margin-top: 2px;">
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1 L8.4 5.6 L13 7 L8.4 8.4 L7 13 L5.6 8.4 L1 7 L5.6 5.6 Z" fill="#FFFFFF"></path></svg>
-            </div>
-            <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 3px 12px 12px 12px; padding: 13px 16px; font-size: 13px; line-height: 1.75; color: #33475A;">
-              Downloads 中主要是 3 类内容：<b>安装包 14.2 GB</b>（其中 9 个已安装完成，对应软件仍在系统中，可以删除）、<b>压缩包 4.8 GB</b>（有 3 个已解压到同目录）、<b>文档与图片 2.3 GB</b>（建议保留）。我已把「已安装的安装包」加入右侧推荐，删除前会逐个做安全评估。
-              <div style="display: flex; gap: 8px; margin-top: 12px;">
-                <span style="font-size: 12px; font-weight: 600; color: {{ accent }}; border: 1px solid #C4E0E5; background: #F0F7F8; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap;" style-hover="background: #E2F0F2">查看这 9 个安装包</span>
-                <span style="font-size: 12px; font-weight: 600; color: #42586A; border: 1px solid #D5DDE2; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap;" style-hover="background: #F2F4F6">加入清理队列</span>
+          <sc-for list="{{ chatBubbles }}" as="b" hint-placeholder-count="2">
+            <sc-if value="{{ b.me }}" hint-placeholder-val="{{ true }}">
+              <div style="align-self: flex-end; max-width: 72%; background: {{ accent }}; color: #FFFFFF; border-radius: 12px 12px 3px 12px; padding: 11px 16px; font-size: 13px; line-height: 1.7; white-space: pre-wrap;">{{ b.text }}</div>
+            </sc-if>
+            <sc-if value="{{ b.ai }}" hint-placeholder-val="{{ false }}">
+              <div style="align-self: flex-start; max-width: 82%; display: flex; gap: 10px;">
+                <div style="width: 26px; height: 26px; flex: none; border-radius: 7px; background: linear-gradient(135deg, #14B8C4, #0E7490); display: flex; align-items: center; justify-content: center; margin-top: 2px;">
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1 L8.4 5.6 L13 7 L8.4 8.4 L7 13 L5.6 8.4 L1 7 L5.6 5.6 Z" fill="#FFFFFF"></path></svg>
+                </div>
+                <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 3px 12px 12px 12px; padding: 13px 16px; font-size: 13px; line-height: 1.75; color: #33475A; white-space: pre-wrap;">{{ b.text }}</div>
               </div>
-            </div>
-          </div>
+            </sc-if>
+          </sc-for>
         </div>
       </sc-if>
 
@@ -346,11 +341,11 @@
             <div style="font-size: 11.5px; color: #9A5B00; background: #FBF0DC; border: 1px solid #EBD9B4; padding: 5px 10px; border-radius: 7px;">{{ attachNotice }}</div>
           </sc-if>
           <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-          <input placeholder="{{ inputPlaceholder }}" style="flex: 1; border: none; outline: none; font-size: 13px; font-family: inherit; color: #1A2530; background: transparent;">
+          <input ref="{{ chatInputRef }}" onKeyDown="{{ onChatKey }}" placeholder="{{ inputPlaceholder }}" style="flex: 1; border: none; outline: none; font-size: 13px; font-family: inherit; color: #1A2530; background: transparent;">
           <div onClick="{{ onPickFolder }}" title="从系统选择文件夹交给 AI 分析" style="width: 30px; height: 30px; border-radius: 8px; border: 1px solid #E1E7EB; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: #F2F4F6">
             <svg width="15" height="13" viewBox="0 0 16 14" fill="none"><path d="M1.5 3.5 a2 2 0 0 1 2-2 h3 l1.8 2 h5.2 a1.5 1.5 0 0 1 1.5 1.5 v6 a2 2 0 0 1-2 2 h-9.5 a2 2 0 0 1-2-2 z" fill="none" stroke="#6B8090" stroke-width="1.3"></path><path d="M8 6.2 L8 10 M6.1 8.1 L9.9 8.1" stroke="#6B8090" stroke-width="1.3" stroke-linecap="round"></path></svg>
           </div>
-          <div style="height: 30px; padding: 0 16px; border-radius: 8px; background: {{ accent }}; color: #FFFFFF; display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer;" style-hover="filter: brightness(1.08)">
+          <div onClick="{{ onSend }}" style="height: 30px; padding: 0 16px; border-radius: 8px; background: {{ accent }}; color: #FFFFFF; display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer;" style-hover="filter: brightness(1.08)">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6 L11 1 L7.5 11 L5.8 6.8 L1 6 Z" fill="#FFFFFF"></path></svg>
             发送
           </div>
@@ -544,24 +539,24 @@
               <sc-if value="{{ isCustom }}" hint-placeholder-val="{{ false }}">
                 <div>
                   <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">接口地址</div>
-                  <input value="http://127.0.0.1:3000/v1" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                  <input ref="{{ endpointRef }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
                   <div style="font-size: 11px; color: #8CA0AD; margin-top: 5px;">支持根地址、/v1、或完整 /v1/chat/completions</div>
                 </div>
               </sc-if>
               <sc-if value="{{ showKey }}" hint-placeholder-val="{{ true }}">
                 <div>
                   <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">API Key</div>
-                  <input type="password" value="sk-............................" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                  <input type="password" ref="{{ keyRef }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
                 </div>
               </sc-if>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                 <div>
                   <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">模型名称</div>
-                  <input value="{{ modelName }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                  <input ref="{{ modelRef }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
                 </div>
                 <div>
                   <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">建议条数上限</div>
-                  <input value="30" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                  <input ref="{{ maxRef }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
                 </div>
               </div>
               <div>
@@ -585,7 +580,7 @@
                   </sc-if>
                 </div>
                 <sc-if value="{{ isCustomPrompt }}" hint-placeholder-val="{{ false }}">
-                  <textarea rows="4" style="width: 100%; margin-top: 8px; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none; resize: vertical; line-height: 1.6;">你是 Windows 磁盘清理审核助手。只允许从候选清单中选择明确可再生成的缓存、临时文件、日志和安装残留……</textarea>
+                  <textarea ref="{{ customPromptRef }}" rows="4" style="width: 100%; margin-top: 8px; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none; resize: vertical; line-height: 1.6;">你是 Windows 磁盘清理审核助手。只允许从候选清单中选择明确可再生成的缓存、临时文件、日志和安装残留……</textarea>
                 </sc-if>
                 <sc-if value="{{ notCustomPrompt }}" hint-placeholder-val="{{ true }}">
                   <div style="margin-top: 8px; padding: 9px 12px; border-radius: 8px; background: #F7F9FA; border: 1px solid #E9EEF1; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #6B8090; line-height: 1.7; max-height: 62px; overflow: hidden;">{{ promptPreview }}</div>
@@ -632,7 +627,7 @@
               <div>
                 <div style="font-size: 12.5px; font-weight: 600; color: #22323F; margin-bottom: 2px;">沙盒白名单（允许删除的根目录）</div>
                 <div style="font-size: 11.5px; color: #6B8090; margin-bottom: 8px;">未开启完全权限模式时，删除操作只允许发生在这些根目录内。每行一条。</div>
-                <textarea rows="5" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none; resize: vertical; line-height: 1.7;">C:\Users\iyuca\AppData\Local\Temp
+                <textarea ref="{{ whitelistRef }}" rows="5" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none; resize: vertical; line-height: 1.7;">C:\Users\iyuca\AppData\Local\Temp
 C:\Windows\Temp
 C:\Windows\SoftwareDistribution\Download
 C:\Windows\Prefetch
@@ -649,12 +644,12 @@ C:\Users\iyuca\AppData\Local\Microsoft\Windows\INetCache</textarea>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
               <div>
                 <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">最小体积阈值（MB）</div>
-                <input value="-1" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                <input ref="{{ minSizeRef }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
                 <div style="font-size: 11px; color: #8CA0AD; margin-top: 5px;">小于该值的条目不进入结果，-1 为不限</div>
               </div>
               <div>
                 <div style="font-size: 12px; font-weight: 600; color: #42586A; margin-bottom: 6px;">每层最多条目</div>
-                <input value="512" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
+                <input ref="{{ perLevelRef }}" style="width: 100%; padding: 9px 12px; border: 1px solid #D5DDE2; border-radius: 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: #1A2530; outline: none;">
                 <div style="font-size: 11px; color: #8CA0AD; margin-top: 5px;">每层目录最多展示的子项数量</div>
               </div>
             </div>
@@ -672,7 +667,7 @@ C:\Users\iyuca\AppData\Local\Microsoft\Windows\INetCache</textarea>
         </div>
         <div style="flex: none; padding: 14px 24px; border-top: 1px solid #E9EEF1; display: flex; justify-content: flex-end; gap: 10px; background: #FBFCFD;">
           <button onClick="{{ onCloseSettings }}" style="padding: 9px 20px; border-radius: 8px; border: 1px solid #D5DDE2; background: #FFFFFF; color: #42586A; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="background: #F2F4F6">取消</button>
-          <button onClick="{{ onCloseSettings }}" style="padding: 9px 24px; border-radius: 8px; border: none; background: {{ accent }}; color: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">保存配置</button>
+          <button onClick="{{ onSaveSettings }}" style="padding: 9px 24px; border-radius: 8px; border: none; background: {{ accent }}; color: #FFFFFF; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;" style-hover="filter: brightness(1.08)">保存配置</button>
         </div>
       </div>
     </div>
@@ -748,7 +743,8 @@ C:\Users\iyuca\AppData\Local\Microsoft\Windows\INetCache</textarea>
 }">
 class Component extends DCLogic {
   state = {
-    view: this.props.view ?? 'done', // 'empty' | 'scanning' | 'done'
+    view: (typeof window !== 'undefined' && window.chrome && window.chrome.webview) ? 'empty' : (this.props.view ?? 'done'), // 'empty' | 'scanning' | 'done'
+    bridged: !!(typeof window !== 'undefined' && window.chrome && window.chrome.webview),
     permOn: false,
     settingsOpen: this.props.panel === 'settings',
     deleteOpen: this.props.panel === 'delete',
@@ -779,6 +775,30 @@ class Component extends DCLogic {
     aiEnabled: true,
     defMode: 'recycle',
     selected: { wechat: true, temp: true, recycle: true, steam: false, pkg: false, installers: false },
+
+    // ---- bridge-backed real data (populated when running inside WebView2) ----
+    versionText: 'v0.2.0',
+    realDrives: null,
+    realElevated: false,
+    aiModel: 'deepseek-chat',
+    appSettings: null,
+    rootInfo: null,            // { path, bytes, totalFiles, totalDirs, rootNodeId, sessionId }
+    nodeChildren: {},          // path -> [child node]
+    openPaths: {},             // path -> bool
+    treeTags: {},              // path -> 'safe'|'confirm'|'system'
+    treeSelPath: {},           // path -> bool
+    recItems: null,            // suggest.analyze items
+    recSelPath: {},
+    expandedRecPath: null,
+    report: null,              // { safeBytes, confirmBytes, systemBytes, summary } | { raw } | { error }
+    reportTime: '',
+    chatBubbles: [],
+    chatTokens: 0,
+    delPending: [],            // [{ path, name, bytes, isDir }]
+    delEval: null,             // del.evaluate items
+    delResults: null,          // del.run results
+    delProgress: null,         // { done, total }
+    delRunning: false,
   };
 
   promptPresets() {
@@ -870,6 +890,530 @@ class Component extends DCLogic {
       this.addAttachment({ path: rel.split('/')[0], size: this.formatBytes(total) });
     };
     input.click();
+  }
+
+  // ================= bridge plumbing =================
+
+  componentDidMount() {
+    const bridge = window.chrome && window.chrome.webview;
+    if (!bridge) return;
+    this._seq = 0;
+    this._pending = {};
+    bridge.addEventListener('message', (ev) => this.onBridgeMessage(ev.data));
+    this.call('env.info').then((env) => {
+      const first = env.drives && env.drives[0];
+      const drive = first ? first.name.replace(':', '') : 'C';
+      this.setState({ realDrives: env.drives || [], versionText: 'v' + (env.version || ''), realElevated: !!env.elevated, drive });
+    }).catch(() => {});
+    this.call('settings.get').then((s) => {
+      this.setState({
+        appSettings: s,
+        aiEnabled: !!(s.Ai && s.Ai.Enabled),
+        aiModel: (s.Ai && s.Ai.Model) || '',
+        permOn: !!(s.Sandbox && s.Sandbox.FullyPrivilegedMode),
+        defMode: (s.Sandbox && s.Sandbox.UseRecycleBin === false) ? 'perm' : 'recycle',
+        sortMode: (s.Scan && (s.Scan.SortMode === 'Logical' || s.Scan.SortMode === 0)) ? 'logical' : 'allocated',
+      });
+    }).catch(() => {});
+  }
+
+  call(method, params) {
+    const bridge = window.chrome && window.chrome.webview;
+    if (!bridge) return Promise.reject(new Error('no bridge'));
+    const id = 'r' + (++this._seq);
+    return new Promise((resolve, reject) => {
+      this._pending[id] = { resolve, reject };
+      bridge.postMessage({ id, method, params: params || {} });
+    });
+  }
+
+  onBridgeMessage(msg) {
+    if (!msg) return;
+    if (msg.event !== undefined) { this.onBridgeEvent(msg.event, msg.data); return; }
+    const p = this._pending[msg.id];
+    if (!p) return;
+    delete this._pending[msg.id];
+    if (msg.ok) p.resolve(msg.result);
+    else p.reject(new Error(msg.error || '请求失败'));
+  }
+
+  onBridgeEvent(name, data) {
+    if (name === 'del.progress') this.setState({ delProgress: data });
+  }
+
+  chatSystemPrompt() {
+    const root = this.state.drive + ':\\';
+    return '你是 Windows 磁盘清理顾问，帮助用户理解磁盘占用并判断哪些内容可以安全清理。' +
+      '回答用简体中文，简明扼要，重点给出可执行的清理建议与风险提示。' +
+      '只讨论 ' + root + ' 范围内的内容。不要建议删除系统核心文件、应用主体和用户文档。';
+  }
+
+  splitSize(bytes) {
+    const s = this.formatBytes(Math.max(0, bytes || 0));
+    const i = s.indexOf(' ');
+    return i < 0 ? { num: s, unit: '' } : { num: s.slice(0, i), unit: s.slice(i + 1) };
+  }
+
+  // ================= scan flow =================
+
+  startScan() {
+    const s = this.state;
+    if (s.view === 'scanning') return;
+    const loc = s.drive + ':\\';
+    this.setState({ view: 'scanning', driveOpen: false, treeTags: {}, treeSelPath: {}, report: null, chatBubbles: [], chatTokens: 0, recItems: null, recSelPath: {}, openPaths: {} });
+    this.call('scan.start', { location: loc, sortMode: s.sortMode }).then((r) => {
+      const rootInfo = { path: r.path, bytes: r.bytes, totalFiles: r.totalFiles, totalDirs: r.totalDirs, rootNodeId: r.rootNodeId, sessionId: r.sessionId };
+      this.setState((st) => ({ view: 'done', rootInfo, nodeChildren: { [r.path]: r.children || [] }, openPaths: {}, scannedDrives: { ...st.scannedDrives, [st.drive]: true } }));
+      this.runReport();
+      this.runSuggest(loc);
+    }).catch((e) => {
+      this.setState({ view: 'empty' });
+      const msg = e.message || '';
+      alert(/NOT_ADMIN|管理员/i.test(msg) ? ('需要管理员权限：请点击右上角「以管理员身份重新启动」后再扫描。\n\n' + msg) : ('扫描失败：' + msg));
+    });
+  }
+
+  buildRealTree() {
+    const s = this.state;
+    if (!s.rootInfo) return [];
+    const flat = [];
+    const walk = (parentPath, depth) => {
+      const kids = s.nodeChildren[parentPath] || [];
+      kids.forEach((n) => {
+        const open = !!s.openPaths[n.path];
+        flat.push({ node: n, depth, open });
+        if (open && n.isDir && n.hasChildren) walk(n.path, depth + 1);
+      });
+    };
+    walk(s.rootInfo.path, 0);
+    return flat;
+  }
+
+  findNode(path) {
+    const nc = this.state.nodeChildren;
+    for (const k in nc) {
+      const arr = nc[k];
+      for (let i = 0; i < arr.length; i++) if (arr[i].path === path) return arr[i];
+    }
+    return null;
+  }
+
+  toggleNode(n) {
+    const s = this.state;
+    if (!n.isDir || !n.hasChildren) return;
+    if (s.openPaths[n.path]) { this.setState((st) => ({ openPaths: { ...st.openPaths, [n.path]: false } })); return; }
+    if (s.nodeChildren[n.path]) { this.setState((st) => ({ openPaths: { ...st.openPaths, [n.path]: true } })); return; }
+    this.call('scan.children', { path: n.path, nodeId: n.nodeId, sessionId: s.rootInfo.sessionId }).then((r) => {
+      this.setState((st) => ({ nodeChildren: { ...st.nodeChildren, [n.path]: r.children || [] }, openPaths: { ...st.openPaths, [n.path]: true } }));
+    }).catch((e) => this.notifyAttach('展开失败：' + e.message));
+  }
+
+  // ================= ai flow =================
+
+  runReport() {
+    if (!this.state.aiEnabled) return;
+    const now = new Date();
+    const stamp = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    this.call('ai.report', {}).then((r) => {
+      this.setState((st) => {
+        const tags = { ...st.treeTags };
+        if (r.classified) r.classified.forEach((c) => { tags[c.path] = c.tag; });
+        return { report: r, reportTime: stamp, chatTokens: st.chatTokens + (r.tokens || 0), treeTags: tags };
+      });
+    }).catch((e) => this.setState({ report: { error: e.message }, reportTime: stamp }));
+  }
+
+  runSuggest(loc) {
+    this.call('suggest.analyze', { location: loc }).then((r) => this.setState({ recItems: r.items || [] }))
+      .catch(() => this.setState({ recItems: [] }));
+  }
+
+  sendChat() {
+    const s = this.state;
+    const el = this._chatInputRef && this._chatInputRef.current;
+    const typed = el ? (el.value || '').trim() : '';
+    const atts = s.attached.slice();
+    if (!typed && atts.length === 0) return;
+    if (!s.aiEnabled) {
+      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: 'AI 未启用，请在设置中开启后再对话。' }] }));
+      return;
+    }
+    let display = typed || '请分析这些文件夹里哪些内容可以安全清理。';
+    let content = display;
+    if (atts.length) {
+      display = display + '\n\n' + atts.map((a) => '📁 ' + a.path).join('\n');
+      content = content + '\n\n附加文件夹：\n' + atts.map((a) => a.path).join('\n');
+    }
+    const history = [{ role: 'system', content: this.chatSystemPrompt() }];
+    s.chatBubbles.forEach((b) => history.push({ role: b.me ? 'user' : 'assistant', content: b.text }));
+    history.push({ role: 'user', content });
+    if (el) el.value = '';
+    this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { me: true, text: display }], attached: [] }));
+    this.call('ai.chat', { messages: history }).then((r) => {
+      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: r.content }], chatTokens: st.chatTokens + (r.tokens || 0) }));
+    }).catch((e) => {
+      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: '请求失败：' + e.message }] }));
+    });
+  }
+
+  // ================= delete flow =================
+
+  openDelete(source, mode) {
+    const s = this.state;
+    let items = [];
+    if (source === 'tree') {
+      items = Object.keys(s.treeSelPath).filter((p) => s.treeSelPath[p]).map((p) => {
+        const n = this.findNode(p);
+        return n ? { path: n.path, name: n.name, bytes: n.bytes, isDir: n.isDir } : { path: p, name: p, bytes: 0, isDir: true };
+      });
+    } else if (source === 'rec') {
+      items = (s.recItems || []).filter((r) => s.recSelPath[r.path]).map((r) => ({ path: r.path, name: r.name, bytes: r.bytes, isDir: r.isDir }));
+    } else if (source === 'ctx' && s.ctxTarget) {
+      items = [s.ctxTarget];
+    }
+    if (!items.length) return;
+    this.setState({ deleteOpen: true, deleteMode: mode, deleteSource: source, deletePhase: 'confirm', delPending: items, delEval: null, delResults: null, delProgress: null, delRunning: false });
+    this.call('del.evaluate', { paths: items.map((i) => i.path) }).then((r) => this.setState({ delEval: r.items || [] })).catch(() => {});
+  }
+
+  confirmDelete() {
+    const s = this.state;
+    if (s.delRunning) return;
+    this.setState({ delRunning: true });
+    this.call('del.run', { items: s.delPending, useRecycleBin: s.deleteMode === 'recycle' }).then((r) => {
+      this.setState({ deletePhase: 'result', delResults: r.results || [], delRunning: false });
+    }).catch((e) => {
+      this.setState((st) => ({ deletePhase: 'result', delResults: st.delPending.map((i) => ({ path: i.path, ok: false, message: e.message })), delRunning: false }));
+    });
+  }
+
+  closeDelete() {
+    const s = this.state;
+    const okPaths = (s.deletePhase === 'result' && s.delResults) ? s.delResults.filter((x) => x.ok).map((x) => x.path) : [];
+    this.setState((st) => {
+      const next = { deleteOpen: false, deletePhase: 'confirm', ctxTarget: null, delEval: null, delResults: null, delPending: [], delProgress: null, delRunning: false };
+      if (okPaths.length) {
+        if (st.deleteSource === 'rec') {
+          const rs = { ...st.recSelPath };
+          okPaths.forEach((p) => delete rs[p]);
+          next.recItems = (st.recItems || []).filter((r) => okPaths.indexOf(r.path) < 0);
+          next.recSelPath = rs;
+        } else {
+          const ts = { ...st.treeSelPath };
+          okPaths.forEach((p) => delete ts[p]);
+          next.treeSelPath = ts;
+          const nc = {};
+          for (const k in st.nodeChildren) nc[k] = st.nodeChildren[k].filter((n) => okPaths.indexOf(n.path) < 0);
+          next.nodeChildren = nc;
+        }
+      }
+      return next;
+    });
+  }
+
+  // ================= settings =================
+
+  providerList() {
+    return [
+      { id: 'deepseek', name: 'DeepSeek', url: 'https://api.deepseek.com/v1', model: 'deepseek-chat', chip: '需要 Key', needsKey: true },
+      { id: 'openai', name: 'OpenAI', url: 'https://api.openai.com/v1', model: 'gpt-4o-mini', chip: '需要 Key', needsKey: true },
+      { id: 'anthropic', name: 'Anthropic', url: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-5', chip: '需要 Key', needsKey: true },
+      { id: 'kimi', name: '月之暗面 Kimi', url: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', chip: '需要 Key', needsKey: true },
+      { id: 'glm', name: '智谱 GLM', url: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', chip: '需要 Key', needsKey: true },
+      { id: 'qwen', name: '阿里云通义', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', chip: '需要 Key', needsKey: true },
+      { id: 'ollama', name: 'Ollama', url: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:14b', chip: '本地 · 免 Key', needsKey: false },
+      { id: 'custom', name: '自定义…', url: '自行输入接口地址', model: 'deepseek-chat', chip: '手动配置', needsKey: true },
+    ];
+  }
+
+  populateSettingsFields() {
+    const s = this.state;
+    const a = (s.appSettings && s.appSettings.Ai) || {};
+    const sb = (s.appSettings && s.appSettings.Sandbox) || {};
+    const sc = (s.appSettings && s.appSettings.Scan) || {};
+    const prov = this.providerList().find((p) => p.id === s.provider) || {};
+    const preset = this.promptPresets().find((p) => p.id === s.promptPreset);
+    const put = (ref, v) => { if (ref && ref.current) ref.current.value = v == null ? '' : String(v); };
+    put(this._endpointRef, a.Endpoint || prov.url || '');
+    put(this._keyRef, a.ApiKey || '');
+    put(this._modelRef, a.Model || prov.model || '');
+    put(this._maxRef, a.MaxSuggestions != null ? a.MaxSuggestions : 30);
+    put(this._minSizeRef, sc.MinSizeMb != null ? sc.MinSizeMb : -1);
+    put(this._perLevelRef, sc.PerLevelLimit != null ? sc.PerLevelLimit : 512);
+    put(this._whitelistRef, (sb.AllowedRoots || []).join('\n'));
+    if (s.promptPreset === 'custom') put(this._customPromptRef, a.SystemPrompt || '');
+  }
+
+  saveSettings() {
+    const s = this.state;
+    const a = (s.appSettings && s.appSettings.Ai) || {};
+    const sb = (s.appSettings && s.appSettings.Sandbox) || {};
+    const sc = (s.appSettings && s.appSettings.Scan) || {};
+    const prov = this.providerList().find((p) => p.id === s.provider) || {};
+    const preset = this.promptPresets().find((p) => p.id === s.promptPreset);
+    const val = (ref, d) => (ref && ref.current) ? ref.current.value : d;
+    const num = (ref, d) => { const v = parseInt(val(ref, d), 10); return isNaN(v) ? d : v; };
+    const settings = {
+      ...(s.appSettings || {}),
+      Ai: {
+        ...a,
+        Enabled: s.aiEnabled,
+        Endpoint: val(this._endpointRef, a.Endpoint || prov.url),
+        ApiKey: val(this._keyRef, a.ApiKey),
+        Model: val(this._modelRef, a.Model || prov.model),
+        MaxSuggestions: num(this._maxRef, a.MaxSuggestions || 30),
+        SystemPrompt: s.promptPreset === 'custom' ? val(this._customPromptRef, a.SystemPrompt) : (preset ? preset.preview : a.SystemPrompt),
+      },
+      Sandbox: {
+        ...sb,
+        FullyPrivilegedMode: s.permOn,
+        UseRecycleBin: s.defMode === 'recycle',
+        AllowedRoots: val(this._whitelistRef, '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean),
+      },
+      Scan: {
+        ...sc,
+        MinSizeMb: num(this._minSizeRef, sc.MinSizeMb != null ? sc.MinSizeMb : -1),
+        PerLevelLimit: num(this._perLevelRef, sc.PerLevelLimit != null ? sc.PerLevelLimit : -1),
+        SortMode: s.sortMode === 'logical' ? 'Logical' : 'Allocated',
+      },
+    };
+    this.call('settings.save', { settings }).then(() => {
+      this.setState({ settingsOpen: false, appSettings: settings, aiModel: settings.Ai.Model });
+    }).catch((e) => alert('保存失败：' + e.message));
+  }
+
+  // ================= bridged render overrides =================
+
+  bridgedVals() {
+    const s = this.state;
+    const accent = this.props.accentColor ?? '#0E7490';
+    const fmt = (b) => this.formatBytes(Math.max(0, b || 0));
+    const tagStyles = {
+      safe: { bg: '#E4F3EC', color: '#0F7A56', text: '可安全清理' },
+      confirm: { bg: '#FBF0DC', color: '#9A5B00', text: '需确认' },
+      system: { bg: '#EDF1F4', color: '#5E7485', text: '系统保留' },
+    };
+    const out = {};
+    out.showSwitcher = false;
+    out.versionText = s.versionText;
+    out.aiModelText = s.aiModel || '';
+    out.showElevateBanner = !s.elevBannerDismissed && !s.realElevated;
+
+    // window controls
+    out.onWinMin = () => this.call('window.minimize').catch(() => {});
+    out.onWinMax = () => this.call('window.maximize').catch(() => {});
+    out.onWinClose = () => this.call('window.close').catch(() => {});
+    out.onTitleBarDown = () => this.call('window.dragMove').catch(() => {});
+    out.onElevate = () => this.call('env.restartElevated').catch(() => {});
+
+    // drives
+    const rd = s.realDrives || [];
+    const letter = s.drive;
+    const dmeta = rd.map((d) => {
+      const total = d.total, used = d.used, free = Math.max(0, total - used);
+      const pct = total > 0 ? Math.round(used / total * 100) : 0;
+      return { id: d.name.replace(':', ''), name: '本地磁盘 (' + d.name + ')', fs: d.fs, total: fmt(total), used: fmt(used), free: fmt(free), pct, rawTotal: total, rawUsed: used };
+    });
+    const cur = dmeta.find((d) => d.id === letter) || dmeta[0] || { id: letter, name: letter + ':', fs: '', total: '', used: '', free: '', pct: 0, rawTotal: 0, rawUsed: 0 };
+    out.curDriveName = cur.name;
+    out.curDriveMeta = cur.fs + ' · ' + cur.total;
+    out.driveUsageLabel = '已用 ' + cur.used + ' / ' + cur.total;
+    out.statusDrive = cur.id + ': · ' + cur.used + ' / ' + cur.total;
+    out.driveRows = dmeta.map((d) => ({
+      name: d.name, fs: d.fs,
+      usage: '已用 ' + d.used + ' / ' + d.total + ' · 可用 ' + d.free,
+      pctW: d.pct + '%',
+      scanned: !!s.scannedDrives[d.id],
+      checkOpacity: d.id === letter ? 1 : 0,
+      bg: d.id === letter ? '#F0F7F8' : '#FFFFFF',
+      onClick: () => this.setState((st) => ({ drive: d.id, driveOpen: false, view: st.scannedDrives[d.id] ? 'done' : 'empty', settingsOpen: false, deleteOpen: false })),
+    }));
+
+    // scan button
+    out.onScan = () => this.startScan();
+
+    // left done header (reclaim + bar)
+    const safeB = (s.report && s.report.safeBytes) || 0;
+    const usedPct = cur.rawTotal > 0 ? cur.rawUsed / cur.rawTotal * 100 : 0;
+    const safePct = cur.rawTotal > 0 ? Math.min(usedPct, safeB / cur.rawTotal * 100) : 0;
+    out.usedBarW = Math.max(0, usedPct - safePct) + '%';
+    out.safeBarW = safePct + '%';
+    out.reclaimLabel = (s.report && s.report.safeBytes != null) ? ('可释放约 ' + fmt(safeB)) : '分析中…';
+    out.treeFooter = s.rootInfo ? ('共 ' + (s.rootInfo.totalFiles || 0).toLocaleString() + ' 个文件 · ' + (s.rootInfo.totalDirs || 0).toLocaleString() + ' 个文件夹') : '';
+    out.treeFooterMeta = 'MFT 扫描';
+
+    // tree rows
+    const flat = this.buildRealTree();
+    let tSelCount = 0, tSelGb = 0;
+    Object.keys(s.treeSelPath).forEach((p) => { if (s.treeSelPath[p]) { const n = this.findNode(p); if (n) { tSelCount++; tSelGb += n.bytes; } } });
+    out.treeRows = flat.map((f) => {
+      const n = f.node;
+      const kind = s.treeTags[n.path];
+      const tag = kind ? tagStyles[kind] : null;
+      const isChecked = !!s.treeSelPath[n.path];
+      const pct = (s.rootInfo && s.rootInfo.bytes > 0) ? Math.min(100, n.bytes / s.rootInfo.bytes * 100) : 0;
+      return {
+        name: n.name, size: fmt(n.bytes),
+        selected: isChecked,
+        checkBg: isChecked ? accent : '#FFFFFF',
+        checkBorder: isChecked ? accent : '#C3CFD6',
+        onCheck: (e) => { e.stopPropagation(); this.setState((st) => ({ treeSelPath: { ...st.treeSelPath, [n.path]: !st.treeSelPath[n.path] } })); },
+        onDragStart: (e) => { this._dragNode = { path: n.path, size: fmt(n.bytes) }; try { e.dataTransfer.setData('text/plain', n.path); e.dataTransfer.effectAllowed = 'copy'; } catch (err) {} },
+        onContext: (e) => { e.preventDefault(); e.stopPropagation(); this.setState({ ctx: { path: n.path, name: n.name, size: fmt(n.bytes), bytes: n.bytes, isDir: n.isDir, x: e.clientX, y: e.clientY } }); },
+        pct: pct + '%',
+        pad: (10 + f.depth * 22) + 'px',
+        weight: f.depth === 0 ? 600 : 400,
+        chevOpacity: (n.isDir && n.hasChildren) ? 1 : 0,
+        chevRot: f.open ? '90deg' : '0deg',
+        folderFill: kind === 'safe' ? '#E2F0F2' : '#EDF1F4',
+        folderStroke: kind === 'safe' ? accent : '#8CA0AD',
+        barColor: kind === 'safe' ? accent : (kind === 'confirm' ? '#C99A3B' : '#33475A'),
+        tag: tag ? tag.text : false,
+        tagBg: tag ? tag.bg : '', tagColor: tag ? tag.color : '',
+        onToggle: () => this.toggleNode(n),
+      };
+    });
+    out.treeHasSel = tSelCount > 0;
+    out.treeNoSel = tSelCount === 0;
+    out.treeSelCount = tSelCount;
+    out.treeSelSize = fmt(tSelGb);
+    out.onClearTreeSel = (e) => { e.stopPropagation(); this.setState({ treeSelPath: {} }); };
+    out.onTreeDeleteRecycle = () => this.openDelete('tree', 'recycle');
+    out.onTreeDeletePerm = () => this.openDelete('tree', 'perm');
+
+    // report card + tokens
+    let sum, safe = this.splitSize(0), conf = this.splitSize(0), sysd = this.splitSize(0);
+    if (s.report && s.report.safeBytes != null) {
+      safe = this.splitSize(s.report.safeBytes);
+      conf = this.splitSize(s.report.confirmBytes);
+      sysd = this.splitSize(s.report.systemBytes);
+      sum = s.report.summary || '';
+    } else if (s.report && s.report.raw != null) {
+      sum = 'AI 未返回结构化报告，请查看对话内容。';
+    } else if (s.report && s.report.error) {
+      sum = '报告生成失败：' + s.report.error;
+    } else {
+      sum = s.aiEnabled ? '扫描完成后自动生成报告…' : 'AI 未启用，未生成整盘报告。';
+    }
+    const hasNums = !!(s.report && s.report.safeBytes != null);
+    out.reportSafeNum = hasNums ? safe.num : '—'; out.reportSafeUnit = hasNums ? safe.unit : '';
+    out.reportConfirmNum = hasNums ? conf.num : '—'; out.reportConfirmUnit = hasNums ? conf.unit : '';
+    out.reportSystemNum = hasNums ? sysd.num : '—'; out.reportSystemUnit = hasNums ? sysd.unit : '';
+    out.reportSummary = sum;
+    out.reportTime = s.reportTime;
+    out.tokensText = s.chatTokens > 0 ? ('tokens ' + s.chatTokens.toLocaleString()) : '';
+
+    // chat
+    out.chatBubbles = s.chatBubbles;
+    out.chatInputRef = (this._chatInputRef = this._chatInputRef || React.createRef());
+    out.onSend = () => this.sendChat();
+    out.onChatKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendChat(); } };
+    out.inputPlaceholder = s.dropHover ? '松开即可把文件夹交给 AI 分析' : (s.attached.length > 0 ? '针对已附加的文件夹提问，例如：这些能删吗？' : (s.view === 'done' ? '询问任意文件或文件夹，或把左侧条目拖到这里…' : '扫描完成后即可提问…'));
+
+    // recommendations
+    const riskStyles = {
+      low: { bg: '#E4F3EC', color: '#0F7A56', text: '低风险' },
+      medium: { bg: '#FBF0DC', color: '#9A5B00', text: '中风险' },
+      high: { bg: '#FBF1F2', color: '#A63A4B', text: '高风险' },
+    };
+    let selCount = 0, selGb = 0;
+    out.recCards = (s.recItems || []).map((r) => {
+      const isSel = !!s.recSelPath[r.path];
+      if (isSel) { selCount++; selGb += r.bytes; }
+      const risk = riskStyles[r.risk] || riskStyles.low;
+      const isExp = s.expandedRecPath === r.path;
+      return {
+        title: r.name, desc: (r.reason || '') + (r.sandboxNote ? (' · ' + r.sandboxNote) : ''),
+        size: fmt(r.bytes),
+        tag: risk.text, tagBg: risk.bg, tagColor: risk.color,
+        source: r.source || '',
+        selected: isSel, expanded: isExp,
+        files: [{ name: r.path, meta: r.sandboxOk ? '沙盒评估通过' : '删除前需确认', size: fmt(r.bytes), dot: r.sandboxOk ? '#0F9A6D' : '#C99A3B' }],
+        actionLabel: isExp ? '收起明细' : '查看明细',
+        chevRot: isExp ? '90deg' : '0deg',
+        bg: isSel ? '#F7FBFC' : '#FFFFFF',
+        borderColor: isExp ? '#9FC4CC' : (isSel ? '#BBD9DE' : '#E1E7EB'),
+        checkBg: isSel ? accent : '#FFFFFF',
+        checkBorder: isSel ? accent : '#C3CFD6',
+        onToggle: (e) => { e.stopPropagation(); this.setState((st) => ({ recSelPath: { ...st.recSelPath, [r.path]: !st.recSelPath[r.path] } })); },
+        onExpand: () => this.setState((st) => ({ expandedRecPath: st.expandedRecPath === r.path ? null : r.path })),
+      };
+    });
+    out.isPre = s.view === 'empty' || s.view === 'scanning';
+    out.recTitle = out.isPre ? '清理方向预判' : '智能推荐';
+    out.recSubtitle = out.isPre ? '扫描后给出可清理项' : ((s.recItems ? s.recItems.length : 0) + ' 项建议');
+    out.selCount = selCount;
+    out.selSize = fmt(selGb);
+    out.onDeleteRecycle = () => this.openDelete('rec', 'recycle');
+    out.onDeletePerm = () => this.openDelete('rec', 'perm');
+
+    // context menu
+    out.ctxItems = s.ctx ? [
+      { label: '在文件资源管理器中打开', color: '#22323F', onClick: () => { this.call('env.openPath', { path: s.ctx.path }).catch(() => {}); this.setState({ ctx: null }); } },
+      { label: '加入 AI 对话', color: '#22323F', onClick: () => { this.addAttachment({ path: s.ctx.path, size: s.ctx.size }); this.setState({ ctx: null }); } },
+      { label: '移到回收站', color: '#22323F', onClick: () => { const t = { path: s.ctx.path, name: s.ctx.name, bytes: s.ctx.bytes, isDir: s.ctx.isDir }; this.setState({ ctx: null, ctxTarget: t }, () => this.openDelete('ctx', 'recycle')); } },
+      { label: '永久删除', color: '#A63A4B', onClick: () => { const t = { path: s.ctx.path, name: s.ctx.name, bytes: s.ctx.bytes, isDir: s.ctx.isDir }; this.setState({ ctx: null, ctxTarget: t }, () => this.openDelete('ctx', 'perm')); } },
+    ] : [];
+
+    // delete modal
+    const isPerm = s.deleteMode === 'perm';
+    const evalByPath = {};
+    (s.delEval || []).forEach((e) => { evalByPath[e.path] = e; });
+    let hasConfirm = false, delGb = 0;
+    out.deleteItems = s.delPending.map((it) => {
+      const ev = evalByPath[it.path];
+      const ok = ev ? ev.ok : false;
+      if (!ev || !ok) hasConfirm = true;
+      delGb += it.bytes || 0;
+      const style = ok
+        ? { dotBg: '#E4F3EC', dotStroke: '#0F7A56', dotPath: 'M5 8.2 L7.2 10.4 L11 5.8', verdictColor: '#0F7A56' }
+        : { dotBg: ev ? '#FBF0DC' : '#EDF1F4', dotStroke: ev ? '#9A5B00' : '#5E7485', dotPath: 'M8 4.5 L8 8.8 M8 10.8 L8 10.9', verdictColor: ev ? '#9A5B00' : '#5E7485' };
+      return { title: it.name, size: fmt(it.bytes), verdict: ev ? (ev.note || (ok ? '评估通过 · 允许删除' : '需人工确认')) : '评估中…', ...style };
+    });
+    out.delCount = s.delPending.length;
+    out.delSize = fmt(delGb);
+    out.delPhaseConfirm = s.deletePhase === 'confirm';
+    out.delPhaseResult = s.deletePhase === 'result';
+    out.delSubtitle = s.deletePhase === 'confirm'
+      ? (s.delRunning ? '正在删除…' : ('已对 ' + s.delPending.length + ' 项完成沙盒安全评估'))
+      : '执行完毕';
+    let freed = 0, nDel = 0, nFail = 0;
+    out.resultItems = (s.delResults || []).map((r) => {
+      const it = s.delPending.find((x) => x.path === r.path) || { name: r.path, bytes: 0 };
+      if (r.ok) { nDel++; freed += it.bytes || 0; } else { nFail++; }
+      return {
+        title: it.name, size: fmt(it.bytes || 0),
+        statusText: r.ok ? '已删除' : '失败',
+        statusColor: r.ok ? '#0F7A56' : '#A63A4B',
+        dotBg: r.ok ? '#E4F3EC' : '#FBF1F2',
+        dotStroke: r.ok ? '#0F7A56' : '#A63A4B',
+        dotPath: r.ok ? 'M5 8.2 L7.2 10.4 L11 5.8' : 'M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5',
+        err: r.ok ? false : (r.message || '删除失败'),
+      };
+    });
+    out.delResultSummary = '已释放 ' + fmt(freed) + ' · 删除 ' + nDel + ' 项 · 失败 ' + nFail + ' 项';
+    out.onConfirmDelete = () => this.confirmDelete();
+    out.onCloseDelete = () => this.closeDelete();
+    out.delTitle = isPerm ? '永久删除确认' : '移到回收站';
+    out.delHeadBg = isPerm ? '#FBF1F2' : '#F0F7F8';
+    out.delHeadIcon = isPerm ? '#A63A4B' : accent;
+    out.delConfirmBg = isPerm ? '#A63A4B' : accent;
+    out.delConfirmLabel = s.delRunning ? '正在删除…' : (isPerm ? ('确认永久删除 ' + s.delPending.length + ' 项') : '确认移入回收站');
+    out.delPermWarn = isPerm || hasConfirm;
+
+    // settings modal
+    out.onOpenSettings = () => { this.setState({ settingsOpen: true }); setTimeout(() => this.populateSettingsFields(), 0); };
+    out.onSaveSettings = () => this.saveSettings();
+    out.endpointRef = (this._endpointRef = this._endpointRef || React.createRef());
+    out.keyRef = (this._keyRef = this._keyRef || React.createRef());
+    out.modelRef = (this._modelRef = this._modelRef || React.createRef());
+    out.maxRef = (this._maxRef = this._maxRef || React.createRef());
+    out.minSizeRef = (this._minSizeRef = this._minSizeRef || React.createRef());
+    out.perLevelRef = (this._perLevelRef = this._perLevelRef || React.createRef());
+    out.whitelistRef = (this._whitelistRef = this._whitelistRef || React.createRef());
+    out.customPromptRef = (this._customPromptRef = this._customPromptRef || React.createRef());
+
+    return out;
   }
 
   renderVals() {
@@ -1141,7 +1685,7 @@ class Component extends DCLogic {
       };
     });
 
-    return {
+    const base = {
       accent, pills,
       showSwitcher: this.props.showSwitcher ?? true,
       isEmpty, isScanning, isDone,
@@ -1373,7 +1917,33 @@ class Component extends DCLogic {
       delConfirmBg: isPerm ? '#A63A4B' : accent,
       delConfirmLabel: isPerm ? '确认永久删除 ' + delCount + ' 项' : '确认移入回收站',
       delPermWarn: isPerm || hasConfirmItem,
+
+      // ---- keys the bridged template also binds; demo defaults keep browser preview intact ----
+      versionText: 'v0.2.0',
+      aiModelText: 'deepseek-chat',
+      onWinMin: () => {}, onWinMax: () => {}, onWinClose: () => {}, onTitleBarDown: () => {},
+      reportTime: '2026-07-05 14:32',
+      reportSafeNum: '34.2', reportSafeUnit: 'GB',
+      reportConfirmNum: '44.8', reportConfirmUnit: 'GB',
+      reportSystemNum: '96.2', reportSystemUnit: 'GB',
+      reportSummary: '本次扫描共分析 128,443 个文件。占用增长主要来自用户缓存：微信 PC 端的图片与视频缓存 3 个月内增长了 8.1 GB；AppData\\Local\\Temp 存在 61 天前的安装残留。建议优先执行右侧推荐的安全清理。',
+      tokensText: 'tokens 1,284',
+      chatBubbles: [
+        { me: true, text: 'Downloads 里 21.3 GB 都是什么？哪些可以删？' },
+        { ai: true, text: 'Downloads 中主要是安装包、压缩包与文档图片三类，其中已安装的安装包可以安全移除，删除前会逐个做安全评估。' },
+      ],
+      chatInputRef: (this._chatInputRef = this._chatInputRef || React.createRef()),
+      onSend: () => {}, onChatKey: () => {},
+      reclaimLabel: '可释放约 34.2 GB',
+      usedBarW: '68%', safeBarW: '14%',
+      treeFooter: '共 128,443 个文件 · 24,891 个文件夹',
+      treeFooterMeta: 'MFT 扫描 · 4.2s',
+      onSaveSettings: () => this.setState({ settingsOpen: false }),
+      endpointRef: null, keyRef: null, modelRef: null, maxRef: null,
+      minSizeRef: null, perLevelRef: null, whitelistRef: null, customPromptRef: null,
     };
+
+    return this.state.bridged ? { ...base, ...this.bridgedVals() } : base;
   }
 }
 </script>

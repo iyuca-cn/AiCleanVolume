@@ -114,7 +114,17 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
 
         private void PostReply(object payload)
         {
-            string json = JsonConvert.SerializeObject(payload);
+            PostJson(JsonConvert.SerializeObject(payload));
+        }
+
+        // 主动推送事件（扫描/删除进度等）：包成 {event, data} 信封，前端按 event 分发。
+        public void PostEvent(string name, object data)
+        {
+            PostJson(JsonConvert.SerializeObject(new { @event = name, data }));
+        }
+
+        private void PostJson(string json)
+        {
             if (IsDisposed) return;
             BeginInvoke((Action)delegate
             {
