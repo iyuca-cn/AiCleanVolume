@@ -59,6 +59,8 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                 case "env.openPath": dependencies.ExplorerService.OpenPath(Str(parameters, "path"), false); return null;
                 case "env.restartElevated": host.RestartElevated(); return null;
 
+                case "size.measure": return SizeMeasure(parameters);
+
                 case "settings.get": return settings;
                 case "settings.save": return SaveSettings(parameters);
                 case "settings.testAi": return TestAi(parameters);
@@ -98,6 +100,62 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                 version = typeof(WebBridge).Assembly.GetName().Version.ToString(3),
                 drives
             };
+        }
+
+        // 按需完整实测单个路径大小（前端对没有大小的卡片调用）：不限层数，上限 30 秒 / 100 万文件，
+        // 超限返回已累计值 approx=true；根目录本身无权限则返回 error（前端显示"需管理员权限"）。
+        private object SizeMeasure(JObject parameters)
+        {
+            string path = Str(parameters, "path");
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path)) return new { error = "路径为空" };
+                if (File.Exists(path)) return new { bytes = new FileInfo(path).Length, approx = false };
+                if (!Directory.Exists(path)) return new { error = "路径不存在" };
+            }
+            catch (UnauthorizedAccessException) { return new { error = "需管理员权限" }; }
+            catch (Exception ex) { return new { error = ex.Message }; }
+
+            bool approx, rootDenied;
+            long bytes = MeasureFull(path, out approx, out rootDenied);
+            if (rootDenied && bytes == 0) return new { error = "需管理员权限" };
+            return new { bytes, approx };
+        }
+
+        // 全递归实测：不限层数，30 秒 / 100 万文件上限，超限置 approx。根目录首次枚举被拒则置 rootDenied。
+        private static long MeasureFull(string path, out bool approx, out bool rootDenied)
+        {
+            approx = false;
+            rootDenied = false;
+            long total = 0;
+            long files = 0;
+            bool first = true;
+            DateTime deadline = DateTime.UtcNow.AddMilliseconds(30000);
+            Stack<string> stack = new Stack<string>();
+            stack.Push(path);
+            while (stack.Count > 0)
+            {
+                if (DateTime.UtcNow > deadline || files >= 1000000L) { approx = true; break; }
+                DirectoryInfo di;
+                try { di = new DirectoryInfo(stack.Pop()); if (!di.Exists) { first = false; continue; } }
+                catch { if (first) { rootDenied = true; first = false; } continue; }
+                bool denied = false;
+                try
+                {
+                    foreach (FileInfo f in di.EnumerateFiles())
+                    {
+                        try { total += f.Length; files++; } catch { }
+                        if (files >= 1000000L) { approx = true; break; }
+                    }
+                }
+                catch (UnauthorizedAccessException) { denied = true; }
+                catch { }
+                try { foreach (DirectoryInfo sub in di.EnumerateDirectories()) stack.Push(sub.FullName); }
+                catch (UnauthorizedAccessException) { denied = true; }
+                catch { }
+                if (first) { rootDenied = denied; first = false; }
+            }
+            return total;
         }
 
         // 扫描前的方向预判：只做路径存在性与第一层浅枚举，跳过无权限项，整体控制在数秒内。
@@ -325,9 +383,10 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             return null;
         }
 
-        // 实测路径大小：文件取 Length，目录做受限递归（最多 2 层 / 5000 文件 / 1.5 秒），
-        // 任一超限即返回已累计值并置 approx=true（前端显示"约 X"）。全程 Try/Catch，失败回 0。
-        // ponytail: 不接扫描会话（需按路径解析 nodeId 的额外管线）；有界递归已够且不会卡住。
+        // 实测路径大小：文件取 Length，目录做全深度递归但受时间/数量限制（1.5 秒 / 20 万文件），
+        // 超限即返回已累计值并置 approx=true（前端显示"约 X"）。逐目录 Try/Catch，无权限子目录跳过。
+        // ponytail: 不接扫描会话（需按路径解析 nodeId 的额外管线）；有界递归够用且不会卡住。
+        //           不限层数——缓存目录常把文件埋在三四层下，限层会把大目录算成 0。
         private static long MeasurePathBytes(string path, out bool approx)
         {
             approx = false;
@@ -341,33 +400,24 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
             long total = 0;
             int files = 0;
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(1500);
-            Queue<KeyValuePair<string, int>> queue = new Queue<KeyValuePair<string, int>>();
-            queue.Enqueue(new KeyValuePair<string, int>(path, 0));
-            while (queue.Count > 0)
+            Stack<string> stack = new Stack<string>();
+            stack.Push(path);
+            while (stack.Count > 0)
             {
-                if (DateTime.UtcNow > deadline || files >= 5000) { approx = true; break; }
-                KeyValuePair<string, int> cur = queue.Dequeue();
+                if (DateTime.UtcNow > deadline || files >= 200000) { approx = true; break; }
                 DirectoryInfo di;
-                try { di = new DirectoryInfo(cur.Key); if (!di.Exists) continue; } catch { continue; }
+                try { di = new DirectoryInfo(stack.Pop()); if (!di.Exists) continue; } catch { continue; }
                 try
                 {
                     foreach (FileInfo f in di.EnumerateFiles())
                     {
                         try { total += f.Length; files++; } catch { }
-                        if (files >= 5000) { approx = true; break; }
+                        if (files >= 200000) { approx = true; break; }
                     }
                 }
                 catch { }
-                if (cur.Value < 2)
-                {
-                    try { foreach (DirectoryInfo sub in di.EnumerateDirectories()) queue.Enqueue(new KeyValuePair<string, int>(sub.FullName, cur.Value + 1)); }
-                    catch { }
-                }
-                else
-                {
-                    try { using (IEnumerator<DirectoryInfo> e = di.EnumerateDirectories().GetEnumerator()) { if (e.MoveNext()) approx = true; } }
-                    catch { }
-                }
+                try { foreach (DirectoryInfo sub in di.EnumerateDirectories()) stack.Push(sub.FullName); }
+                catch { }
             }
             return total;
         }
@@ -583,16 +633,14 @@ namespace AiCleanVolume.Desktop.Presentation.WebShell
                 if (string.IsNullOrWhiteSpace(name)) name = path;
                 string risk = (it["risk"]?.ToString() ?? "caution").Trim().ToLowerInvariant();
                 SandboxEvaluation ev = dependencies.DeletionWorkflow.Evaluate(path, settings.Sandbox);
-                bool approx;
-                long measured = MeasurePathBytes(path, out approx);
-                long bytes = measured > 0 ? measured : ReadLong(it as JObject, "bytes");
+                // 不在这里实测大小（会阻塞对话回复）；前端拿到卡片后再逐个异步调 path.size。
                 result.Add(new
                 {
                     path,
                     name,
                     risk,
-                    bytes,
-                    approx = measured > 0 && approx,
+                    bytes = ReadLong(it as JObject, "bytes"),
+                    approx = false,
                     reason = it["reason"]?.ToString(),
                     sandboxOk = ev != null && ev.Action == SandboxAction.Allow,
                     sandboxNote = ev == null ? null : ev.Message

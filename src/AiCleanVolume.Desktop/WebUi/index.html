@@ -194,7 +194,7 @@
         <div style="height: 1px; background: #E9EEF1; flex: none;"></div>
         <div style="flex: 1; overflow-y: auto; padding: 6px 8px 12px;">
           <sc-for list="{{ treeRows }}" as="row" hint-placeholder-count="8">
-            <div onClick="{{ row.onToggle }}" onContextMenu="{{ row.onContext }}" draggable="{{ true }}" onDragStart="{{ row.onDragStart }}" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px 7px {{ row.pad }}; border-radius: 7px; cursor: pointer; position: relative;" style-hover="background: #F2F6F8">
+            <div onClick="{{ row.onToggle }}" onContextMenu="{{ row.onContext }}" draggable="{{ true }}" onDragStart="{{ row.onDragStart }}" data-tree-path="{{ row.dataPath }}" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px 7px {{ row.pad }}; border-radius: 7px; cursor: pointer; position: relative; background: {{ row.rowBg }}; transition: background 0.2s;" style-hover="background: #F2F6F8">
               <div onClick="{{ row.onCheck }}" style="width: 15px; height: 15px; flex: none; border-radius: 4px; border: 1.5px solid {{ row.checkBorder }}; background: {{ row.checkBg }}; display: flex; align-items: center; justify-content: center;" style-hover="border-color: {{ accent }}">
                 <sc-if value="{{ row.selected }}" hint-placeholder-val="{{ false }}">
                   <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M1.5 5.2 L4 7.7 L8.5 2.3" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
@@ -443,8 +443,9 @@
                     <span style="font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 10px; background: #EDF1F4; color: #5E7485; white-space: nowrap;">{{ card.source }}</span>
                   </div>
                   <div style="font-size: 11.5px; color: #6B8090; line-height: 1.6; margin-top: 3px;">{{ card.desc }}</div>
+                  <div onClick="{{ card.onLocate }}" title="{{ card.path }}" style="font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #8CA0AD; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;" style-hover="color: {{ accent }}">{{ card.pathShort }}</div>
                   <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
-                    <span style="font-size: 13px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #22323F;">{{ card.size }}</span>
+                    <span style="font-size: 13px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #22323F; animation: {{ card.sizeAnim }};">{{ card.size }}</span>
                     <span style="display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; color: {{ accent }};">{{ card.actionLabel }}
                       <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="transform: rotate({{ card.chevRot }}); transition: transform 0.15s;"><path d="M3 1.5 L7 5 L3 8.5" stroke="{{ accent }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
                     </span>
@@ -464,8 +465,8 @@
                     </div>
                   </sc-for>
                   <div style="display: flex; gap: 8px; margin-top: 3px;">
-                    <span style="font-size: 11px; font-weight: 600; color: {{ accent }}; border: 1px solid #C4E0E5; background: #F0F7F8; padding: 4px 10px; border-radius: 6px;" style-hover="background: #E2F0F2">在存储结构中定位</span>
-                    <span style="font-size: 11px; font-weight: 600; color: #42586A; border: 1px solid #D5DDE2; padding: 4px 10px; border-radius: 6px;" style-hover="background: #F2F4F6">打开所在文件夹</span>
+                    <span onClick="{{ card.onLocate }}" style="font-size: 11px; font-weight: 600; color: {{ accent }}; border: 1px solid #C4E0E5; background: #F0F7F8; padding: 4px 10px; border-radius: 6px; cursor: pointer;" style-hover="background: #E2F0F2">在存储结构中定位</span>
+                    <span onClick="{{ card.onOpen }}" style="font-size: 11px; font-weight: 600; color: #42586A; border: 1px solid #D5DDE2; padding: 4px 10px; border-radius: 6px; cursor: pointer;" style-hover="background: #F2F4F6">打开所在文件夹</span>
                   </div>
                 </div>
               </sc-if>
@@ -840,6 +841,8 @@ class Component extends DCLogic {
     recItems: null,            // suggest.analyze items（并合并 AI 对话结论）
     recSelPath: {},
     flashPaths: [],            // 刚由 AI 对话落入右栏、需短暂高亮的路径
+    sizingPaths: [],           // 正在后台实测大小的路径（卡片显示"扫描中…"）
+    highlightPath: null,       // 左侧存储树中被"定位"高亮的路径
     expandedRecPath: null,
     report: null,              // { safeBytes, confirmBytes, systemBytes, summary } | { raw } | { error }
     reportTime: '',
@@ -1136,6 +1139,8 @@ class Component extends DCLogic {
 
   toggleNode(n) {
     const s = this.state;
+    // 折叠/点击该文件夹即清除定位高亮（除非重新点"定位"）。
+    if (s.highlightPath) this.setState({ highlightPath: null });
     if (!n.isDir || !n.hasChildren) return;
     if (s.openPaths[n.path]) { this.setState((st) => ({ openPaths: { ...st.openPaths, [n.path]: false } })); return; }
     if (s.nodeChildren[n.path]) { this.setState((st) => ({ openPaths: { ...st.openPaths, [n.path]: true } })); return; }
@@ -1230,8 +1235,84 @@ class Component extends DCLogic {
     // 新结论放到推荐区顶部，落地后滚到顶让用户看见。
     this.setState((st) => ({ recItems: mapped.concat((st.recItems || []).filter((r) => paths.indexOf(r.path) < 0)), flashPaths: paths }), () => this.scrollRecTop());
     this.collapsePredictions();
+    this.sizeItems(mapped);
     clearTimeout(this._flashT);
     this._flashT = setTimeout(() => this.setState({ flashPaths: [] }), 1400);
+  }
+
+  // 对没有大小的推荐项后台实测（size.measure，最多同时 2 个），期间显示加载点，返回后填真实大小/错误。
+  sizeItems(items) {
+    const pending = items.filter((it) => !it.bytes && it.path);
+    if (!pending.length) return;
+    this.setState((st) => ({ sizingPaths: Array.from(new Set(st.sizingPaths.concat(pending.map((p) => p.path)))) }));
+    let idx = 0, active = 0;
+    const done = (path, patch) => this.setState((st) => ({
+      recItems: (st.recItems || []).map((x) => x.path === path ? { ...x, ...patch } : x),
+      sizingPaths: st.sizingPaths.filter((p) => p !== path),
+    }));
+    const pump = () => {
+      while (active < 2 && idx < pending.length) {
+        const it = pending[idx++];
+        active++;
+        this.call('size.measure', { path: it.path })
+          .then((r) => done(it.path, r.error ? { sizeError: r.error } : { bytes: r.bytes || 0, approx: !!r.approx, sizeError: null }))
+          .catch((e) => done(it.path, { sizeError: '测量失败' }))
+          .then(() => { active--; pump(); });
+      }
+    };
+    pump();
+  }
+
+  // 在左侧存储树中定位某路径：逐段懒加载展开祖先，滚动到该行并 1.5s 高亮；
+  // 中途某段被过滤/找不到就定位到已到达的最近上级；所在盘未扫描则提示。
+  locateInTree(path) {
+    const s = this.state;
+    if (!path) return;
+    const driveOf = (p) => (String(p).split(':')[0] || '').toUpperCase();
+    const drive = driveOf(path);
+    const rootDrive = s.rootInfo ? driveOf(s.rootInfo.path) : null;
+    if (!s.rootInfo || drive !== rootDrive) {
+      if (drive && s.scannedDrives[drive]) { this.switchDrive(drive); setTimeout(() => this.locateInTree(path), 350); return; }
+      this.notifyAttach('该路径所在磁盘（' + drive + ':）尚未扫描，请切到该盘点击「开始扫描」。');
+      return;
+    }
+    const lower = (p) => (p || '').replace(/\\+$/, '').toLowerCase();
+    const target = lower(path);
+    const step = (cur) => {
+      const kids = this.state.nodeChildren[cur];
+      if (!kids) { this.flashRow(cur); return; }
+      const next = kids.find((n) => lower(n.path) === target || target.indexOf(lower(n.path) + '\\') === 0);
+      if (!next) { this.flashRow(cur); if (lower(cur) !== target) this.notifyAttach('未在存储结构中找到该项（可能被大小阈值过滤），已定位到最近的上级。'); return; }
+      if (lower(next.path) === target) { this.setState((st) => ({ openPaths: { ...st.openPaths, [cur]: true } }), () => this.flashRow(next.path)); return; }
+      this.setState((st) => ({ openPaths: { ...st.openPaths, [next.path]: true } }));
+      if (this.state.nodeChildren[next.path]) { step(next.path); return; }
+      if (!next.hasChildren) { this.flashRow(next.path); return; }
+      this.call('scan.children', { path: next.path, nodeId: next.nodeId, sessionId: s.rootInfo.sessionId })
+        .then((r) => { this.setState((st) => ({ nodeChildren: { ...st.nodeChildren, [next.path]: r.children || [] } }), () => step(next.path)); })
+        .catch(() => this.flashRow(next.path));
+    };
+    step(s.rootInfo.path);
+  }
+
+  // 高亮某行 1.5s（背景过渡）并滚动到可见。
+  flashRow(path) {
+    this.setState({ highlightPath: path }, () => {
+      try {
+        const el = document.querySelector('[data-tree-path="' + (window.CSS ? CSS.escape(path) : path) + '"]');
+        if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch (e) {}
+    });
+    clearTimeout(this._hlT);
+    this._hlT = setTimeout(() => this.setState({ highlightPath: null }), 1500);
+  }
+
+  // 中段省略保留头尾，用于路径外显（悬停 title 显示全路径）。
+  midTruncate(p, max) {
+    p = String(p || '');
+    max = max || 46;
+    if (p.length <= max) return p;
+    const head = Math.ceil(max * 0.55), tail = max - head - 1;
+    return p.slice(0, head) + '…' + p.slice(p.length - tail);
   }
 
   sendChat() {
@@ -1555,6 +1636,8 @@ class Component extends DCLogic {
       const pct = (s.rootInfo && s.rootInfo.bytes > 0) ? Math.min(100, n.bytes / s.rootInfo.bytes * 100) : 0;
       return {
         name: n.name, size: fmt(n.bytes),
+        dataPath: n.path,
+        rowBg: (s.highlightPath && s.highlightPath.toLowerCase() === n.path.toLowerCase()) ? '#FFF3D0' : 'transparent',
         selected: isChecked,
         checkBg: isChecked ? accent : '#FFFFFF',
         checkBorder: isChecked ? accent : '#C3CFD6',
@@ -1634,10 +1717,15 @@ class Component extends DCLogic {
       if (isSel) { selCount++; selGb += r.bytes; }
       const risk = riskStyles[r.risk] || riskStyles.low;
       const isExp = s.expandedRecPath === r.path;
-      const sizeText = r.bytes > 0 ? ((r.approx ? '约 ' : '') + fmt(r.bytes)) : '大小待定';
+      const sizing = (s.sizingPaths || []).indexOf(r.path) >= 0;
+      let sizeText = '大小待定', sizeAnim = 'none';
+      if (r.bytes > 0) sizeText = (r.approx ? '约 ' : '') + fmt(r.bytes);
+      else if (r.sizeError) sizeText = r.sizeError;
+      else if (sizing) { sizeText = '···'; sizeAnim = 'acv-pulse 1.2s ease-in-out infinite'; }
       return {
         title: r.name, desc: (r.reason || '') + (r.sandboxNote ? (' · ' + r.sandboxNote) : ''),
-        size: sizeText,
+        path: r.path, pathShort: this.midTruncate(r.path, 46),
+        size: sizeText, sizeAnim,
         tag: risk.text, tagBg: risk.bg, tagColor: risk.color,
         source: r.source || '',
         selected: isSel, expanded: isExp,
@@ -1651,6 +1739,8 @@ class Component extends DCLogic {
         checkBorder: isSel ? accent : '#C3CFD6',
         onToggle: (e) => { e.stopPropagation(); this.setState((st) => ({ recSelPath: { ...st.recSelPath, [r.path]: !st.recSelPath[r.path] } })); },
         onExpand: () => this.setState((st) => ({ expandedRecPath: st.expandedRecPath === r.path ? null : r.path })),
+        onLocate: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.locateInTree(r.path); },
+        onOpen: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.call('env.openPath', { path: r.path }).catch(() => {}); },
       };
     });
     out.isPre = s.view === 'empty' || s.view === 'scanning';
@@ -1840,6 +1930,7 @@ class Component extends DCLogic {
       const isChecked = !!treeSelected[t.id];
       return {
         name: t.name, size: t.size,
+        dataPath: t.path, rowBg: 'transparent',
         selected: isChecked,
         checkBg: isChecked ? accent : '#FFFFFF',
         checkBorder: isChecked ? accent : '#C3CFD6',
@@ -2009,7 +2100,9 @@ class Component extends DCLogic {
         source: r.source,
         selected: isSel,
         expanded: isExp,
-        flash: 'none',
+        flash: 'none', sizeAnim: 'none',
+        path: 'C:\\Users\\iyuca\\' + r.id, pathShort: 'C:\\Users\\iyuca\\' + r.id,
+        onLocate: () => {}, onOpen: () => {},
         files: r.files,
         actionLabel: isExp ? '收起明细' : r.action,
         chevRot: isExp ? '90deg' : '0deg',
