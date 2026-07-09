@@ -289,15 +289,15 @@
             </div>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px;">
               <div style="padding: 12px 14px; border-radius: 9px; background: #F0F7F8; border: 1px solid #D8E9EC;">
-                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: {{ accent }};">{{ reportSafeNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportSafeUnit }}</span></div>
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: {{ accent }}; animation: {{ reportNumAnim }};">{{ reportSafeNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportSafeUnit }}</span></div>
                 <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">可安全释放</div>
               </div>
               <div style="padding: 12px 14px; border-radius: 9px; background: #FBF6EC; border: 1px solid #EEE2C8;">
-                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #9A5B00;">{{ reportConfirmNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportConfirmUnit }}</span></div>
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #9A5B00; animation: {{ reportNumAnim }};">{{ reportConfirmNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportConfirmUnit }}</span></div>
                 <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">需人工确认</div>
               </div>
               <div style="padding: 12px 14px; border-radius: 9px; background: #F2F4F6; border: 1px solid #E1E7EB;">
-                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #33475A;">{{ reportSystemNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportSystemUnit }}</span></div>
+                <div style="font-size: 22px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: #33475A; animation: {{ reportNumAnim }};">{{ reportSystemNum }} <span style="font-size: 12px; font-weight: 500;">{{ reportSystemUnit }}</span></div>
                 <div style="font-size: 11.5px; color: #42586A; margin-top: 2px;">系统保留 · 勿动</div>
               </div>
             </div>
@@ -313,7 +313,7 @@
                 <div style="width: 26px; height: 26px; flex: none; border-radius: 7px; background: linear-gradient(135deg, #14B8C4, #0E7490); display: flex; align-items: center; justify-content: center; margin-top: 2px;">
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1 L8.4 5.6 L13 7 L8.4 8.4 L7 13 L5.6 8.4 L1 7 L5.6 5.6 Z" fill="#FFFFFF"></path></svg>
                 </div>
-                <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 3px 12px 12px 12px; padding: 13px 16px; font-size: 13px; line-height: 1.75; color: #33475A; white-space: pre-wrap;">{{ b.text }}</div>
+                <div style="background: #FFFFFF; border: 1px solid #E1E7EB; border-radius: 3px 12px 12px 12px; padding: 13px 16px; font-size: 13px; line-height: 1.75; color: #33475A; white-space: pre-wrap; animation: {{ b.anim }};">{{ b.text }}</div>
               </div>
             </sc-if>
           </sc-for>
@@ -385,6 +385,24 @@
 
       <!-- post-scan actionable cards -->
       <sc-if value="{{ isDone }}" hint-placeholder-val="{{ true }}">
+        <sc-if value="{{ recHasDir }}" hint-placeholder-val="{{ false }}">
+          <div style="flex: none; margin: 0 18px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #8CA0AD;">清理方向 · 点击向 AI 提问</div>
+          <div style="flex: none; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 8px; max-height: 210px; overflow-y: auto;">
+            <sc-for list="{{ preCards }}" as="pc" hint-placeholder-count="3">
+              <div onClick="{{ pc.onClick }}" style="border: 1px solid #E1E7EB; background: #FFFFFF; border-radius: 10px; padding: 11px 12px; display: flex; gap: 11px; cursor: {{ pc.cursor }};" style-hover="border-color: #9FB4BF">
+                <div style="width: 30px; height: 30px; flex: none; border-radius: 8px; background: {{ pc.iconBg }}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: {{ pc.iconColor }}; font-family: 'IBM Plex Mono', monospace;">{{ pc.mono }}</div>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 12.5px; font-weight: 600;">{{ pc.title }}</span>
+                    <span style="font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; background: {{ pc.chipBg }}; color: {{ pc.chipColor }};">{{ pc.chip }}</span>
+                  </div>
+                  <div style="font-size: 11px; color: #6B8090; line-height: 1.5; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ pc.desc }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex: none; height: 1px; background: #E9EEF1; margin: 0 18px 10px;"></div>
+        </sc-if>
         <div style="flex: none; margin: 0 18px 10px; padding: 9px 12px; border-radius: 8px; background: #F0F7F8; border: 1px solid #D8E9EC; font-size: 12px; line-height: 1.6; color: #0B5E63;">
           AI 主动发现的可清理项，勾选后在底部一键执行。每项删除前都会再次做沙盒安全评估。
         </div>
@@ -802,8 +820,10 @@ class Component extends DCLogic {
     expandedRecPath: null,
     report: null,              // { safeBytes, confirmBytes, systemBytes, summary } | { raw } | { error }
     reportTime: '',
+    reportProgress: 1,         // 报告数字 count-up 进度 0..1
     chatBubbles: [],
     chatTokens: 0,
+    chatPending: false,        // ai.chat 请求进行中，渲染"正在思考"气泡
     delPending: [],            // [{ path, name, bytes, isDir }]
     delEval: null,             // del.evaluate items
     delResults: null,          // del.run results
@@ -1066,7 +1086,21 @@ class Component extends DCLogic {
         if (r.classified) r.classified.forEach((c) => { tags[c.path] = c.tag; });
         return { report: r, reportTime: stamp, chatTokens: st.chatTokens + (r.tokens || 0), treeTags: tags };
       });
+      if (r && r.safeBytes != null) this.startCountUp();
     }).catch((e) => this.setState({ report: { error: e.message }, reportTime: stamp }));
+  }
+
+  // 报告数字从 0 滚动到目标值，约 800ms。reportProgress 供渲染按比例缩放三个统计值。
+  startCountUp() {
+    const dur = 800;
+    const t0 = performance.now();
+    const tick = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      this.setState({ reportProgress: p });
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    this.setState({ reportProgress: 0 });
+    requestAnimationFrame(tick);
   }
 
   runSuggest(loc) {
@@ -1080,11 +1114,11 @@ class Component extends DCLogic {
     const history = [{ role: 'system', content: this.chatSystemPrompt() }];
     this.state.chatBubbles.forEach((b) => history.push({ role: b.me ? 'user' : 'assistant', content: b.text }));
     history.push({ role: 'user', content });
-    this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { me: true, text: display }] }));
+    this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { me: true, text: display }], chatPending: true }));
     this.call('ai.chat', { messages: history }).then((r) => {
-      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: r.content }], chatTokens: st.chatTokens + (r.tokens || 0) }));
+      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: r.content }], chatTokens: st.chatTokens + (r.tokens || 0), chatPending: false }));
     }).catch((e) => {
-      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: '请求失败：' + e.message }] }));
+      this.setState((st) => ({ chatBubbles: [...st.chatBubbles, { ai: true, text: '请求失败：' + e.message }], chatPending: false }));
     });
   }
 
@@ -1110,17 +1144,41 @@ class Component extends DCLogic {
     this.postChat(display, content);
   }
 
-  // 预判卡片点击：忽略扫描中；先扫描该项所在盘，扫描完成后按方向自动发起针对性提问。
+  // 预判卡片点击：扫描中/AI 回答中忽略并轻提示；目标盘已扫描则直接问 AI，否则切盘扫描后再问。
   prescan(card) {
-    if (this.state.view === 'scanning') return;
+    const s = this.state;
+    if (s.view === 'scanning') { this.notifyAttach('正在扫描，请稍候…'); return; }
+    if (s.chatPending) { this.notifyAttach('AI 正在回答，请稍候…'); return; }
+    const drive = (card && card.drive) || s.drive;
+    // ponytail: 仅"当前盘已扫描"走直接提问；跨盘一律重扫（预判目标多在当前盘，够用）。
+    if (drive === s.drive && s.view === 'done' && s.rootInfo && s.scannedDrives[drive]) {
+      this.askPrecheck(card);
+      return;
+    }
     const ask = () => this.startScan(() => this.askPrecheck(card));
-    const drive = card && card.drive;
-    if (drive && drive !== this.state.drive) {
-      // ponytail: 直接切盘符再扫，不做上一盘快照存档——用户明确要扫这个方向的目标盘
+    if (drive !== s.drive) {
       this.setState({ drive, treeTags: {}, treeSelPath: {}, report: null, chatBubbles: [], chatTokens: 0, recItems: null, recSelPath: {}, openPaths: {}, nodeChildren: {}, rootInfo: null }, ask);
     } else {
       ask();
     }
+  }
+
+  // recItems 与 AI 报告 classified 中判定 safe、但推荐未覆盖的目录合并成一份可执行推荐列表。
+  // 删除与渲染共用同一份，勾选与删除才一致。
+  mergedRecItems() {
+    const s = this.state;
+    const base = s.recItems || [];
+    if (!s.report || !s.report.classified) return base;
+    const norm = (p) => (p || '').replace(/\\+$/, '').toLowerCase();
+    const have = {};
+    base.forEach((r) => { have[norm(r.path)] = true; });
+    const extra = s.report.classified
+      .filter((c) => c.tag === 'safe' && c.path && !have[norm(c.path)])
+      .map((c) => {
+        const n = this.findNode(c.path);
+        return { path: c.path, name: (c.path.split('\\').pop() || c.path), bytes: n ? n.bytes : 0, isDir: true, risk: 'low', source: 'AI 报告', reason: 'AI 整盘报告判定可安全清理。', sandboxOk: false, sandboxNote: null };
+      });
+    return base.concat(extra);
   }
 
   askPrecheck(card) {
@@ -1153,7 +1211,7 @@ class Component extends DCLogic {
         return n ? { path: n.path, name: n.name, bytes: n.bytes, isDir: n.isDir } : { path: p, name: p, bytes: 0, isDir: true };
       });
     } else if (source === 'rec') {
-      items = (s.recItems || []).filter((r) => s.recSelPath[r.path]).map((r) => ({ path: r.path, name: r.name, bytes: r.bytes, isDir: r.isDir }));
+      items = this.mergedRecItems().filter((r) => s.recSelPath[r.path]).map((r) => ({ path: r.path, name: r.name, bytes: r.bytes, isDir: r.isDir }));
     } else if (source === 'ctx' && s.ctxTarget) {
       items = [s.ctxTarget];
     }
@@ -1410,29 +1468,34 @@ class Component extends DCLogic {
     out.onTreeDeletePerm = () => this.openDelete('tree', 'perm');
 
     // report card + tokens
+    const reportLoading = s.view === 'done' && s.aiEnabled && s.report === null;
+    const prog = s.reportProgress == null ? 1 : s.reportProgress;
     let sum, safe = this.splitSize(0), conf = this.splitSize(0), sysd = this.splitSize(0);
     if (s.report && s.report.safeBytes != null) {
-      safe = this.splitSize(s.report.safeBytes);
-      conf = this.splitSize(s.report.confirmBytes);
-      sysd = this.splitSize(s.report.systemBytes);
+      safe = this.splitSize(s.report.safeBytes * prog);
+      conf = this.splitSize(s.report.confirmBytes * prog);
+      sysd = this.splitSize(s.report.systemBytes * prog);
       sum = s.report.summary || '';
     } else if (s.report && s.report.raw != null) {
       sum = 'AI 未返回结构化报告，请查看对话内容。';
     } else if (s.report && s.report.error) {
       sum = '报告生成失败：' + s.report.error;
     } else {
-      sum = s.aiEnabled ? '扫描完成后自动生成报告…' : 'AI 未启用，未生成整盘报告。';
+      sum = reportLoading ? 'AI 正在生成整盘解析…' : (s.aiEnabled ? '扫描完成后自动生成报告…' : 'AI 未启用，未生成整盘报告。');
     }
     const hasNums = !!(s.report && s.report.safeBytes != null);
-    out.reportSafeNum = hasNums ? safe.num : '—'; out.reportSafeUnit = hasNums ? safe.unit : '';
-    out.reportConfirmNum = hasNums ? conf.num : '—'; out.reportConfirmUnit = hasNums ? conf.unit : '';
-    out.reportSystemNum = hasNums ? sysd.num : '—'; out.reportSystemUnit = hasNums ? sysd.unit : '';
+    const ph = reportLoading ? '···' : '—';
+    out.reportNumAnim = reportLoading ? 'acv-pulse 1.4s ease-in-out infinite' : 'none';
+    out.reportSafeNum = hasNums ? safe.num : ph; out.reportSafeUnit = hasNums ? safe.unit : '';
+    out.reportConfirmNum = hasNums ? conf.num : ph; out.reportConfirmUnit = hasNums ? conf.unit : '';
+    out.reportSystemNum = hasNums ? sysd.num : ph; out.reportSystemUnit = hasNums ? sysd.unit : '';
     out.reportSummary = sum;
     out.reportTime = s.reportTime;
     out.tokensText = s.chatTokens > 0 ? ('tokens ' + s.chatTokens.toLocaleString()) : '';
 
-    // chat
-    out.chatBubbles = s.chatBubbles;
+    // chat（含 pending 时的"正在思考"气泡；每个气泡带 anim 供加载态脉冲）
+    const rawBubbles = s.chatPending ? s.chatBubbles.concat([{ ai: true, text: 'AI 正在思考…', loading: true }]) : s.chatBubbles;
+    out.chatBubbles = rawBubbles.map((b) => ({ ...b, anim: b.loading ? 'acv-pulse 1.2s ease-in-out infinite' : 'none' }));
     out.chatInputRef = (this._chatInputRef = this._chatInputRef || React.createRef());
     out.onSend = () => this.sendChat();
     out.onChatKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendChat(); } };
@@ -1445,7 +1508,8 @@ class Component extends DCLogic {
       high: { bg: '#FBF1F2', color: '#A63A4B', text: '高风险' },
     };
     let selCount = 0, selGb = 0;
-    out.recCards = (s.recItems || []).map((r) => {
+    const recList = this.mergedRecItems();
+    out.recCards = recList.map((r) => {
       const isSel = !!s.recSelPath[r.path];
       if (isSel) { selCount++; selGb += r.bytes; }
       const risk = riskStyles[r.risk] || riskStyles.low;
@@ -1474,7 +1538,9 @@ class Component extends DCLogic {
     out.centerEmpty = s.view === 'empty' && !hasBubbles;
     out.centerScanning = s.view === 'scanning' && !hasBubbles;
     out.recTitle = out.isPre ? '清理方向预判' : '智能推荐';
-    out.recSubtitle = out.isPre ? '扫描后给出可清理项' : ((s.recItems ? s.recItems.length : 0) + ' 项建议');
+    out.recSubtitle = out.isPre ? '扫描后给出可清理项' : (recList.length + ' 项建议');
+    // 扫描后预判卡常驻在推荐上方作为"清理方向"，可随时点击问 AI；有真实预判项时才显示该小节。
+    out.recHasDir = !out.isPre && Array.isArray(s.preCheck) && s.preCheck.length > 0;
     out.selCount = selCount;
     out.selSize = fmt(selGb);
     out.onDeleteRecycle = () => this.openDelete('rec', 'recycle');
@@ -2081,14 +2147,15 @@ class Component extends DCLogic {
       aiModelText: 'deepseek-chat',
       onWinMin: () => {}, onWinMax: () => {}, onWinClose: () => {}, onTitleBarDown: () => {},
       reportTime: '2026-07-05 14:32',
-      reportSafeNum: '34.2', reportSafeUnit: 'GB',
+      reportSafeNum: '34.2', reportSafeUnit: 'GB', reportNumAnim: 'none',
       reportConfirmNum: '44.8', reportConfirmUnit: 'GB',
       reportSystemNum: '96.2', reportSystemUnit: 'GB',
       reportSummary: '本次扫描共分析 128,443 个文件。占用增长主要来自用户缓存：微信 PC 端的图片与视频缓存 3 个月内增长了 8.1 GB；AppData\\Local\\Temp 存在 61 天前的安装残留。建议优先执行右侧推荐的安全清理。',
       tokensText: 'tokens 1,284',
+      recHasDir: false,
       chatBubbles: [
-        { me: true, text: 'Downloads 里 21.3 GB 都是什么？哪些可以删？' },
-        { ai: true, text: 'Downloads 中主要是安装包、压缩包与文档图片三类，其中已安装的安装包可以安全移除，删除前会逐个做安全评估。' },
+        { me: true, text: 'Downloads 里 21.3 GB 都是什么？哪些可以删？', anim: 'none' },
+        { ai: true, text: 'Downloads 中主要是安装包、压缩包与文档图片三类，其中已安装的安装包可以安全移除，删除前会逐个做安全评估。', anim: 'none' },
       ],
       chatInputRef: (this._chatInputRef = this._chatInputRef || React.createRef()),
       onSend: () => {}, onChatKey: () => {},
